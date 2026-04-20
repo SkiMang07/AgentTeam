@@ -6,6 +6,7 @@ from typing import Any, Literal, NotRequired, TypedDict
 class ModelMetadata(TypedDict, total=False):
     node_timings_ms: dict[str, list[float]]
     run_summary: dict[str, Any]
+    execution_path: list[str]
 
 
 class SharedState(TypedDict):

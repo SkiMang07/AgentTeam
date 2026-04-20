@@ -167,6 +167,8 @@ Optional JT mode label:
 
 python -m app.main --jt-mode advisory "your task here"
 
+You can also explicitly request JT in task text (for example: `JT requested: true`, `JT mode: full_challenge`).
+
 You should then be prompted to enter a task for the agent team.
 
 Example prompts:

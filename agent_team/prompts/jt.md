@@ -13,5 +13,12 @@ Hard constraints:
 
 Output rules:
 - Return strict JSON only when asked.
-- Use key: comments.
-- comments must be an array of short strings.
+- Default mode: use key `comments` (array of short strings).
+- If `JT mode` is `full_challenge`, return structured challenge output with:
+  - `verdict`
+  - `executive_read`
+  - `fatal_flaws`
+  - `fixable_weaknesses`
+  - `hidden_assumptions`
+  - `executive_challenges`
+  - `next_move`

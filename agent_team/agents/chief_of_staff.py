@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from app.state import SharedState
@@ -20,7 +21,9 @@ class ChiefOfStaffAgent:
             system_prompt=self._prompt,
             user_prompt=(
                 "Classify and route this task. Return strict JSON with keys: "
-                "route, rationale. route must be 'research' or 'write_direct'.\n\n"
+                "route, rationale, jt_requested, jt_mode. "
+                "route must be 'research' or 'write_direct'. "
+                "jt_requested must be true only when explicitly requested in the task text.\n\n"
                 f"Task:\n{user_task}"
             ),
         )
@@ -29,6 +32,8 @@ class ChiefOfStaffAgent:
         return {
             **state,
             "route": route,
+            "jt_requested": data["jt_requested"],
+            "jt_mode": data["jt_mode"],
             "status": "routed",
             "model_metadata": {"chief_of_staff_raw": raw},
         }
@@ -79,14 +84,33 @@ class ChiefOfStaffAgent:
         try:
             return json.loads(raw)
         except json.JSONDecodeError:
-            return {"route": "research", "rationale": "fallback due to parse error"}
+            candidate = ChiefOfStaffAgent._extract_json_object(raw)
+            if candidate is not None:
+                try:
+                    return json.loads(candidate)
+                except json.JSONDecodeError:
+                    pass
+            return {"route": "research", "rationale": "fallback due to parse error", "jt_requested": False, "jt_mode": None}
 
     @staticmethod
     def _normalize_output(data: dict) -> dict:
         route = data.get("route")
         if route not in {"research", "write_direct"}:
             route = "research"
-        return {**data, "route": route}
+        jt_requested = data.get("jt_requested")
+        if not isinstance(jt_requested, bool):
+            jt_requested = False
+
+        jt_mode = data.get("jt_mode")
+        if jt_mode is not None and not isinstance(jt_mode, str):
+            jt_mode = None
+
+        return {
+            **data,
+            "route": route,
+            "jt_requested": jt_requested,
+            "jt_mode": jt_mode,
+        }
 
     @staticmethod
     def _normalize_final_output(data: dict) -> dict:
@@ -103,3 +127,10 @@ class ChiefOfStaffAgent:
             "next_step": next_step,
             "instructions": instructions,
         }
+
+    @staticmethod
+    def _extract_json_object(raw: str) -> str | None:
+        match = re.search(r"\{[\s\S]*\}", raw)
+        if match:
+            return match.group(0)
+        return None

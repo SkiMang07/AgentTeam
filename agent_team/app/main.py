@@ -69,6 +69,8 @@ def main() -> None:
 
     graph = build_graph(chief_of_staff, jt, researcher, reviewer, writer)
     jt_requested = args.jt or bool(args.jt_mode)
+    print(f"JT requested (CLI): {jt_requested}")
+    print(f"JT mode (CLI): {args.jt_mode}")
     initial_state: SharedState = {
         "user_task": task,
         "status": "received",

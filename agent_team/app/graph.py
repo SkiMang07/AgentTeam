@@ -24,6 +24,7 @@ def build_graph(
 
     def timed_node(node_name: str, fn):
         def _wrapped(state: SharedState) -> SharedState:
+            print(f"[flow] entering node: {node_name}")
             start = perf_counter()
             result_state = fn(state)
             elapsed_ms = (perf_counter() - start) * 1000
@@ -31,6 +32,8 @@ def build_graph(
             prior_metadata = state.get("model_metadata", {})
             result_metadata = result_state.get("model_metadata", {})
             merged_metadata = {**prior_metadata, **result_metadata}
+            execution_path = [*prior_metadata.get("execution_path", []), node_name]
+            merged_metadata["execution_path"] = execution_path
 
             existing_timings = result_metadata.get(
                 "node_timings_ms",
@@ -98,6 +101,11 @@ def build_graph(
         print("\n=== Draft for human review ===\n")
         print(draft)
         print("\n=============================\n")
+        execution_path = state.get("model_metadata", {}).get("execution_path", [])
+        if execution_path:
+            print(f"Execution path: {' -> '.join(execution_path)}")
+        print(f"jt_requested: {state.get('jt_requested', False)}")
+        print(f"jt_mode: {state.get('jt_mode')}")
         print(f"Reviewer verdict: {'approved' if review_approved else 'needs_revision'}")
         if review_feedback:
             print("Reviewer feedback:")

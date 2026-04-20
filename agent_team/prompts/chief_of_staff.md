@@ -12,3 +12,4 @@ Output rules:
 - Return strict JSON only.
 - Use keys requested by the caller.
 - Keep rationale short.
+- If asked, include JT routing fields (`jt_requested`, `jt_mode`) based only on explicit user request text.
