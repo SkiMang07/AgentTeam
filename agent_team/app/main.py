@@ -5,6 +5,7 @@ import argparse
 from openai import AuthenticationError, RateLimitError
 
 from agents.chief_of_staff import ChiefOfStaffAgent
+from agents.jt import JTAgent
 from agents.researcher import ResearcherAgent
 from agents.reviewer import ReviewerAgent
 from agents.writer import WriterAgent
@@ -20,6 +21,17 @@ def parse_args() -> argparse.Namespace:
         "--dry-run",
         action="store_true",
         help="Run deterministically without OpenAI API calls.",
+    )
+    parser.add_argument(
+        "--jt",
+        action="store_true",
+        help="Enable optional JT challenge stage.",
+    )
+    parser.add_argument(
+        "--jt-mode",
+        type=str,
+        default=None,
+        help="Optional JT mode label (for example: advisory or strict).",
     )
     parser.add_argument("task", type=str, nargs="*", help="Task for the agent team")
     return parser.parse_args()
@@ -50,12 +62,21 @@ def main() -> None:
         client = ResponsesClient(settings)
 
     chief_of_staff = ChiefOfStaffAgent(client)
+    jt = JTAgent(client)
     researcher = ResearcherAgent(client)
     reviewer = ReviewerAgent(client)
     writer = WriterAgent(client)
 
-    graph = build_graph(chief_of_staff, researcher, reviewer, writer)
-    initial_state: SharedState = {"user_task": task, "status": "received", "dry_run": args.dry_run}
+    graph = build_graph(chief_of_staff, jt, researcher, reviewer, writer)
+    jt_requested = args.jt or bool(args.jt_mode)
+    initial_state: SharedState = {
+        "user_task": task,
+        "status": "received",
+        "dry_run": args.dry_run,
+        "jt_requested": jt_requested,
+        "jt_mode": args.jt_mode,
+        "jt_findings": None,
+    }
 
     try:
         result = graph.invoke(initial_state)
