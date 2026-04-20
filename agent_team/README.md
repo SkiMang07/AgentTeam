@@ -90,6 +90,7 @@ The graph pauses after draft generation and asks:
 - Optional revision notes when not approved
 
 If notes are provided, Writer runs one more time with the reviewer note added to approved facts.
+That human-note redraft is then reviewed again by Reviewer before returning to human approval.
 
 ## Notes
 

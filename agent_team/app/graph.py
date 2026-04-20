@@ -81,7 +81,10 @@ def build_graph(
                     ],
                     "status": "needs_redraft",
                 }
-                return writer.run(revised_state)
+                print("\nApplying human revision notes and re-running Writer + Reviewer.\n")
+                redrafted_state = writer.run(revised_state)
+                rereviewed_state = reviewer.run(redrafted_state)
+                return human_review_node(rereviewed_state)
 
             return {
                 **state,
@@ -110,6 +113,7 @@ def build_graph(
     graph_builder.add_node("researcher", researcher_node)
     graph_builder.add_node("writer", writer_node)
     graph_builder.add_node("reviewer", reviewer_node)
+    graph_builder.add_node("auto_redraft_prep", auto_redraft_prep_node)
     graph_builder.add_node("human_review", human_review_node)
 
     graph_builder.add_edge(START, "chief_of_staff")
@@ -132,7 +136,6 @@ def build_graph(
         },
     )
     graph_builder.add_edge("auto_redraft_prep", "writer")
-    graph_builder.add_edge("reviewer", "human_review")
     graph_builder.add_edge("human_review", END)
 
     return graph_builder.compile()
