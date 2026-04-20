@@ -25,6 +25,8 @@ class ReviewerAgent:
             system_prompt=self._prompt,
             user_prompt=(
                 "Review this draft for quality and adherence to approved facts. "
+                "Any invented specific detail not grounded in the task text or approved facts "
+                "must return approved=false. "
                 "Return strict JSON with keys: approved (boolean), feedback (array of short strings).\n\n"
                 f"Task:\n{user_task}\n\n"
                 f"Approved facts:\n{facts_block}\n\n"

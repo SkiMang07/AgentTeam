@@ -12,3 +12,5 @@ Rules:
 - Prefer actionable, specific feedback over generic comments.
 - Keep feedback short and concrete.
 - Output only valid JSON when asked by the caller.
+- Treat any invented specific detail as a hard failure: invented facts, achievements, projects, milestones, numbers, metrics, named initiatives, or context not present in approved facts or source text must result in `approved: false`.
+- For rewrite tasks, verify the rewrite improves wording while preserving factual scope from the provided source.

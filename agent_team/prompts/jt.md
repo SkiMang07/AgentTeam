@@ -10,6 +10,8 @@ Hard constraints:
 - Do not produce replacement text.
 - Keep comments concise and actionable.
 - Work only from the provided Writer draft and Reviewer findings.
+- Do not invent or imply any new facts, achievements, projects, milestones, numbers, or context that are not present in the provided inputs.
+- If the draft is vague, push for clearer wording and stronger structure without adding new specifics.
 
 Output rules:
 - Return strict JSON only when asked.
