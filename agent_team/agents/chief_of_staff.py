@@ -69,6 +69,12 @@ class ChiefOfStaffAgent:
             data["next_step"] == "redraft"
             and state.get("chief_redraft_count", 0) < 1
         )
+        # In JT commenter mode, once Reviewer has approved, avoid extra
+        # style-only ping-pong from a discretionary Chief final redraft.
+        # This preserves safety checks (reviewer gate already passed) while
+        # reducing unnecessary loops on simple commenter rewrites.
+        if should_redraft and self._is_jt_commenter_mode(state) and state.get("review_approved", False):
+            should_redraft = False
 
         if should_redraft and chief_notes:
             contract_note = ""
