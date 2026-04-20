@@ -15,6 +15,7 @@ class SharedState(TypedDict):
     jt_requested: NotRequired[bool]
     jt_mode: NotRequired[str | None]
     jt_findings: NotRequired[str | None]
+    jt_review_count: NotRequired[int]
     route: NotRequired[Literal["research", "write_direct"]]
     research_facts: NotRequired[list[str]]
     research_gaps: NotRequired[list[str]]
