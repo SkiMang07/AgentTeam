@@ -18,6 +18,7 @@ A local CLI-based multi-agent scaffold using:
 - Researcher extracts structured facts and gaps.
 - Writer drafts output from approved facts.
 - Reviewer performs a quality/factuality pass on the draft.
+- If Reviewer flags issues, the system performs one automatic redraft before human review.
 - Human review pauses before finalization.
 
 ## Project structure

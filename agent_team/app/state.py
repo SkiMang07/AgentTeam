@@ -12,6 +12,7 @@ class SharedState(TypedDict):
     draft: NotRequired[str]
     review_feedback: NotRequired[list[str]]
     review_approved: NotRequired[bool]
+    auto_redraft_count: NotRequired[int]
     final_output: NotRequired[str]
     status: NotRequired[str]
     model_metadata: NotRequired[dict[str, Any]]

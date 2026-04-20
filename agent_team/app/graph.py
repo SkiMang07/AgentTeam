@@ -16,6 +16,7 @@ def build_graph(
     writer: WriterAgent,
 ):
     graph_builder = StateGraph(SharedState)
+    max_auto_redrafts = 1
 
     def chief_node(state: SharedState) -> SharedState:
         return chief_of_staff.run(state)
@@ -28,6 +29,17 @@ def build_graph(
 
     def reviewer_node(state: SharedState) -> SharedState:
         return reviewer.run(state)
+
+    def auto_redraft_prep_node(state: SharedState) -> SharedState:
+        feedback = state.get("review_feedback", [])
+        revision_notes = [f"Reviewer note: {item}" for item in feedback]
+        print("\nReviewer requested revisions. Triggering one automatic redraft before human review.\n")
+        return {
+            **state,
+            "approved_facts": [*state.get("approved_facts", []), *revision_notes],
+            "auto_redraft_count": state.get("auto_redraft_count", 0) + 1,
+            "status": "needs_redraft_auto",
+        }
 
     def human_review_node(state: SharedState) -> SharedState:
         draft = state.get("draft", "")
@@ -86,6 +98,14 @@ def build_graph(
     def route_after_chief(state: SharedState) -> str:
         return "researcher" if state.get("route") == "research" else "writer"
 
+    def route_after_reviewer(state: SharedState) -> str:
+        is_approved = state.get("review_approved", False)
+        has_feedback = bool(state.get("review_feedback"))
+        auto_redraft_count = state.get("auto_redraft_count", 0)
+        if (not is_approved) and has_feedback and auto_redraft_count < max_auto_redrafts:
+            return "auto_redraft_prep"
+        return "human_review"
+
     graph_builder.add_node("chief_of_staff", chief_node)
     graph_builder.add_node("researcher", researcher_node)
     graph_builder.add_node("writer", writer_node)
@@ -103,6 +123,15 @@ def build_graph(
     )
     graph_builder.add_edge("researcher", "writer")
     graph_builder.add_edge("writer", "reviewer")
+    graph_builder.add_conditional_edges(
+        "reviewer",
+        route_after_reviewer,
+        {
+            "auto_redraft_prep": "auto_redraft_prep",
+            "human_review": "human_review",
+        },
+    )
+    graph_builder.add_edge("auto_redraft_prep", "writer")
     graph_builder.add_edge("reviewer", "human_review")
     graph_builder.add_edge("human_review", END)
 
