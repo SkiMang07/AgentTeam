@@ -25,8 +25,10 @@ class ReviewerAgent:
             system_prompt=self._prompt,
             user_prompt=(
                 "Review this draft for quality and adherence to approved facts. "
-                "Any invented specific detail not grounded in the task text or approved facts "
-                "must return approved=false. "
+                "Treat concrete facts/specs explicitly present in the source task text as approved grounding, "
+                "even when they are specific (numbers, percentages, dates, named items, concrete claims). "
+                "Reject only if the draft invents, changes, exaggerates, or misstates those source-provided specifics, "
+                "or adds specifics not present in source task text or approved facts. "
                 "Return strict JSON with keys: approved (boolean), feedback (array of short strings).\n\n"
                 f"Task:\n{user_task}\n\n"
                 f"Approved facts:\n{facts_block}\n\n"
