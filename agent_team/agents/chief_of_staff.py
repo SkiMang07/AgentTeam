@@ -39,6 +39,11 @@ class ChiefOfStaffAgent:
         }
 
     def final_pass(self, state: SharedState) -> SharedState:
+        normalized_draft = self._normalize_jt_commenter_draft(
+            draft=state.get("draft", ""),
+            jt_requested=state.get("jt_requested", False),
+            jt_mode=state.get("jt_mode"),
+        )
         review_feedback = state.get("review_feedback", [])
         review_block = "\n".join(f"- {item}" for item in review_feedback) or "- (none)"
         jt_findings = state.get("jt_findings")
@@ -52,7 +57,7 @@ class ChiefOfStaffAgent:
                 "next_step must be 'human_review' or 'redraft'. "
                 "Use 'redraft' only when the draft should be revised before human review. "
                 "If you request a redraft, instructions must preserve factual scope and forbid adding new specifics not in the draft/review inputs.\n\n"
-                f"Draft:\n{state.get('draft', '')}\n\n"
+                f"Draft:\n{normalized_draft}\n\n"
                 f"Reviewer findings:\n{review_block}\n\n"
                 f"JT findings:\n{jt_block}"
             ),
@@ -66,10 +71,18 @@ class ChiefOfStaffAgent:
         )
 
         if should_redraft and chief_notes:
-            current_notes = [*current_notes, f"Chief final pass note: {chief_notes}"]
+            contract_note = ""
+            if self._is_jt_commenter_mode(state):
+                contract_note = (
+                    " Return exactly two lines in this exact structure: "
+                    "'JT Feedback: ...' and 'JT Rewrite: ...'. "
+                    "Do not add any other labels, commentary, wrappers, or notes."
+                )
+            current_notes = [*current_notes, f"Chief final pass note: {chief_notes}{contract_note}"]
 
         return {
             **state,
+            "draft": normalized_draft,
             "approved_facts": current_notes,
             "chief_final_next_step": "writer" if should_redraft else "human_review",
             "chief_redraft_count": state.get("chief_redraft_count", 0) + (1 if should_redraft else 0),
@@ -125,3 +138,42 @@ class ChiefOfStaffAgent:
         if match:
             return match.group(0)
         return None
+
+    @staticmethod
+    def _is_jt_commenter_mode(state: SharedState) -> bool:
+        return bool(state.get("jt_requested")) and state.get("jt_mode") == "commenter"
+
+    @staticmethod
+    def _normalize_jt_commenter_draft(draft: str, jt_requested: bool, jt_mode: str | None) -> str:
+        if not jt_requested or jt_mode != "commenter":
+            return draft
+        return ChiefOfStaffAgent._enforce_jt_commenter_contract(draft)
+
+    @staticmethod
+    def _enforce_jt_commenter_contract(text: str) -> str:
+        feedback = ""
+        rewrite = ""
+
+        feedback_match = re.search(
+            r"JT Feedback:\s*(.*?)(?=\n\s*JT Rewrite:|\Z)",
+            text,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        rewrite_match = re.search(
+            r"JT Rewrite:\s*(.*?)(?=\n\s*[A-Za-z][^:\n]{0,40}:|\Z)",
+            text,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+
+        if feedback_match:
+            feedback = feedback_match.group(1).strip()
+        if rewrite_match:
+            rewrite = rewrite_match.group(1).strip()
+
+        stripped = text.strip()
+        if not feedback and not rewrite and stripped:
+            parts = [part.strip() for part in stripped.splitlines() if part.strip()]
+            feedback = parts[0] if parts else ""
+            rewrite = " ".join(parts[1:]).strip() if len(parts) > 1 else ""
+
+        return f"JT Feedback: {feedback}\nJT Rewrite: {rewrite}".strip()
