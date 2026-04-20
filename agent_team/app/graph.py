@@ -195,7 +195,25 @@ def build_graph(
         return "chief_final"
 
     def route_after_chief_final(state: SharedState) -> str:
+        if (
+            state.get("jt_requested", False)
+            and state.get("jt_mode") == "commenter"
+            and not state.get("review_approved", False)
+        ):
+            return "review_rejected_after_redraft"
         return state.get("chief_final_next_step", "human_review")
+
+    def review_rejected_after_redraft_node(state: SharedState) -> SharedState:
+        message = (
+            "Reviewer verdict remains needs_revision after the automatic redraft pass. "
+            "Stopping before normal human review."
+        )
+        print(f"\n{message}\n")
+        return {
+            **state,
+            "final_output": message,
+            "status": "review_rejected_after_redraft",
+        }
 
     graph_builder.add_node("chief_of_staff", timed_chief_node)
     graph_builder.add_node("researcher", timed_researcher_node)
@@ -206,6 +224,10 @@ def build_graph(
     graph_builder.add_node("auto_redraft_prep", timed_node("auto_redraft_prep", auto_redraft_prep_node))
     graph_builder.add_node("human_review", timed_node("human_review", human_review_node))
     graph_builder.add_node("reviewer_parse_failure", timed_node("reviewer_parse_failure", reviewer_parse_failure_node))
+    graph_builder.add_node(
+        "review_rejected_after_redraft",
+        timed_node("review_rejected_after_redraft", review_rejected_after_redraft_node),
+    )
 
     graph_builder.add_edge(START, "chief_of_staff")
     graph_builder.add_conditional_edges(
@@ -236,9 +258,11 @@ def build_graph(
         {
             "writer": "writer",
             "human_review": "human_review",
+            "review_rejected_after_redraft": "review_rejected_after_redraft",
         },
     )
     graph_builder.add_edge("human_review", END)
     graph_builder.add_edge("reviewer_parse_failure", END)
+    graph_builder.add_edge("review_rejected_after_redraft", END)
 
     return graph_builder.compile()

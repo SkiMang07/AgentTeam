@@ -69,13 +69,18 @@ class ChiefOfStaffAgent:
             data["next_step"] == "redraft"
             and state.get("chief_redraft_count", 0) < 1
         )
+        reviewer_rejection_blocking = (
+            self._is_jt_commenter_mode(state)
+            and not state.get("review_approved", False)
+            and state.get("auto_redraft_count", 0) >= 1
+        )
         # In JT commenter mode, once Reviewer has approved, avoid extra
         # style-only ping-pong from a discretionary Chief final redraft.
         # This preserves safety checks (reviewer gate already passed) while
         # reducing unnecessary loops on simple commenter rewrites.
         if should_redraft and self._is_jt_commenter_mode(state) and state.get("review_approved", False):
             should_redraft = False
-        if should_redraft and self._is_jt_commenter_mode(state) and state.get("auto_redraft_count", 0) >= 1:
+        if should_redraft and reviewer_rejection_blocking:
             should_redraft = False
 
         if should_redraft and chief_notes:
@@ -98,6 +103,7 @@ class ChiefOfStaffAgent:
             "model_metadata": {
                 **state.get("model_metadata", {}),
                 "chief_of_staff_final_raw": raw,
+                "chief_final_reviewer_rejection_blocking": reviewer_rejection_blocking,
             },
         }
 
