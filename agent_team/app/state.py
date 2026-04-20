@@ -10,6 +10,7 @@ class ModelMetadata(TypedDict, total=False):
 
 class SharedState(TypedDict):
     user_task: str
+    dry_run: NotRequired[bool]
     route: NotRequired[Literal["research", "write_direct"]]
     research_facts: NotRequired[list[str]]
     research_gaps: NotRequired[list[str]]
