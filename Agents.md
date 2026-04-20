@@ -47,3 +47,25 @@ This project is an early stage scaffold for an "Agent Team" system with:
 2. The graph should be understandable
 3. The human review step should be real, not hand waved
 4. Keep the first pass boring and solid
+
+## Planning and task tracking
+
+The canonical project plan lives in `PROJECT_PLAN.md` at the repo root.
+
+When making changes:
+- update `PROJECT_PLAN.md` in the same PR when project status changes
+- keep checkboxes honest and current
+- keep the `Current next task` section accurate
+- reference the related GitHub issue in the PR when one exists
+- do not mark work complete unless code, docs, and behavior are actually done
+
+Scope discipline:
+- do not add new business integrations unless explicitly requested
+- do not add a UI unless explicitly requested
+- do not add more core agents beyond the current architecture without explicit approval
+- JT is an optional challenge stage, not a default always on core agent
+
+Documentation discipline:
+- if implementation changes behavior, update `README.md`
+- if implementation changes project status or priorities, update `PROJECT_PLAN.md`
+- prefer small, reviewable PRs over large bundled changes
