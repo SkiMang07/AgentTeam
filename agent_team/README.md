@@ -10,12 +10,15 @@ A local CLI-based multi-agent scaffold using:
 1. Chief of Staff
 2. Researcher
 3. Writer
+4. Reviewer
 
 ## What v1 does
 - Accepts a user task from CLI input.
 - Chief of Staff classifies and routes the task.
 - Researcher extracts structured facts and gaps.
 - Writer drafts output from approved facts.
+- Reviewer performs a quality/factuality pass on the draft.
+- If Reviewer flags issues, the system performs one automatic redraft before human review.
 - Human review pauses before finalization.
 
 ## Project structure
@@ -30,12 +33,14 @@ agent_team/
   agents/
     chief_of_staff.py
     researcher.py
+    reviewer.py
     writer.py
   tools/
     openai_client.py
   prompts/
     chief_of_staff.md
     researcher.md
+    reviewer.md
     writer.md
   requirements.txt
   .env.example
@@ -85,6 +90,7 @@ The graph pauses after draft generation and asks:
 - Optional revision notes when not approved
 
 If notes are provided, Writer runs one more time with the reviewer note added to approved facts.
+That human-note redraft is then reviewed again by Reviewer before returning to human approval.
 
 ## Notes
 
