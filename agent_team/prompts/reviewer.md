@@ -14,3 +14,4 @@ Rules:
 - Output only valid JSON when asked by the caller.
 - Treat any invented specific detail as a hard failure: invented facts, achievements, projects, milestones, numbers, metrics, named initiatives, or context not present in approved facts or source text must result in `approved: false`.
 - For rewrite tasks, verify the rewrite improves wording while preserving factual scope from the provided source.
+- For JT commenter tasks that explicitly ask for sharp/direct critique, reject bland or generic editorial output that avoids concrete judgment about the provided text.
