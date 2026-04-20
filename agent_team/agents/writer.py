@@ -22,7 +22,8 @@ class WriterAgent:
             system_prompt=self._prompt,
             user_prompt=(
                 "Draft output for the user task using only approved facts. "
-                "If facts are missing, state assumptions and limits clearly.\n\n"
+                "If facts are missing, state assumptions and limits clearly. "
+                "Do not introduce new factual specifics beyond the source task text and approved facts.\n\n"
                 f"Task:\n{user_task}\n\n"
                 f"Approved facts:\n{facts_block if facts_block else '- (none provided)'}"
             ),
