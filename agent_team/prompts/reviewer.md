@@ -13,6 +13,8 @@ Rules:
 - Keep feedback short and concrete.
 - Output only valid JSON when asked by the caller.
 - Treat any invented specific detail as a hard failure: invented facts, achievements, projects, milestones, numbers, metrics, named initiatives, or context not present in approved facts or source text must result in `approved: false`.
+- Treat concrete specifics already present in the provided source/task text as grounded and allowed (including numbers, percentages, dates, and explicit claims), even when no separate approved-facts entry repeats them.
+- For source-provided specifics, reject only when the rewrite changes, exaggerates, misstates, or expands them beyond what the source supports.
 - For rewrite tasks, verify the rewrite improves wording while preserving factual scope from the provided source.
 - For JT commenter tasks that explicitly ask for sharp/direct critique, reject bland or generic editorial output that avoids concrete judgment about the provided text.
 
