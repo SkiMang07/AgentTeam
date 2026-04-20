@@ -74,6 +74,14 @@ def build_graph(
         }
 
     def human_review_node(state: SharedState) -> SharedState:
+        if state.get("dry_run"):
+            print("\nDry-run mode: auto-approving at human review step.\n")
+            return {
+                **state,
+                "final_output": state.get("draft", ""),
+                "status": "finalized",
+            }
+
         draft = state.get("draft", "")
         review_feedback = state.get("review_feedback", [])
         review_approved = state.get("review_approved", False)

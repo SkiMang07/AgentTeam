@@ -11,11 +11,16 @@ from agents.writer import WriterAgent
 from app.config import get_settings
 from app.graph import build_graph
 from app.state import SharedState
-from tools.openai_client import ResponsesClient
+from tools.openai_client import DryRunResponsesClient, ResponsesClient
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Local multi-agent CLI")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Run deterministically without OpenAI API calls.",
+    )
     parser.add_argument("task", type=str, nargs="*", help="Task for the agent team")
     return parser.parse_args()
 
@@ -33,13 +38,16 @@ def main() -> None:
     if not task:
         raise ValueError("A task is required.")
 
-    try:
-        settings = get_settings()
-    except ValueError as e:
-        print(f"\nConfiguration error: {e}\n")
-        return
-
-    client = ResponsesClient(settings)
+    if args.dry_run:
+        print("\nMode: DRY RUN (no OpenAI calls)\n")
+        client = DryRunResponsesClient()
+    else:
+        try:
+            settings = get_settings()
+        except ValueError as e:
+            print(f"\nConfiguration error: {e}\n")
+            return
+        client = ResponsesClient(settings)
 
     chief_of_staff = ChiefOfStaffAgent(client)
     researcher = ResearcherAgent(client)
@@ -47,7 +55,7 @@ def main() -> None:
     writer = WriterAgent(client)
 
     graph = build_graph(chief_of_staff, researcher, reviewer, writer)
-    initial_state: SharedState = {"user_task": task, "status": "received"}
+    initial_state: SharedState = {"user_task": task, "status": "received", "dry_run": args.dry_run}
 
     try:
         result = graph.invoke(initial_state)
@@ -72,6 +80,8 @@ def main() -> None:
     print(result.get("final_output", "(no final output produced)"))
     print("\n====================\n")
     print(f"Status: {result.get('status', 'unknown')}")
+    if args.dry_run:
+        print("Mode: DRY RUN (no OpenAI calls)")
 
     node_timings = result.get("model_metadata", {}).get("node_timings_ms", {})
     if node_timings:
