@@ -11,8 +11,10 @@ Version one includes:
 1. A **Chief of Staff** agent that interprets the task and routes work
 2. A **Researcher** agent that extracts facts and gaps
 3. A **Writer** agent that drafts output using approved facts
-4. A **human review** step before finalization
-5. A local **CLI** entry point for testing workflows
+4. A **Reviewer** agent that checks the draft for quality and grounding
+5. An optional **JT** challenge stage that runs only when explicitly requested
+6. A **human review** step before finalization
+7. A local **CLI** entry point for testing workflows
 
 ## Current scope
 
@@ -106,7 +108,10 @@ user submits task
 Chief of Staff classifies and routes
 Researcher gathers facts if needed
 Writer drafts the response
-human review pauses the flow
+Reviewer checks the draft
+JT challenge stage runs only when requested (`--jt` or `--jt-mode`)
+Chief of Staff runs a final pass and can request one final redraft
+human review pauses the flow as the final approval gate
 final output is approved or sent back for revision
 Design principles
 
@@ -153,6 +158,14 @@ Running the app
 Run the local CLI:
 
 python -m app.main
+
+Optional JT challenge stage:
+
+python -m app.main --jt "your task here"
+
+Optional JT mode label:
+
+python -m app.main --jt-mode advisory "your task here"
 
 You should then be prompted to enter a task for the agent team.
 

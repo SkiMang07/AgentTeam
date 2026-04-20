@@ -26,6 +26,7 @@ class ResponsesClient:
 class DryRunResponsesClient:
     def __init__(self) -> None:
         self._reviewer_calls = 0
+        self._chief_final_calls = 0
 
     def ask(self, system_prompt: str, user_prompt: str) -> str:  # noqa: ARG002
         if "Classify and route this task." in user_prompt:
@@ -69,5 +70,41 @@ class DryRunResponsesClient:
                     }
                 )
             return json.dumps({"approved": True, "feedback": []})
+
+        if "Return strict JSON with key: comments" in user_prompt:
+            return json.dumps(
+                {
+                    "comments": [
+                        "JT comment: tighten one claim for precision.",
+                        "JT comment: call out one remaining assumption explicitly.",
+                    ]
+                }
+            )
+
+        if "Run final Chief of Staff pass before human review." in user_prompt:
+            self._chief_final_calls += 1
+            if "JT findings:\n(JT not requested or no findings)" in user_prompt:
+                return json.dumps(
+                    {
+                        "next_step": "human_review",
+                        "rationale": "No JT challenge requested.",
+                        "instructions": "",
+                    }
+                )
+            if self._chief_final_calls == 1:
+                return json.dumps(
+                    {
+                        "next_step": "redraft",
+                        "rationale": "Apply JT feedback once.",
+                        "instructions": "Incorporate JT comments without changing scope.",
+                    }
+                )
+            return json.dumps(
+                {
+                    "next_step": "human_review",
+                    "rationale": "One JT-informed redraft completed.",
+                    "instructions": "",
+                }
+            )
 
         return ""
