@@ -20,6 +20,12 @@ class ReviewerAgent:
         draft = state.get("draft", "")
         approved_facts = state.get("approved_facts", [])
         facts_block = "\n".join(f"- {fact}" for fact in approved_facts) or "- (none provided)"
+        jt_commenter_check = ""
+        if state.get("jt_requested") and state.get("jt_mode") == "commenter":
+            jt_commenter_check = (
+                "\nFor JT commenter mode, enforce output contract strictly: output must contain exactly two lines: "
+                "'JT Feedback: ...' and 'JT Rewrite: ...', with no extra headings, wrappers, or commentary."
+            )
 
         raw = self._client.ask(
             system_prompt=self._prompt,
@@ -29,7 +35,7 @@ class ReviewerAgent:
                 "even when they are specific (numbers, percentages, dates, named items, concrete claims). "
                 "Reject only if the draft invents, changes, exaggerates, or misstates those source-provided specifics, "
                 "or adds specifics not present in source task text or approved facts. "
-                "Return strict JSON with keys: approved (boolean), feedback (array of short strings).\n\n"
+                f"Return strict JSON with keys: approved (boolean), feedback (array of short strings).{jt_commenter_check}\n\n"
                 f"Task:\n{user_task}\n\n"
                 f"Approved facts:\n{facts_block}\n\n"
                 f"Draft:\n{draft}"
