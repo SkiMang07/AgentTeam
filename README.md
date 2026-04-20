@@ -169,6 +169,8 @@ python -m app.main --jt-mode advisory "your task here"
 
 You can also explicitly request JT in task text (for example: `JT requested: true`, `JT mode: full_challenge`).
 
+For local JT regression coverage on external communication and edit quality, use the prompts and scoring rubric in `JT Tests.md`.
+
 You should then be prompted to enter a task for the agent team.
 
 Example prompts:
@@ -205,7 +207,7 @@ no real external retrieval yet
 no persistence beyond the current run unless added later
 no UI beyond CLI
 no business system integrations
-no tracing or eval framework yet
+no tracing or automated eval framework yet (manual JT regression checks live in `JT Tests.md`)
 Next likely steps
 
 After the scaffold is running, the most sensible next steps are:
