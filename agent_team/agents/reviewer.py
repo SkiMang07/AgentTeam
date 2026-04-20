@@ -37,7 +37,8 @@ class ReviewerAgent:
                 "even when they are specific (numbers, percentages, dates, named items, concrete claims). "
                 "Reject only if the draft invents, changes, exaggerates, or misstates those source-provided specifics, "
                 "or adds specifics not present in source task text or approved facts. "
-                f"Return strict JSON with keys: approved (boolean), feedback (array of short strings).{jt_commenter_check}\n\n"
+                "Return ONLY valid JSON (no markdown fences, no commentary before/after) with keys: "
+                f"approved (boolean), feedback (array of short strings).{jt_commenter_check}\n\n"
                 f"Task:\n{user_task}\n\n"
                 f"Approved facts:\n{facts_block}\n\n"
                 f"Draft:\n{draft}"
@@ -52,6 +53,7 @@ class ReviewerAgent:
             "review_approved": data["approved"],
             "review_feedback": data["feedback"],
             "reviewer_parse_failed": parse_failed,
+            "reviewer_parse_error_raw": raw if parse_failed else "",
             "status": "reviewer_parse_failed" if parse_failed else "reviewed",
             "model_metadata": {
                 **state.get("model_metadata", {}),
