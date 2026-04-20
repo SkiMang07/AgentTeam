@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 
+from openai import AuthenticationError, RateLimitError
+
 from agents.chief_of_staff import ChiefOfStaffAgent
 from agents.researcher import ResearcherAgent
 from agents.writer import WriterAgent
@@ -35,7 +37,25 @@ def main() -> None:
 
     graph = build_graph(chief_of_staff, researcher, writer)
     initial_state: SharedState = {"user_task": task, "status": "received"}
-    result = graph.invoke(initial_state)
+
+    try:
+        result = graph.invoke(initial_state)
+    except AuthenticationError:
+        print(
+            "\nAuthentication failed: your OpenAI API key appears invalid.\n"
+            "Check OPENAI_API_KEY in .env and try again.\n"
+        )
+        return
+    except RateLimitError as e:
+        message = str(e).lower()
+        if "insufficient_quota" in message:
+            print(
+                "\nOpenAI request failed: your project appears to be out of quota.\n"
+                "Check billing/usage limits in OpenAI Platform, then try again.\n"
+            )
+        else:
+            print("\nOpenAI rate limit reached. Please wait a moment and try again.\n")
+        return
 
     print("\n=== Final Output ===\n")
     print(result.get("final_output", "(no final output produced)"))
