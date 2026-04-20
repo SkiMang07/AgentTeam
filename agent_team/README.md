@@ -55,6 +55,15 @@ agent_team/
    ```
 4. Add your OpenAI API key to `.env`.
 
+## Configuration
+
+Set these environment variables in `.env` (loaded via `python-dotenv`):
+
+- `OPENAI_API_KEY` (required): your OpenAI API key.
+- `OPENAI_MODEL` (optional): model name to use. Defaults to `gpt-4.1-mini`.
+
+The default `OPENAI_MODEL` value is a starter setting for local v1 usage convenience, not a recommendation of the “best” model.
+
 ## Run
 
 From `agent_team/`:
