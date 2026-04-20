@@ -20,13 +20,30 @@ class ReviewerAgent:
         draft = state.get("draft", "")
         approved_facts = state.get("approved_facts", [])
         facts_block = "\n".join(f"- {fact}" for fact in approved_facts) or "- (none provided)"
+        is_jt_commenter = state.get("jt_requested") and state.get("jt_mode") == "commenter"
+
+        if is_jt_commenter:
+            jt_shape_error = self._validate_jt_commenter_draft_shape(draft)
+            if jt_shape_error is not None:
+                return {
+                    **state,
+                    "review_approved": False,
+                    "review_feedback": [jt_shape_error],
+                    "reviewer_parse_failed": False,
+                    "reviewer_parse_error_raw": "",
+                    "status": "reviewed",
+                    "model_metadata": {
+                        **state.get("model_metadata", {}),
+                        "reviewer_parse_failed": False,
+                    },
+                }
+
         jt_commenter_check = ""
-        if state.get("jt_requested") and state.get("jt_mode") == "commenter":
+        if is_jt_commenter:
             jt_commenter_check = (
-                "\nFor JT commenter mode, enforce output contract strictly: output must contain exactly two lines: "
-                "'JT Feedback: ...' and 'JT Rewrite: ...', with no extra headings, wrappers, or commentary."
-                " Reject rewrites that add stronger ownership, new urgency/timing, new asks/priorities, "
-                "new risk framing, or stronger commitment language than the source text."
+                "\nFor JT commenter mode, validate the Writer draft shape:"
+                " exactly two non-empty lines, line 1 starts with 'JT Feedback:',"
+                " and line 2 starts with 'JT Rewrite:'."
             )
 
         raw = self._client.ask(
@@ -96,4 +113,15 @@ class ReviewerAgent:
         match = re.search(r"\{[\s\S]*\}", raw)
         if match:
             return match.group(0)
+        return None
+
+    @staticmethod
+    def _validate_jt_commenter_draft_shape(draft: str) -> str | None:
+        lines = [line.strip() for line in draft.splitlines() if line.strip()]
+        if len(lines) != 2:
+            return "JT commenter contract failure: draft must contain exactly two non-empty lines."
+        if not lines[0].startswith("JT Feedback:"):
+            return "JT commenter contract failure: line 1 must start with 'JT Feedback:'."
+        if not lines[1].startswith("JT Rewrite:"):
+            return "JT commenter contract failure: line 2 must start with 'JT Rewrite:'."
         return None
