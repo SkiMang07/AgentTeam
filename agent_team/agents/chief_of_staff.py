@@ -75,6 +75,8 @@ class ChiefOfStaffAgent:
         # reducing unnecessary loops on simple commenter rewrites.
         if should_redraft and self._is_jt_commenter_mode(state) and state.get("review_approved", False):
             should_redraft = False
+        if should_redraft and self._is_jt_commenter_mode(state) and state.get("auto_redraft_count", 0) >= 1:
+            should_redraft = False
 
         if should_redraft and chief_notes:
             contract_note = ""

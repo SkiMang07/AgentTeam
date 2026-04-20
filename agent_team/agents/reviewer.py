@@ -25,6 +25,8 @@ class ReviewerAgent:
             jt_commenter_check = (
                 "\nFor JT commenter mode, enforce output contract strictly: output must contain exactly two lines: "
                 "'JT Feedback: ...' and 'JT Rewrite: ...', with no extra headings, wrappers, or commentary."
+                " Reject rewrites that add stronger ownership, new urgency/timing, new asks/priorities, "
+                "new risk framing, or stronger commitment language than the source text."
             )
 
         raw = self._client.ask(
@@ -41,16 +43,20 @@ class ReviewerAgent:
                 f"Draft:\n{draft}"
             ),
         )
-        data = self._normalize_output(self._safe_parse(raw))
+        parsed = self._safe_parse(raw)
+        data = self._normalize_output(parsed)
+        parse_failed = bool(parsed.get("_parse_failed", False))
 
         return {
             **state,
             "review_approved": data["approved"],
             "review_feedback": data["feedback"],
-            "status": "reviewed",
+            "reviewer_parse_failed": parse_failed,
+            "status": "reviewer_parse_failed" if parse_failed else "reviewed",
             "model_metadata": {
                 **state.get("model_metadata", {}),
                 "reviewer_raw": raw,
+                "reviewer_parse_failed": parse_failed,
             },
         }
 
@@ -65,7 +71,11 @@ class ReviewerAgent:
                     return json.loads(candidate)
                 except json.JSONDecodeError:
                     pass
-            return {"approved": False, "feedback": ["Failed to parse reviewer output"]}
+            return {
+                "approved": False,
+                "feedback": ["Failed to parse reviewer output"],
+                "_parse_failed": True,
+            }
 
     @staticmethod
     def _normalize_output(data: dict) -> dict:
