@@ -6,6 +6,7 @@ from openai import AuthenticationError, RateLimitError
 
 from agents.chief_of_staff import ChiefOfStaffAgent
 from agents.researcher import ResearcherAgent
+from agents.reviewer import ReviewerAgent
 from agents.writer import WriterAgent
 from app.config import get_settings
 from app.graph import build_graph
@@ -23,19 +24,29 @@ def main() -> None:
     args = parse_args()
     task = " ".join(args.task).strip()
     if not task:
-        task = input("Enter your task: ").strip()
+        try:
+            task = input("Enter your task: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nNo task provided. Exiting.\n")
+            return
 
     if not task:
         raise ValueError("A task is required.")
 
-    settings = get_settings()
+    try:
+        settings = get_settings()
+    except ValueError as e:
+        print(f"\nConfiguration error: {e}\n")
+        return
+
     client = ResponsesClient(settings)
 
     chief_of_staff = ChiefOfStaffAgent(client)
     researcher = ResearcherAgent(client)
+    reviewer = ReviewerAgent(client)
     writer = WriterAgent(client)
 
-    graph = build_graph(chief_of_staff, researcher, writer)
+    graph = build_graph(chief_of_staff, researcher, reviewer, writer)
     initial_state: SharedState = {"user_task": task, "status": "received"}
 
     try:
