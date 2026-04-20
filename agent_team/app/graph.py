@@ -161,10 +161,16 @@ def build_graph(
         }
 
     def reviewer_parse_failure_node(state: SharedState) -> SharedState:
+        raw_output = str(state.get("reviewer_parse_error_raw", "") or "").strip()
+        compact_raw_output = " ".join(raw_output.split())
+        if len(compact_raw_output) > 220:
+            compact_raw_output = f"{compact_raw_output[:217]}..."
         message = (
             "Reviewer parse failure: reviewer output was not valid JSON. "
             "Approval flow stopped before human review."
         )
+        if compact_raw_output:
+            message = f'{message} Raw reviewer output (compact): "{compact_raw_output}"'
         print(f"\n{message}\n")
         return {
             **state,
