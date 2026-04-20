@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from time import perf_counter
+
 from langgraph.graph import END, START, StateGraph
 
 from agents.chief_of_staff import ChiefOfStaffAgent
@@ -18,6 +20,31 @@ def build_graph(
     graph_builder = StateGraph(SharedState)
     max_auto_redrafts = 1
 
+    def timed_node(node_name: str, fn):
+        def _wrapped(state: SharedState) -> SharedState:
+            start = perf_counter()
+            result_state = fn(state)
+            elapsed_ms = (perf_counter() - start) * 1000
+
+            prior_metadata = state.get("model_metadata", {})
+            result_metadata = result_state.get("model_metadata", {})
+            merged_metadata = {**prior_metadata, **result_metadata}
+
+            existing_timings = result_metadata.get(
+                "node_timings_ms",
+                prior_metadata.get("node_timings_ms", {}),
+            )
+            node_timings_ms = {key: [*values] for key, values in existing_timings.items()}
+            node_timings_ms.setdefault(node_name, []).append(elapsed_ms)
+
+            merged_metadata["node_timings_ms"] = node_timings_ms
+            return {
+                **result_state,
+                "model_metadata": merged_metadata,
+            }
+
+        return _wrapped
+
     def chief_node(state: SharedState) -> SharedState:
         return chief_of_staff.run(state)
 
@@ -29,6 +56,11 @@ def build_graph(
 
     def reviewer_node(state: SharedState) -> SharedState:
         return reviewer.run(state)
+
+    timed_chief_node = timed_node("chief_of_staff", chief_node)
+    timed_researcher_node = timed_node("researcher", researcher_node)
+    timed_writer_node = timed_node("writer", writer_node)
+    timed_reviewer_node = timed_node("reviewer", reviewer_node)
 
     def auto_redraft_prep_node(state: SharedState) -> SharedState:
         feedback = state.get("review_feedback", [])
@@ -82,8 +114,8 @@ def build_graph(
                     "status": "needs_redraft",
                 }
                 print("\nApplying human revision notes and re-running Writer + Reviewer.\n")
-                redrafted_state = writer.run(revised_state)
-                rereviewed_state = reviewer.run(redrafted_state)
+                redrafted_state = timed_writer_node(revised_state)
+                rereviewed_state = timed_reviewer_node(redrafted_state)
                 return human_review_node(rereviewed_state)
 
             return {
@@ -109,12 +141,12 @@ def build_graph(
             return "auto_redraft_prep"
         return "human_review"
 
-    graph_builder.add_node("chief_of_staff", chief_node)
-    graph_builder.add_node("researcher", researcher_node)
-    graph_builder.add_node("writer", writer_node)
-    graph_builder.add_node("reviewer", reviewer_node)
-    graph_builder.add_node("auto_redraft_prep", auto_redraft_prep_node)
-    graph_builder.add_node("human_review", human_review_node)
+    graph_builder.add_node("chief_of_staff", timed_chief_node)
+    graph_builder.add_node("researcher", timed_researcher_node)
+    graph_builder.add_node("writer", timed_writer_node)
+    graph_builder.add_node("reviewer", timed_reviewer_node)
+    graph_builder.add_node("auto_redraft_prep", timed_node("auto_redraft_prep", auto_redraft_prep_node))
+    graph_builder.add_node("human_review", timed_node("human_review", human_review_node))
 
     graph_builder.add_edge(START, "chief_of_staff")
     graph_builder.add_conditional_edges(

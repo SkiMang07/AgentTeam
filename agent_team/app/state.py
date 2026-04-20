@@ -3,6 +3,11 @@ from __future__ import annotations
 from typing import Any, Literal, NotRequired, TypedDict
 
 
+class ModelMetadata(TypedDict, total=False):
+    node_timings_ms: dict[str, list[float]]
+    run_summary: dict[str, Any]
+
+
 class SharedState(TypedDict):
     user_task: str
     route: NotRequired[Literal["research", "write_direct"]]
@@ -15,4 +20,4 @@ class SharedState(TypedDict):
     auto_redraft_count: NotRequired[int]
     final_output: NotRequired[str]
     status: NotRequired[str]
-    model_metadata: NotRequired[dict[str, Any]]
+    model_metadata: NotRequired[ModelMetadata | dict[str, Any]]
