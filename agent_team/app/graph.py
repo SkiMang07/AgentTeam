@@ -160,10 +160,24 @@ def build_graph(
             "status": "finalized",
         }
 
+    def reviewer_parse_failure_node(state: SharedState) -> SharedState:
+        message = (
+            "Reviewer parse failure: reviewer output was not valid JSON. "
+            "Approval flow stopped before human review."
+        )
+        print(f"\n{message}\n")
+        return {
+            **state,
+            "final_output": message,
+            "status": "reviewer_parse_failed",
+        }
+
     def route_after_chief(state: SharedState) -> str:
         return "researcher" if state.get("route") == "research" else "writer"
 
     def route_after_reviewer(state: SharedState) -> str:
+        if state.get("reviewer_parse_failed", False):
+            return "reviewer_parse_failure"
         is_approved = state.get("review_approved", False)
         has_feedback = bool(state.get("review_feedback"))
         auto_redraft_count = state.get("auto_redraft_count", 0)
@@ -185,6 +199,7 @@ def build_graph(
     graph_builder.add_node("chief_final", timed_chief_final_node)
     graph_builder.add_node("auto_redraft_prep", timed_node("auto_redraft_prep", auto_redraft_prep_node))
     graph_builder.add_node("human_review", timed_node("human_review", human_review_node))
+    graph_builder.add_node("reviewer_parse_failure", timed_node("reviewer_parse_failure", reviewer_parse_failure_node))
 
     graph_builder.add_edge(START, "chief_of_staff")
     graph_builder.add_conditional_edges(
@@ -201,6 +216,7 @@ def build_graph(
         "reviewer",
         route_after_reviewer,
         {
+            "reviewer_parse_failure": "reviewer_parse_failure",
             "auto_redraft_prep": "auto_redraft_prep",
             "jt": "jt",
             "chief_final": "chief_final",
@@ -217,5 +233,6 @@ def build_graph(
         },
     )
     graph_builder.add_edge("human_review", END)
+    graph_builder.add_edge("reviewer_parse_failure", END)
 
     return graph_builder.compile()

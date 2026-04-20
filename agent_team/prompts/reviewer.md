@@ -30,6 +30,12 @@ Forcefulness and risk policy:
 - Explicitly reject drafts that are sharper but less faithful.
 - External communication risk is high: clearer/more confident wording is acceptable only when it preserves meaning and does not add pressure, blame, deadlines, ultimatums, or false certainty.
 - Unsupported escalation is a failure: reject added blame language, stronger causality, absolute claims, threat framing, or urgency cues not present in source text.
+- In JT commenter mode, reject as meaning changes (even without invented facts) when the rewrite adds any of:
+  - stronger ownership than source (e.g., "I will drive/own this" when source is softer),
+  - new urgency or timing pressure (e.g., immediate/now/this week deadlines not present),
+  - new asks, directives, or priorities not present in source,
+  - new risk framing, consequences, or alarm language not present,
+  - new commitment language, guarantees, or certainty beyond source.
 
 Feedback style:
 - If rejecting, name the exact unsupported escalation and the minimal fix.

@@ -23,6 +23,7 @@ class SharedState(TypedDict):
     draft: NotRequired[str]
     review_feedback: NotRequired[list[str]]
     review_approved: NotRequired[bool]
+    reviewer_parse_failed: NotRequired[bool]
     auto_redraft_count: NotRequired[int]
     chief_redraft_count: NotRequired[int]
     chief_final_next_step: NotRequired[Literal["writer", "human_review"]]

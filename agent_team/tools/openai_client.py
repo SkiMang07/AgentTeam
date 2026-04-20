@@ -62,6 +62,21 @@ class DryRunResponsesClient:
 
         if "Review this draft for quality" in user_prompt:
             self._reviewer_calls += 1
+            task_block = user_prompt.split("Task:\n", maxsplit=1)[-1].lower()
+            is_jt_commenter = "for jt commenter mode" in user_prompt.lower()
+            if "simulate reviewer parse failure" in task_block:
+                return "not-json-reviewer-output"
+            if is_jt_commenter:
+                if self._reviewer_calls == 1:
+                    return json.dumps(
+                        {
+                            "approved": False,
+                            "feedback": [
+                                "Meaning changed: rewrite adds stronger ownership not present in source. Keep support language without new commitments.",
+                            ],
+                        }
+                    )
+                return json.dumps({"approved": True, "feedback": []})
             if self._reviewer_calls == 1:
                 return json.dumps(
                     {
@@ -96,6 +111,22 @@ class DryRunResponsesClient:
 
         if "Run final Chief of Staff pass before human review." in user_prompt:
             self._chief_final_calls += 1
+            if "JT Feedback:" in user_prompt and "JT Rewrite:" in user_prompt:
+                if "Reviewer findings:\n- (none)" in user_prompt:
+                    return json.dumps(
+                        {
+                            "next_step": "human_review",
+                            "rationale": "JT commenter rewrite approved; no extra style redraft needed.",
+                            "instructions": "",
+                        }
+                    )
+                return json.dumps(
+                    {
+                        "next_step": "redraft",
+                        "rationale": "Reviewer still reports meaning issues.",
+                        "instructions": "Fix reviewer-noted meaning changes only; preserve source scope and commenter contract.",
+                    }
+                )
             if "JT findings:\n(JT not requested or no findings)" in user_prompt:
                 return json.dumps(
                     {
