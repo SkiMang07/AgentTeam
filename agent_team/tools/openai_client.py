@@ -32,14 +32,10 @@ class DryRunResponsesClient:
         if "Classify and route this task." in user_prompt:
             task = user_prompt.split("Task:\n", maxsplit=1)[-1].lower()
             route = "write_direct" if "write_direct" in task else "research"
-            jt_requested = "jt requested: true" in task or "run jt" in task
-            jt_mode = "full_challenge" if "full_challenge" in task else None
             return json.dumps(
                 {
                     "route": route,
                     "rationale": "dry-run deterministic routing",
-                    "jt_requested": jt_requested,
-                    "jt_mode": jt_mode,
                 }
             )
 

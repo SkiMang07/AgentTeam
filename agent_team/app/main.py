@@ -11,6 +11,7 @@ from agents.reviewer import ReviewerAgent
 from agents.writer import WriterAgent
 from app.config import get_settings
 from app.graph import build_graph
+from app.jt_request import detect_jt_request
 from app.state import SharedState
 from tools.openai_client import DryRunResponsesClient, ResponsesClient
 
@@ -68,15 +69,15 @@ def main() -> None:
     writer = WriterAgent(client)
 
     graph = build_graph(chief_of_staff, jt, researcher, reviewer, writer)
-    jt_requested = args.jt or bool(args.jt_mode)
+    jt_requested, jt_mode = detect_jt_request(task=task, cli_jt=args.jt, cli_mode=args.jt_mode)
     print(f"JT requested (CLI): {jt_requested}")
-    print(f"JT mode (CLI): {args.jt_mode}")
+    print(f"JT mode (CLI): {jt_mode}")
     initial_state: SharedState = {
         "user_task": task,
         "status": "received",
         "dry_run": args.dry_run,
         "jt_requested": jt_requested,
-        "jt_mode": args.jt_mode,
+        "jt_mode": jt_mode,
         "jt_findings": None,
     }
 
