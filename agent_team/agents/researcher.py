@@ -24,9 +24,9 @@ class ResearcherAgent:
                 f"Task:\n{user_task}"
             ),
         )
-        data = self._safe_parse(raw)
-        facts = data.get("facts", [])
-        gaps = data.get("gaps", [])
+        data = self._normalize_output(self._safe_parse(raw))
+        facts = data["facts"]
+        gaps = data["gaps"]
 
         return {
             **state,
@@ -46,3 +46,22 @@ class ResearcherAgent:
             return json.loads(raw)
         except json.JSONDecodeError:
             return {"facts": [], "gaps": ["Failed to parse researcher output"]}
+
+    @staticmethod
+    def _normalize_output(data: dict) -> dict:
+        notes: list[str] = []
+
+        facts = data.get("facts")
+        if not isinstance(facts, list) or not all(isinstance(item, str) for item in facts):
+            facts = []
+            notes.append("Validation note: normalized invalid facts to an empty list.")
+
+        gaps = data.get("gaps")
+        if not isinstance(gaps, list) or not all(isinstance(item, str) for item in gaps):
+            gaps = []
+            notes.append("Validation note: normalized invalid gaps to an empty list.")
+
+        if notes:
+            gaps = [*gaps, *notes]
+
+        return {**data, "facts": facts, "gaps": gaps}

@@ -24,11 +24,11 @@ class ChiefOfStaffAgent:
                 f"Task:\n{user_task}"
             ),
         )
-        data = self._safe_parse(raw)
-        route = data.get("route", "research")
+        data = self._normalize_output(self._safe_parse(raw))
+        route = data["route"]
         return {
             **state,
-            "route": "write_direct" if route == "write_direct" else "research",
+            "route": route,
             "status": "routed",
             "model_metadata": {"chief_of_staff_raw": raw},
         }
@@ -39,3 +39,10 @@ class ChiefOfStaffAgent:
             return json.loads(raw)
         except json.JSONDecodeError:
             return {"route": "research", "rationale": "fallback due to parse error"}
+
+    @staticmethod
+    def _normalize_output(data: dict) -> dict:
+        route = data.get("route")
+        if route not in {"research", "write_direct"}:
+            route = "research"
+        return {**data, "route": route}
