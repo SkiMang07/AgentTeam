@@ -30,9 +30,23 @@ def build_graph(
         print(draft)
         print("\n=============================\n")
 
-        approved = input("Approve final output? [y/N]: ").strip().lower() == "y"
+        try:
+            approved = input("Approve final output? [y/N]: ").strip().lower() == "y"
+        except (EOFError, KeyboardInterrupt):
+            return {
+                **state,
+                "final_output": "Finalization interrupted before approval.",
+                "status": "stopped_by_human",
+            }
         if not approved:
-            notes = input("Optional revision notes for Writer (or press Enter to keep as-is): ").strip()
+            try:
+                notes = input("Optional revision notes for Writer (or press Enter to keep as-is): ").strip()
+            except (EOFError, KeyboardInterrupt):
+                return {
+                    **state,
+                    "final_output": "Finalization interrupted before approval.",
+                    "status": "stopped_by_human",
+                }
             if notes:
                 revised_state = {
                     **state,
