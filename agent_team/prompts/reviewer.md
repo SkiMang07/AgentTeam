@@ -15,3 +15,20 @@ Rules:
 - Treat any invented specific detail as a hard failure: invented facts, achievements, projects, milestones, numbers, metrics, named initiatives, or context not present in approved facts or source text must result in `approved: false`.
 - For rewrite tasks, verify the rewrite improves wording while preserving factual scope from the provided source.
 - For JT commenter tasks that explicitly ask for sharp/direct critique, reject bland or generic editorial output that avoids concrete judgment about the provided text.
+
+Approval gate (all must pass):
+1. Grounded in source/task text and approved facts.
+2. Material meaning preserved (no changed commitments, intent, chronology, ownership, or implications).
+3. Tone is proportional to the source and audience.
+4. No invented urgency/deadlines/pressure/blame/certainty.
+5. If the original draft is already specific and strong, accept light-touch revisions; do not demand extra intensity.
+
+Forcefulness and risk policy:
+- Never reward outputs for sounding tougher, more certain, or more urgent if that strength is not grounded in the source.
+- Explicitly reject drafts that are sharper but less faithful.
+- External communication risk is high: clearer/more confident wording is acceptable only when it preserves meaning and does not add pressure, blame, deadlines, ultimatums, or false certainty.
+- Unsupported escalation is a failure: reject added blame language, stronger causality, absolute claims, threat framing, or urgency cues not present in source text.
+
+Feedback style:
+- If rejecting, name the exact unsupported escalation and the minimal fix.
+- If approving, do so succinctly and avoid inventing extra rewrite requirements.
