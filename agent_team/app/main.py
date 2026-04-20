@@ -73,6 +73,16 @@ def main() -> None:
     print("\n====================\n")
     print(f"Status: {result.get('status', 'unknown')}")
 
+    node_timings = result.get("model_metadata", {}).get("node_timings_ms", {})
+    if node_timings:
+        print("\n=== Node Timing Summary (ms) ===")
+        for node_name, values in node_timings.items():
+            count = len(values)
+            total_ms = sum(values)
+            avg_ms = total_ms / count if count else 0.0
+            print(f"- {node_name}: calls={count}, total={total_ms:.1f}, avg={avg_ms:.1f}")
+        print("================================\n")
+
 
 if __name__ == "__main__":
     main()
