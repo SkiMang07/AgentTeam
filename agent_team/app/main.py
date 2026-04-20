@@ -6,6 +6,7 @@ from openai import AuthenticationError, RateLimitError
 
 from agents.chief_of_staff import ChiefOfStaffAgent
 from agents.researcher import ResearcherAgent
+from agents.reviewer import ReviewerAgent
 from agents.writer import WriterAgent
 from app.config import get_settings
 from app.graph import build_graph
@@ -42,9 +43,10 @@ def main() -> None:
 
     chief_of_staff = ChiefOfStaffAgent(client)
     researcher = ResearcherAgent(client)
+    reviewer = ReviewerAgent(client)
     writer = WriterAgent(client)
 
-    graph = build_graph(chief_of_staff, researcher, writer)
+    graph = build_graph(chief_of_staff, researcher, reviewer, writer)
     initial_state: SharedState = {"user_task": task, "status": "received"}
 
     try:

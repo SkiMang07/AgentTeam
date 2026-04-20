@@ -4,6 +4,7 @@ from langgraph.graph import END, START, StateGraph
 
 from agents.chief_of_staff import ChiefOfStaffAgent
 from agents.researcher import ResearcherAgent
+from agents.reviewer import ReviewerAgent
 from agents.writer import WriterAgent
 from app.state import SharedState
 
@@ -11,6 +12,7 @@ from app.state import SharedState
 def build_graph(
     chief_of_staff: ChiefOfStaffAgent,
     researcher: ResearcherAgent,
+    reviewer: ReviewerAgent,
     writer: WriterAgent,
 ):
     graph_builder = StateGraph(SharedState)
@@ -24,11 +26,22 @@ def build_graph(
     def writer_node(state: SharedState) -> SharedState:
         return writer.run(state)
 
+    def reviewer_node(state: SharedState) -> SharedState:
+        return reviewer.run(state)
+
     def human_review_node(state: SharedState) -> SharedState:
         draft = state.get("draft", "")
+        review_feedback = state.get("review_feedback", [])
+        review_approved = state.get("review_approved", False)
         print("\n=== Draft for human review ===\n")
         print(draft)
         print("\n=============================\n")
+        print(f"Reviewer verdict: {'approved' if review_approved else 'needs_revision'}")
+        if review_feedback:
+            print("Reviewer feedback:")
+            for item in review_feedback:
+                print(f"- {item}")
+            print()
 
         try:
             approved = input("Approve final output? [y/N]: ").strip().lower() == "y"
@@ -76,6 +89,7 @@ def build_graph(
     graph_builder.add_node("chief_of_staff", chief_node)
     graph_builder.add_node("researcher", researcher_node)
     graph_builder.add_node("writer", writer_node)
+    graph_builder.add_node("reviewer", reviewer_node)
     graph_builder.add_node("human_review", human_review_node)
 
     graph_builder.add_edge(START, "chief_of_staff")
@@ -88,7 +102,8 @@ def build_graph(
         },
     )
     graph_builder.add_edge("researcher", "writer")
-    graph_builder.add_edge("writer", "human_review")
+    graph_builder.add_edge("writer", "reviewer")
+    graph_builder.add_edge("reviewer", "human_review")
     graph_builder.add_edge("human_review", END)
 
     return graph_builder.compile()

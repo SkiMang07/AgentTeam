@@ -10,6 +10,8 @@ class SharedState(TypedDict):
     research_gaps: NotRequired[list[str]]
     approved_facts: NotRequired[list[str]]
     draft: NotRequired[str]
+    review_feedback: NotRequired[list[str]]
+    review_approved: NotRequired[bool]
     final_output: NotRequired[str]
     status: NotRequired[str]
     model_metadata: NotRequired[dict[str, Any]]
