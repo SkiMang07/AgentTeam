@@ -63,7 +63,11 @@ def build_graph(
         return reviewer.run(state)
 
     def jt_node(state: SharedState) -> SharedState:
-        return jt.run(state)
+        jt_state = jt.run(state)
+        return {
+            **jt_state,
+            "jt_review_count": state.get("jt_review_count", 0) + 1,
+        }
 
     def chief_final_node(state: SharedState) -> SharedState:
         return chief_of_staff.final_pass(state)
@@ -163,9 +167,12 @@ def build_graph(
         is_approved = state.get("review_approved", False)
         has_feedback = bool(state.get("review_feedback"))
         auto_redraft_count = state.get("auto_redraft_count", 0)
+        jt_review_count = state.get("jt_review_count", 0)
         if (not is_approved) and has_feedback and auto_redraft_count < max_auto_redrafts:
             return "auto_redraft_prep"
-        return "jt" if state.get("jt_requested", False) else "chief_final"
+        if state.get("jt_requested", False) and jt_review_count < 1:
+            return "jt"
+        return "chief_final"
 
     def route_after_chief_final(state: SharedState) -> str:
         return state.get("chief_final_next_step", "human_review")
