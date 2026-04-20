@@ -58,7 +58,7 @@ This project is succeeding in the near term if it can:
 
 - [x] Get the local scaffold running from Terminal
 - [x] Confirm GitHub repo and local clone are working
-- [ ] Review and tighten shared state fields
+- [x] Review and tighten shared state fields
 - [ ] Improve Chief of Staff routing logic
 - [ ] Add clearer reviewer output structure
 - [ ] Add Chief of Staff final validation pass
@@ -76,14 +76,14 @@ This project is succeeding in the near term if it can:
 - JT sees only the writer draft and reviewer findings
 - Chief of Staff decides what to do with JT feedback
 
-- [ ] Add `jt_requested` field to shared state
-- [ ] Add `jt_mode` field to shared state
-- [ ] Add `jt_findings` field to shared state
-- [ ] Create `prompts/jt.md`
-- [ ] Add JT node or JT review path
-- [ ] Route JT only when `jt_requested = true`
-- [ ] Return JT findings to Chief of Staff for final pass
-- [ ] Document JT behavior in README if implemented
+- [x] Add `jt_requested` field to shared state
+- [x] Add `jt_mode` field to shared state
+- [x] Add `jt_findings` field to shared state
+- [x] Create `prompts/jt.md`
+- [x] Add JT node or JT review path
+- [x] Route JT only when `jt_requested = true`
+- [x] Return JT findings to Chief of Staff for final pass
+- [x] Document JT behavior in README if implemented
 
 ### 3. Structured handoffs
 
@@ -138,11 +138,10 @@ This project is succeeding in the near term if it can:
 
 ### Immediate next issues
 
-1. Add JT state fields and routing
-2. Add Chief of Staff final validation pass
-3. Structure reviewer findings
-4. Define Chief of Staff work order format
-5. Add first local file context workflow
+1. Add Chief of Staff final validation pass
+2. Structure reviewer findings
+3. Define Chief of Staff work order format
+4. Add first local file context workflow
 
 ### After those
 
@@ -153,15 +152,12 @@ This project is succeeding in the near term if it can:
 
 ## Current next task
 
-**Issue 1:** Add JT as an optional challenge stage without expanding the core architecture
+**Issue 2:** Add Chief of Staff final validation pass
 
 ### Done when
 
-- `jt_requested` exists in state
-- JT only runs when explicitly requested
-- JT sees writer draft and reviewer findings only
-- JT returns comments only
-- Chief of Staff receives JT findings and does final pass
+- Chief of Staff receives reviewer and JT findings before human review
+- Chief of Staff can request one final redraft before human review
 - Human review still remains the final approval step
 
 ## Risks to avoid
@@ -189,3 +185,4 @@ This project is succeeding in the near term if it can:
 - Local scaffold confirmed running
 - JT approach defined as optional challenge stage
 - Next major target identified as local file context
+- Issue 1 completed: JT optional challenge stage added with explicit routing and scoped inputs

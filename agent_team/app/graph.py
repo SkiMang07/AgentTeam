@@ -5,6 +5,7 @@ from time import perf_counter
 from langgraph.graph import END, START, StateGraph
 
 from agents.chief_of_staff import ChiefOfStaffAgent
+from agents.jt import JTAgent
 from agents.researcher import ResearcherAgent
 from agents.reviewer import ReviewerAgent
 from agents.writer import WriterAgent
@@ -13,6 +14,7 @@ from app.state import SharedState
 
 def build_graph(
     chief_of_staff: ChiefOfStaffAgent,
+    jt: JTAgent,
     researcher: ResearcherAgent,
     reviewer: ReviewerAgent,
     writer: WriterAgent,
@@ -22,6 +24,7 @@ def build_graph(
 
     def timed_node(node_name: str, fn):
         def _wrapped(state: SharedState) -> SharedState:
+            print(f"[flow] entering node: {node_name}")
             start = perf_counter()
             result_state = fn(state)
             elapsed_ms = (perf_counter() - start) * 1000
@@ -29,6 +32,8 @@ def build_graph(
             prior_metadata = state.get("model_metadata", {})
             result_metadata = result_state.get("model_metadata", {})
             merged_metadata = {**prior_metadata, **result_metadata}
+            execution_path = [*prior_metadata.get("execution_path", []), node_name]
+            merged_metadata["execution_path"] = execution_path
 
             existing_timings = result_metadata.get(
                 "node_timings_ms",
@@ -57,10 +62,18 @@ def build_graph(
     def reviewer_node(state: SharedState) -> SharedState:
         return reviewer.run(state)
 
+    def jt_node(state: SharedState) -> SharedState:
+        return jt.run(state)
+
+    def chief_final_node(state: SharedState) -> SharedState:
+        return chief_of_staff.final_pass(state)
+
     timed_chief_node = timed_node("chief_of_staff", chief_node)
     timed_researcher_node = timed_node("researcher", researcher_node)
     timed_writer_node = timed_node("writer", writer_node)
     timed_reviewer_node = timed_node("reviewer", reviewer_node)
+    timed_jt_node = timed_node("jt", jt_node)
+    timed_chief_final_node = timed_node("chief_of_staff_final", chief_final_node)
 
     def auto_redraft_prep_node(state: SharedState) -> SharedState:
         feedback = state.get("review_feedback", [])
@@ -88,6 +101,11 @@ def build_graph(
         print("\n=== Draft for human review ===\n")
         print(draft)
         print("\n=============================\n")
+        execution_path = state.get("model_metadata", {}).get("execution_path", [])
+        if execution_path:
+            print(f"Execution path: {' -> '.join(execution_path)}")
+        print(f"jt_requested: {state.get('jt_requested', False)}")
+        print(f"jt_mode: {state.get('jt_mode')}")
         print(f"Reviewer verdict: {'approved' if review_approved else 'needs_revision'}")
         if review_feedback:
             print("Reviewer feedback:")
@@ -147,12 +165,17 @@ def build_graph(
         auto_redraft_count = state.get("auto_redraft_count", 0)
         if (not is_approved) and has_feedback and auto_redraft_count < max_auto_redrafts:
             return "auto_redraft_prep"
-        return "human_review"
+        return "jt" if state.get("jt_requested", False) else "chief_final"
+
+    def route_after_chief_final(state: SharedState) -> str:
+        return state.get("chief_final_next_step", "human_review")
 
     graph_builder.add_node("chief_of_staff", timed_chief_node)
     graph_builder.add_node("researcher", timed_researcher_node)
     graph_builder.add_node("writer", timed_writer_node)
     graph_builder.add_node("reviewer", timed_reviewer_node)
+    graph_builder.add_node("jt", timed_jt_node)
+    graph_builder.add_node("chief_final", timed_chief_final_node)
     graph_builder.add_node("auto_redraft_prep", timed_node("auto_redraft_prep", auto_redraft_prep_node))
     graph_builder.add_node("human_review", timed_node("human_review", human_review_node))
 
@@ -172,10 +195,20 @@ def build_graph(
         route_after_reviewer,
         {
             "auto_redraft_prep": "auto_redraft_prep",
-            "human_review": "human_review",
+            "jt": "jt",
+            "chief_final": "chief_final",
         },
     )
     graph_builder.add_edge("auto_redraft_prep", "writer")
+    graph_builder.add_edge("jt", "chief_final")
+    graph_builder.add_conditional_edges(
+        "chief_final",
+        route_after_chief_final,
+        {
+            "writer": "writer",
+            "human_review": "human_review",
+        },
+    )
     graph_builder.add_edge("human_review", END)
 
     return graph_builder.compile()

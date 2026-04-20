@@ -26,15 +26,20 @@ class ResponsesClient:
 class DryRunResponsesClient:
     def __init__(self) -> None:
         self._reviewer_calls = 0
+        self._chief_final_calls = 0
 
     def ask(self, system_prompt: str, user_prompt: str) -> str:  # noqa: ARG002
         if "Classify and route this task." in user_prompt:
             task = user_prompt.split("Task:\n", maxsplit=1)[-1].lower()
             route = "write_direct" if "write_direct" in task else "research"
+            jt_requested = "jt requested: true" in task or "run jt" in task
+            jt_mode = "full_challenge" if "full_challenge" in task else None
             return json.dumps(
                 {
                     "route": route,
                     "rationale": "dry-run deterministic routing",
+                    "jt_requested": jt_requested,
+                    "jt_mode": jt_mode,
                 }
             )
 
@@ -69,5 +74,54 @@ class DryRunResponsesClient:
                     }
                 )
             return json.dumps({"approved": True, "feedback": []})
+
+        if "Return strict JSON with keys: verdict, executive_read" in user_prompt:
+            return json.dumps(
+                {
+                    "verdict": "Needs revision before confidence is justified.",
+                    "executive_read": "Sequence is mostly sensible but has brittle contracts.",
+                    "fatal_flaws": ["JT activation and parsing contracts are not yet robust enough."],
+                    "fixable_weaknesses": ["Reviewer criteria are too broad for internal planning tasks."],
+                    "hidden_assumptions": ["Assumes strict JSON compliance without fallback parsing."],
+                    "executive_challenges": ["How do we prove JT path was executed every run?"],
+                    "next_move": "Tighten schema handling and add path visibility in CLI output.",
+                }
+            )
+
+        if "Return strict JSON with key: comments" in user_prompt:
+            return json.dumps(
+                {
+                    "comments": [
+                        "JT comment: tighten one claim for precision.",
+                        "JT comment: call out one remaining assumption explicitly.",
+                    ]
+                }
+            )
+
+        if "Run final Chief of Staff pass before human review." in user_prompt:
+            self._chief_final_calls += 1
+            if "JT findings:\n(JT not requested or no findings)" in user_prompt:
+                return json.dumps(
+                    {
+                        "next_step": "human_review",
+                        "rationale": "No JT challenge requested.",
+                        "instructions": "",
+                    }
+                )
+            if self._chief_final_calls == 1:
+                return json.dumps(
+                    {
+                        "next_step": "redraft",
+                        "rationale": "Apply JT feedback once.",
+                        "instructions": "Incorporate JT comments without changing scope.",
+                    }
+                )
+            return json.dumps(
+                {
+                    "next_step": "human_review",
+                    "rationale": "One JT-informed redraft completed.",
+                    "instructions": "",
+                }
+            )
 
         return ""

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from app.state import SharedState
@@ -48,6 +49,12 @@ class ReviewerAgent:
         try:
             return json.loads(raw)
         except json.JSONDecodeError:
+            candidate = ReviewerAgent._extract_json_object(raw)
+            if candidate is not None:
+                try:
+                    return json.loads(candidate)
+                except json.JSONDecodeError:
+                    pass
             return {"approved": False, "feedback": ["Failed to parse reviewer output"]}
 
     @staticmethod
@@ -61,3 +68,10 @@ class ReviewerAgent:
             feedback = ["Validation note: normalized invalid feedback to a default note."]
 
         return {**data, "approved": approved, "feedback": feedback}
+
+    @staticmethod
+    def _extract_json_object(raw: str) -> str | None:
+        match = re.search(r"\{[\s\S]*\}", raw)
+        if match:
+            return match.group(0)
+        return None
