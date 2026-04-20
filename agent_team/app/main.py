@@ -23,12 +23,21 @@ def main() -> None:
     args = parse_args()
     task = " ".join(args.task).strip()
     if not task:
-        task = input("Enter your task: ").strip()
+        try:
+            task = input("Enter your task: ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\nNo task provided. Exiting.\n")
+            return
 
     if not task:
         raise ValueError("A task is required.")
 
-    settings = get_settings()
+    try:
+        settings = get_settings()
+    except ValueError as e:
+        print(f"\nConfiguration error: {e}\n")
+        return
+
     client = ResponsesClient(settings)
 
     chief_of_staff = ChiefOfStaffAgent(client)
