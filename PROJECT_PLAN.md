@@ -36,7 +36,7 @@ This project is succeeding in the near term if it can:
 1. Take a real user task
 2. Route it clearly through the core workflow
 3. Use structured research and drafting
-4. Optionally run JT only when explicitly requested
+4. Optionally run JT challenge stage only when explicitly requested (commenter mode handled without JT node)
 5. Return a final output that is reviewable and grounded
 6. Move toward local file context so outputs are more useful than a normal chat window
 
@@ -46,7 +46,7 @@ This project is succeeding in the near term if it can:
 2. Researcher gathers facts and gaps when needed
 3. Writer produces a draft
 4. Reviewer checks the draft
-5. JT runs only if explicitly requested
+5. JT challenge stage runs only if explicitly requested (except commenter mode, which stays in core flow)
 6. Chief of Staff does a final structure and completeness pass
 7. Human review approves or sends back for revision
 
@@ -75,6 +75,7 @@ This project is succeeding in the near term if it can:
 - JT does not rewrite
 - JT sees only the writer draft and reviewer findings
 - Chief of Staff decides what to do with JT feedback
+- JT commenter mode is enforced in Chief/Writer/Reviewer flow without a separate JT node
 
 - [x] Add `jt_requested` field to shared state
 - [x] Add `jt_mode` field to shared state
@@ -186,3 +187,8 @@ This project is succeeding in the near term if it can:
 - JT approach defined as optional challenge stage
 - Next major target identified as local file context
 - Issue 1 completed: JT optional challenge stage added with explicit routing and scoped inputs
+
+### 2026-04-21
+- Refactored JT commenter mode to remove separate JT-node dependency
+- JT node now skips commenter mode and remains available for challenge-mode requests
+- Chief of Staff now carries JT commenter editorial bar in active flow

@@ -41,9 +41,14 @@ class ReviewerAgent:
         jt_commenter_check = ""
         if is_jt_commenter:
             jt_commenter_check = (
-                "\nFor JT commenter mode, validate the Writer draft shape:"
-                " exactly two non-empty lines, line 1 starts with 'JT Feedback:',"
-                " and line 2 starts with 'JT Rewrite:'."
+                "\nFor JT commenter mode, validate all of the following:"
+                " exact two-line shape (line 1 starts with 'JT Feedback:' and line 2 starts with 'JT Rewrite:'),"
+                " material meaning is preserved,"
+                " no invented urgency,"
+                " no invented ownership,"
+                " no new commitments,"
+                " no new priorities,"
+                " and no new risk framing."
             )
 
         raw = self._client.ask(

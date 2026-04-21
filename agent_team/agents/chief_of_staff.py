@@ -29,9 +29,19 @@ class ChiefOfStaffAgent:
         )
         data = self._normalize_output(self._safe_parse(raw))
         route = data["route"]
+        approved_facts = state.get("approved_facts", [])
+        if self._is_jt_commenter_mode(state):
+            approved_facts = [
+                *approved_facts,
+                (
+                    "Chief JT commenter standard: keep rewrite materially faithful to source intent; "
+                    "do not add urgency, ownership, commitments, priorities, or risk framing not present in source text."
+                ),
+            ]
         return {
             **state,
             "route": route,
+            "approved_facts": approved_facts,
             "jt_requested": state.get("jt_requested", False),
             "jt_mode": state.get("jt_mode"),
             "status": "routed",
@@ -48,6 +58,15 @@ class ChiefOfStaffAgent:
         review_block = "\n".join(f"- {item}" for item in review_feedback) or "- (none)"
         jt_findings = state.get("jt_findings")
         jt_block = jt_findings if jt_findings else "(JT not requested or no findings)"
+        mode_specific_bar = ""
+        if self._is_jt_commenter_mode(state):
+            mode_specific_bar = (
+                "\n\nJT commenter editorial bar (Chief-owned):\n"
+                "- Enforce strict meaning preservation from source text.\n"
+                "- Reject added urgency, ownership, commitments, priorities, or risk framing.\n"
+                "- Preserve helpful nuance (appreciation/support/caution) when present in source.\n"
+                "- If Reviewer approved and two-line contract is intact, default to human_review."
+            )
 
         raw = self._client.ask(
             system_prompt=self._prompt,
@@ -60,6 +79,7 @@ class ChiefOfStaffAgent:
                 f"Draft:\n{normalized_draft}\n\n"
                 f"Reviewer findings:\n{review_block}\n\n"
                 f"JT findings:\n{jt_block}"
+                f"{mode_specific_bar}"
             ),
         )
         data = self._normalize_final_output(self._safe_parse(raw))

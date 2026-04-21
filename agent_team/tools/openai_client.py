@@ -53,6 +53,16 @@ class DryRunResponsesClient:
             )
 
         if "Draft output for the user task" in user_prompt:
+            if "JT commenter output contract (required):" in user_prompt:
+                if "Reviewer note:" in user_prompt or "Human reviewer note:" in user_prompt:
+                    return (
+                        "JT Feedback: Tighten wording while keeping the original scope.\n"
+                        "JT Rewrite: We have a lot underway. I appreciate the team's work and progress. There's more to do, and I'm encouraged by the momentum. Let me know if you need support."
+                    )
+                return (
+                    "JT Feedback: Rewrite adds ownership not supported by the source tone.\n"
+                    "JT Rewrite: We have a lot underway. I appreciate the team's work and progress. There's still more to do, and I'm encouraged by the momentum. Let me know what you need and I will drive this."
+                )
             approved_facts = user_prompt.count("\n- ")
             return (
                 "DRY RUN DRAFT\n"
