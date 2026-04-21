@@ -20,6 +20,7 @@ class JTAgent:
         approved_facts = state.get("approved_facts", [])
         facts_block = "\n".join(f"- {fact}" for fact in approved_facts) or "- (none provided)"
         jt_mode = state.get("jt_mode")
+        work_order = state.get("work_order", {})
 
         raw = self._client.ask(
             system_prompt=self._prompt,
@@ -29,6 +30,8 @@ class JTAgent:
                 "jt_rewrite must be a single string.\n\n"
                 f"JT mode: {jt_mode or 'default'}\n\n"
                 f"Task:\n{state['user_task']}\n\n"
+                f"Work order objective:\n{work_order.get('objective', '')}\n\n"
+                f"Work order deliverable_type:\n{work_order.get('deliverable_type', '')}\n\n"
                 f"Approved facts:\n{facts_block}\n\n"
                 f"Writer draft to challenge and rewrite:\n{writer_draft}"
             ),

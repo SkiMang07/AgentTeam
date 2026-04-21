@@ -16,6 +16,10 @@ class WriterAgent:
     def run(self, state: SharedState) -> SharedState:
         approved_facts = state.get("approved_facts", [])
         facts_block = "\n".join(f"- {fact}" for fact in approved_facts)
+        work_order = state.get("work_order", {})
+        success_criteria = "\n".join(f"- {item}" for item in work_order.get("success_criteria", []))
+        open_questions = "\n".join(f"- {item}" for item in work_order.get("open_questions", []))
+
         revision_targets = state.get("revision_targets", [])
         prior_draft = state.get("redraft_source_draft", "")
         reviewer_findings = state.get("reviewer_findings", {})
@@ -43,17 +47,21 @@ class WriterAgent:
                 "\n\nCurrent draft to revise (do a surgical revision, not a full rewrite):\n"
                 f"{prior_draft}"
             )
-        user_task = state["user_task"]
+
         raw = self._client.ask(
             system_prompt=self._prompt,
             user_prompt=(
-                "Draft output for the user task using only approved facts. "
+                "Draft output for the Chief of Staff work order using only approved facts. "
                 "If facts are missing, state assumptions and limits clearly. "
                 "Do not introduce new factual specifics beyond the source task text and approved facts."
                 f"{priority_block}"
                 f"{revision_target_block}\n\n"
                 f"{redraft_source_block}\n\n"
-                f"Task:\n{user_task}\n\n"
+                f"Original task:\n{state['user_task']}\n\n"
+                f"Work order objective:\n{work_order.get('objective', '')}\n\n"
+                f"Work order deliverable_type:\n{work_order.get('deliverable_type', '')}\n\n"
+                f"Work order success_criteria:\n{success_criteria if success_criteria else '- (none provided)'}\n\n"
+                f"Work order open_questions:\n{open_questions if open_questions else '- (none provided)'}\n\n"
                 f"Approved facts:\n{facts_block if facts_block else '- (none provided)'}"
             ),
         )

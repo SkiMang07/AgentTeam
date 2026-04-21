@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from app.state import SharedState
+from app.state import ChiefWorkOrder, SharedState
 from tools.openai_client import ResponsesClient
 
 PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "chief_of_staff.md"
@@ -18,28 +18,41 @@ class ChiefOfStaffAgent:
 
     def run(self, state: SharedState) -> SharedState:
         user_task = state["user_task"]
+        inferred_jt_requested = state.get("jt_requested", False)
+
         raw = self._client.ask(
             system_prompt=self._prompt,
             user_prompt=(
-                "Classify and route this task. Return strict JSON with keys: "
-                "route, rationale. "
+                "Create and route the Chief of Staff work order. Return strict JSON with keys: "
+                "work_order, route, rationale. "
+                "work_order must include: objective (string), deliverable_type (string), "
+                "success_criteria (array of strings), research_needed (boolean), "
+                "open_questions (array of strings), jt_requested (boolean). "
                 "route must be 'research' or 'write_direct'. "
+                "Set work_order.jt_requested from explicit task text only; do not infer hidden intent. "
                 "Do not include extra keys.\n\n"
+                f"CLI JT requested flag: {inferred_jt_requested}\n\n"
                 f"Task:\n{user_task}"
             ),
         )
-        data = self._normalize_output(self._safe_parse(raw))
+        data = self._normalize_output(self._safe_parse(raw), inferred_jt_requested)
+        work_order = data["work_order"]
 
         return {
             **state,
+            "work_order": work_order,
             "route": data["route"],
-            "jt_requested": state.get("jt_requested", False),
+            "jt_requested": work_order["jt_requested"],
             "jt_mode": state.get("jt_mode"),
             "status": "routed",
-            "model_metadata": {"chief_of_staff_raw": raw},
+            "model_metadata": {
+                **state.get("model_metadata", {}),
+                "chief_of_staff_raw": raw,
+            },
         }
 
     def final_pass(self, state: SharedState) -> SharedState:
+        work_order = self._get_work_order(state)
         reviewer_findings = state.get("reviewer_findings")
         review_block = self._format_reviewer_findings_block(reviewer_findings, state)
         jt_block = self._format_jt_block(state)
@@ -48,6 +61,7 @@ class ChiefOfStaffAgent:
             system_prompt=self._prompt,
             user_prompt=(
                 "Run final Chief of Staff pass before human review. "
+                "Use the work order as the source-of-truth contract for completeness checks. "
                 "This is an alignment/completeness validation, not a rewrite task. "
                 "Return strict JSON with keys: next_step, rationale, instructions, "
                 "answers_request, matches_deliverable_type, reviewer_findings_addressed, "
@@ -55,6 +69,7 @@ class ChiefOfStaffAgent:
                 "next_step must be 'human_review' or 'redraft'. "
                 "Use 'redraft' only when the draft should be revised before human review. "
                 "If you request a redraft, instructions must preserve factual scope and forbid adding new specifics not in the draft/review inputs.\n\n"
+                f"Work order:\n{self._format_work_order(work_order)}\n\n"
                 f"Draft:\n{state.get('draft', '')}\n\n"
                 f"Reviewer findings (structured):\n{review_block}\n\n"
                 f"JT findings:\n{jt_block}"
@@ -114,14 +129,84 @@ class ChiefOfStaffAgent:
             return {"route": "research", "rationale": "fallback due to parse error"}
 
     @staticmethod
-    def _normalize_output(data: dict) -> dict:
+    def _normalize_output(data: dict, inferred_jt_requested: bool) -> dict:
+        work_order = ChiefOfStaffAgent._normalize_work_order(data.get("work_order"), inferred_jt_requested)
+
         route = data.get("route")
         if route not in {"research", "write_direct"}:
-            route = "research"
+            route = "research" if work_order["research_needed"] else "write_direct"
+
         return {
             **data,
             "route": route,
+            "work_order": work_order,
         }
+
+    @staticmethod
+    def _normalize_work_order(raw_work_order: Any, inferred_jt_requested: bool) -> ChiefWorkOrder:
+        if not isinstance(raw_work_order, dict):
+            raw_work_order = {}
+
+        objective = raw_work_order.get("objective")
+        if not isinstance(objective, str) or not objective.strip():
+            objective = "Clarify and complete the user request."
+
+        deliverable_type = raw_work_order.get("deliverable_type")
+        if not isinstance(deliverable_type, str) or not deliverable_type.strip():
+            deliverable_type = "general_response"
+
+        success_criteria = raw_work_order.get("success_criteria")
+        if not isinstance(success_criteria, list) or not all(isinstance(item, str) for item in success_criteria):
+            success_criteria = ["Answer the user task directly and clearly."]
+
+        open_questions = raw_work_order.get("open_questions")
+        if not isinstance(open_questions, list) or not all(isinstance(item, str) for item in open_questions):
+            open_questions = []
+
+        research_needed = raw_work_order.get("research_needed")
+        if not isinstance(research_needed, bool):
+            research_needed = True
+
+        jt_requested = raw_work_order.get("jt_requested")
+        if not isinstance(jt_requested, bool):
+            jt_requested = bool(inferred_jt_requested)
+
+        return {
+            "objective": objective.strip(),
+            "deliverable_type": deliverable_type.strip(),
+            "success_criteria": [item.strip() for item in success_criteria if item.strip()],
+            "research_needed": research_needed,
+            "open_questions": [item.strip() for item in open_questions if item.strip()],
+            "jt_requested": jt_requested,
+        }
+
+    @staticmethod
+    def _get_work_order(state: SharedState) -> ChiefWorkOrder:
+        existing = state.get("work_order")
+        if isinstance(existing, dict):
+            return ChiefOfStaffAgent._normalize_work_order(existing, state.get("jt_requested", False))
+        user_task = state.get("user_task", "")
+        return {
+            "objective": user_task.strip() or "Clarify and complete the user request.",
+            "deliverable_type": "general_response",
+            "success_criteria": ["Answer the user task directly and clearly."],
+            "research_needed": True,
+            "open_questions": [],
+            "jt_requested": bool(state.get("jt_requested", False)),
+        }
+
+    @staticmethod
+    def _format_work_order(work_order: ChiefWorkOrder) -> str:
+        success_criteria = "\n".join(f"- {item}" for item in work_order["success_criteria"]) or "- (none)"
+        open_questions = "\n".join(f"- {item}" for item in work_order["open_questions"]) or "- (none)"
+        return (
+            f"objective: {work_order['objective']}\n"
+            f"deliverable_type: {work_order['deliverable_type']}\n"
+            f"research_needed: {work_order['research_needed']}\n"
+            f"jt_requested: {work_order['jt_requested']}\n"
+            f"success_criteria:\n{success_criteria}\n"
+            f"open_questions:\n{open_questions}"
+        )
 
     @staticmethod
     def _normalize_final_output(data: dict) -> dict:

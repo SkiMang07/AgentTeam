@@ -15,13 +15,17 @@ class ResearcherAgent:
         self._prompt = PROMPT_PATH.read_text(encoding="utf-8")
 
     def run(self, state: SharedState) -> SharedState:
-        user_task = state["user_task"]
+        work_order = state.get("work_order", {})
         raw = self._client.ask(
             system_prompt=self._prompt,
             user_prompt=(
-                "Extract facts and gaps. Return strict JSON with keys: facts, gaps. "
+                "Extract facts and gaps for the Chief of Staff work order. Return strict JSON with keys: facts, gaps. "
                 "Both must be arrays of short strings.\n\n"
-                f"Task:\n{user_task}"
+                f"Task:\n{state['user_task']}\n\n"
+                f"Work order objective: {work_order.get('objective', '')}\n"
+                f"Work order deliverable_type: {work_order.get('deliverable_type', '')}\n"
+                f"Work order success_criteria: {work_order.get('success_criteria', [])}\n"
+                f"Work order open_questions: {work_order.get('open_questions', [])}"
             ),
         )
         data = self._normalize_output(self._safe_parse(raw))
