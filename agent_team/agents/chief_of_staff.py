@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from app.state import ChiefWorkOrder, SharedState
+from app.state import ChiefWorkOrder, SharedState, get_canonical_jt_requested
 from tools.openai_client import ResponsesClient
 
 PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "chief_of_staff.md"
@@ -172,8 +172,8 @@ class ChiefOfStaffAgent:
             research_needed = True
 
         jt_requested = raw_work_order.get("jt_requested")
-        if not isinstance(jt_requested, bool):
-            jt_requested = bool(inferred_jt_requested)
+        model_jt_requested = jt_requested if isinstance(jt_requested, bool) else False
+        jt_requested = bool(inferred_jt_requested) or model_jt_requested
 
         return {
             "objective": objective.strip(),
@@ -188,7 +188,7 @@ class ChiefOfStaffAgent:
     def _get_work_order(state: SharedState) -> ChiefWorkOrder:
         existing = state.get("work_order")
         if isinstance(existing, dict):
-            return ChiefOfStaffAgent._normalize_work_order(existing, state.get("jt_requested", False))
+            return ChiefOfStaffAgent._normalize_work_order(existing, get_canonical_jt_requested(state))
         user_task = state.get("user_task", "")
         return {
             "objective": user_task.strip() or "Clarify and complete the user request.",
@@ -196,7 +196,7 @@ class ChiefOfStaffAgent:
             "success_criteria": ["Answer the user task directly and clearly."],
             "research_needed": True,
             "open_questions": [],
-            "jt_requested": bool(state.get("jt_requested", False)),
+            "jt_requested": get_canonical_jt_requested(state),
         }
 
     @staticmethod
@@ -289,10 +289,7 @@ class ChiefOfStaffAgent:
 
     @staticmethod
     def _format_jt_block(state: SharedState) -> str:
-        work_order = state.get("work_order", {})
-        jt_requested = work_order.get("jt_requested") if isinstance(work_order, dict) else None
-        if not isinstance(jt_requested, bool):
-            jt_requested = bool(state.get("jt_requested"))
+        jt_requested = get_canonical_jt_requested(state)
         if not jt_requested:
             return "(JT not requested)"
 

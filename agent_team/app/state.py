@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Literal, NotRequired, TypedDict
+from typing import Any, Literal, Mapping, NotRequired, TypedDict
 
 
 class ModelMetadata(TypedDict, total=False):
@@ -49,6 +49,7 @@ class SharedState(TypedDict):
     dry_run: NotRequired[bool]
     debug: NotRequired[bool]
     work_order: NotRequired[ChiefWorkOrder]
+    # Backward-compatibility field: canonical JT routing should resolve from work_order.jt_requested.
     jt_requested: NotRequired[bool]
     jt_mode: NotRequired[str | None]
     jt_input: NotRequired[JTInput]
@@ -81,3 +82,12 @@ class SharedState(TypedDict):
     final_output: NotRequired[str]
     status: NotRequired[str]
     model_metadata: NotRequired[ModelMetadata | dict[str, Any]]
+
+
+def get_canonical_jt_requested(state: Mapping[str, Any]) -> bool:
+    work_order = state.get("work_order")
+    if isinstance(work_order, Mapping):
+        value = work_order.get("jt_requested")
+        if isinstance(value, bool):
+            return value
+    return bool(state.get("jt_requested", False))
