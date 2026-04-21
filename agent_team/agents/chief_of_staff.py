@@ -93,7 +93,10 @@ class ChiefOfStaffAgent:
             "recommended_action": "redraft" if data["next_step"] == "redraft" else "human_review",
         }
         should_redraft = data["next_step"] == "redraft" and state.get("chief_redraft_count", 0) < 1
-        if has_critical_reviewer_findings and state.get("chief_redraft_count", 0) < 1:
+        auto_redraft_count = state.get("auto_redraft_count", 0)
+        if has_critical_reviewer_findings and auto_redraft_count > 0:
+            should_redraft = False
+        elif has_critical_reviewer_findings and state.get("chief_redraft_count", 0) < 1:
             should_redraft = True
 
         critical_reviewer_blocking = has_critical_reviewer_findings and not should_redraft

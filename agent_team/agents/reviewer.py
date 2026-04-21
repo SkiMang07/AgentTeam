@@ -400,8 +400,22 @@ class ReviewerAgent:
         )
         for pattern in patterns:
             for match in re.finditer(pattern, raw_text, flags=re.IGNORECASE):
-                prohibited.extend(ReviewerAgent._split_claims(match.group(1)))
+                clause = match.group(1).strip()
+                if ReviewerAgent._is_generic_no_new_facts_clause(clause):
+                    continue
+                prohibited.extend(ReviewerAgent._split_claims(clause))
         return prohibited
+
+    @staticmethod
+    def _is_generic_no_new_facts_clause(clause: str) -> bool:
+        prefix = clause.split(":", maxsplit=1)[0]
+        normalized = ReviewerAgent._normalize_text(prefix)
+        return bool(
+            re.fullmatch(
+                r"(?:any\s+)?new\s+facts?(?:\s+or\s+specifics?)?",
+                normalized,
+            )
+        )
 
     @staticmethod
     def _extract_required_claims_from_work_order(work_order: dict) -> list[str]:
