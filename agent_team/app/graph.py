@@ -22,6 +22,16 @@ def build_graph(
     graph_builder = StateGraph(SharedState)
     max_auto_redrafts = 1
 
+    def _commenter_artifacts_enabled(state: SharedState) -> bool:
+        return bool(state.get("jt_requested", False)) and state.get("jt_mode") == "commenter"
+
+    def _print_debug_block(title: str, body: str, state: SharedState) -> None:
+        if not _commenter_artifacts_enabled(state):
+            return
+        print(f"\n===== {title} =====")
+        print(body if body.strip() else "(empty)")
+        print("===== END =====\n")
+
     def timed_node(node_name: str, fn):
         def _wrapped(state: SharedState) -> SharedState:
             print(f"[flow] entering node: {node_name}")
@@ -57,10 +67,32 @@ def build_graph(
         return researcher.run(state)
 
     def writer_node(state: SharedState) -> SharedState:
-        return writer.run(state)
+        result = writer.run(state)
+        if _commenter_artifacts_enabled(state):
+            pass_no = state.get("auto_redraft_count", 0) + 1
+            _print_debug_block(
+                f"WRITER OUTPUT PASS {pass_no}",
+                result.get("draft", ""),
+                state,
+            )
+        return result
 
     def reviewer_node(state: SharedState) -> SharedState:
-        return reviewer.run(state)
+        result = reviewer.run(state)
+        if _commenter_artifacts_enabled(state):
+            pass_no = state.get("auto_redraft_count", 0) + 1
+            reviewer_raw = str(result.get("model_metadata", {}).get("reviewer_raw", ""))
+            if not reviewer_raw:
+                reviewer_raw = (
+                    f'{{"approved": {str(result.get("review_approved", False)).lower()}, '
+                    f'"feedback": {result.get("review_feedback", [])}}}'
+                )
+            _print_debug_block(
+                f"REVIEWER JSON PASS {pass_no}",
+                reviewer_raw,
+                state,
+            )
+        return result
 
     def jt_node(state: SharedState) -> SharedState:
         jt_state = jt.run(state)
@@ -83,12 +115,25 @@ def build_graph(
         feedback = state.get("review_feedback", [])
         revision_notes = [f"Reviewer note: {item}" for item in feedback]
         print("\nReviewer requested revisions. Triggering one automatic redraft before human review.\n")
-        return {
+        next_state = {
             **state,
             "approved_facts": [*state.get("approved_facts", []), *revision_notes],
+            "revision_targets": feedback,
+            "redraft_source_draft": state.get("draft", ""),
             "auto_redraft_count": state.get("auto_redraft_count", 0) + 1,
             "status": "needs_redraft_auto",
         }
+        if _commenter_artifacts_enabled(state):
+            _print_debug_block(
+                "AUTO REDRAFT INPUT / INSTRUCTIONS",
+                (
+                    f"revision_targets={next_state.get('revision_targets', [])}\n"
+                    f"redraft_source_draft={next_state.get('redraft_source_draft', '')}\n"
+                    f"approved_facts_added={revision_notes}"
+                ),
+                state,
+            )
+        return next_state
 
     def human_review_node(state: SharedState) -> SharedState:
         if state.get("dry_run"):
@@ -214,6 +259,37 @@ def build_graph(
             "Stopping before normal human review."
         )
         print(f"\n{message}\n")
+        if _commenter_artifacts_enabled(state):
+            writer_outputs = state.get("model_metadata", {}).get("writer_outputs", [])
+            reviewer_outputs = state.get("model_metadata", {}).get("reviewer_outputs", [])
+            _print_debug_block(
+                "WRITER OUTPUT PASS 1",
+                writer_outputs[0] if len(writer_outputs) > 0 else "",
+                state,
+            )
+            _print_debug_block(
+                "REVIEWER JSON PASS 1",
+                reviewer_outputs[0] if len(reviewer_outputs) > 0 else "",
+                state,
+            )
+            _print_debug_block(
+                "AUTO REDRAFT INPUT / INSTRUCTIONS",
+                (
+                    f"revision_targets={state.get('revision_targets', [])}\n"
+                    f"redraft_source_draft={state.get('redraft_source_draft', '')}"
+                ),
+                state,
+            )
+            _print_debug_block(
+                "WRITER OUTPUT PASS 2",
+                writer_outputs[1] if len(writer_outputs) > 1 else "",
+                state,
+            )
+            _print_debug_block(
+                "REVIEWER JSON PASS 2",
+                reviewer_outputs[1] if len(reviewer_outputs) > 1 else "",
+                state,
+            )
         return {
             **state,
             "final_output": message,

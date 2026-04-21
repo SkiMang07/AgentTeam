@@ -34,6 +34,11 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional JT mode label (for example: advisory or strict).",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Print detailed node artifacts for diagnosis.",
+    )
     parser.add_argument("task", type=str, nargs="*", help="Task for the agent team")
     return parser.parse_args()
 
@@ -76,6 +81,7 @@ def main() -> None:
         "user_task": task,
         "status": "received",
         "dry_run": args.dry_run,
+        "debug": args.debug,
         "jt_requested": jt_requested,
         "jt_mode": jt_mode,
         "jt_findings": None,
