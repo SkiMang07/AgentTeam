@@ -51,6 +51,12 @@ class ReviewerAgent:
             approved_facts=approved_facts,
             draft=evaluation_draft,
         )
+        data = self._enforce_constrained_rewrite_contract(
+            findings=data,
+            user_task=user_task,
+            approved_facts=approved_facts,
+            draft=evaluation_draft,
+        )
         review_feedback = self._build_feedback(data)
         review_approved = data["recommended_next_action"] == "approve"
         parse_failed = bool(parsed.get("_parse_failed", False))
@@ -388,6 +394,73 @@ class ReviewerAgent:
         }
 
     @staticmethod
+    def _enforce_constrained_rewrite_contract(
+        findings: dict,
+        user_task: str,
+        approved_facts: list[str],
+        draft: str,
+    ) -> dict:
+        if not ReviewerAgent._is_constrained_source_rewrite_task(user_task):
+            return findings
+
+        source_text = ReviewerAgent._extract_primary_source_text(user_task)
+        if not source_text:
+            return findings
+
+        normalized = {**findings}
+        unsupported = list(normalized.get("unsupported_claims", []))
+        missing = list(normalized.get("missing_content", []))
+
+        filtered_unsupported = [
+            item for item in unsupported if not ReviewerAgent._unsupported_item_is_source_grounded(item, source_text)
+        ]
+        removed_source_grounded_issues = len(filtered_unsupported) != len(unsupported)
+
+        source_numbers = set(re.findall(r"\d+(?:\.\d+)?", source_text))
+        draft_numbers = set(re.findall(r"\d+(?:\.\d+)?", draft))
+        approved_numbers = set(
+            token
+            for fact in approved_facts
+            if isinstance(fact, str)
+            for token in re.findall(r"\d+(?:\.\d+)?", fact)
+        )
+
+        dropped_numbers = sorted(source_numbers - draft_numbers)
+        added_numbers = sorted(draft_numbers - source_numbers - approved_numbers)
+
+        for value in dropped_numbers:
+            missing.append(
+                f"Constrained rewrite dropped source-provided specific '{value}'. Restore that source fact."
+            )
+        for value in added_numbers:
+            filtered_unsupported.append(
+                f"Constrained rewrite added new specific '{value}' not in the source draft. Remove it."
+            )
+
+        normalized["unsupported_claims"] = ReviewerAgent._dedupe_preserve_order(filtered_unsupported)
+        normalized["missing_content"] = ReviewerAgent._dedupe_preserve_order(missing)
+
+        has_any_issues = any(
+            normalized[key]
+            for key in (
+                "missing_content",
+                "unsupported_claims",
+                "contradictions_or_logic_problems",
+                "format_or_structure_issues",
+            )
+        )
+
+        if removed_source_grounded_issues and not has_any_issues:
+            normalized["overall_assessment"] = (
+                "Constrained rewrite contract satisfied: rewrite stays within source-provided facts."
+            )
+            normalized["recommended_next_action"] = "approve"
+        elif normalized.get("recommended_next_action") == "approve" and has_any_issues:
+            normalized["recommended_next_action"] = "revise"
+
+        return normalized
+
+    @staticmethod
     def _extract_claim_scopes(raw_task_segment: str) -> tuple[str, list[str]]:
         directive_pattern = ReviewerAgent._directive_pattern()
         directive_match = directive_pattern.search(raw_task_segment)
@@ -489,6 +562,42 @@ class ReviewerAgent:
             return ""
         candidates = [left or right for left, right in quote_matches]
         return max(candidates, key=lambda item: len(item.strip())).strip()
+
+    @staticmethod
+    def _is_constrained_source_rewrite_task(user_task: str) -> bool:
+        if not ReviewerAgent._detect_no_invention_constraints(user_task):
+            return False
+        normalized = ReviewerAgent._normalize_text(user_task)
+        has_rewrite_intent = bool(re.search(r"\brewrite\b", normalized))
+        return has_rewrite_intent and bool(ReviewerAgent._extract_primary_source_text(user_task))
+
+    @staticmethod
+    def _unsupported_item_is_source_grounded(item: str, source_text: str) -> bool:
+        normalized_item = ReviewerAgent._normalize_text(item)
+        source_normalized = ReviewerAgent._normalize_text(source_text)
+        if not normalized_item or not source_normalized:
+            return False
+
+        quoted = ReviewerAgent._extract_quoted_phrase(item)
+        if quoted:
+            quoted_normalized = ReviewerAgent._normalize_text(quoted)
+            if quoted_normalized and ReviewerAgent._appears_in_text(quoted_normalized, source_normalized):
+                return True
+
+        source_numbers = set(re.findall(r"\d+(?:\.\d+)?", source_text))
+        item_numbers = set(re.findall(r"\d+(?:\.\d+)?", item))
+        if item_numbers and item_numbers.issubset(source_numbers):
+            return True
+
+        content_tokens = [
+            token
+            for token in normalized_item.split()
+            if len(token) > 3 and token not in {"unsupported", "claim", "draft", "rewrite", "source", "provided"}
+        ]
+        if not content_tokens:
+            return False
+        token_overlap = sum(1 for token in content_tokens if token in source_normalized.split())
+        return token_overlap >= max(2, len(content_tokens) // 2)
 
     @staticmethod
     def _references_any_blocked_claim(item: str, blocked_claims: list[str]) -> bool:
