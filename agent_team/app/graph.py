@@ -86,6 +86,7 @@ def build_graph(
         return {
             **state,
             "approved_facts": [*state.get("approved_facts", []), *revision_notes],
+            "revision_targets": feedback,
             "auto_redraft_count": state.get("auto_redraft_count", 0) + 1,
             "status": "needs_redraft_auto",
         }

@@ -22,6 +22,7 @@ class SharedState(TypedDict):
     approved_facts: NotRequired[list[str]]
     draft: NotRequired[str]
     review_feedback: NotRequired[list[str]]
+    revision_targets: NotRequired[list[str]]
     review_approved: NotRequired[bool]
     reviewer_parse_failed: NotRequired[bool]
     reviewer_parse_error_raw: NotRequired[str]
