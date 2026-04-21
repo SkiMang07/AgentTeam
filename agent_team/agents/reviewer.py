@@ -251,13 +251,14 @@ class ReviewerAgent:
         contradictions = list(normalized.get("contradictions_or_logic_problems", []))
         format_issues = list(normalized.get("format_or_structure_issues", []))
 
-        policy = ReviewerAgent._extract_closed_fact_policy(user_task)
-        if not policy["is_closed_facts_mode"]:
+        policy = ReviewerAgent._extract_grounding_policy(user_task)
+        if not policy["is_closed_facts_mode"] and not policy["is_no_invention_mode"]:
             return normalized
 
         allowed_facts = policy["allowed_facts"]
         blocked_claims = policy["blocked_claims"]
-        draft_normalized = ReviewerAgent._normalize_text(draft)
+        evaluation_text = ReviewerAgent._extract_jt_rewrite_text(draft) or draft
+        draft_normalized = ReviewerAgent._normalize_text(evaluation_text)
 
         blocked_hits: list[str] = []
         for claim in blocked_claims:
@@ -266,15 +267,8 @@ class ReviewerAgent:
                 blocked_hits.append(claim)
 
         if blocked_hits:
-            unsupported.extend(
-                [
-                    (
-                        "Use-only-facts violation: draft includes blocked claim "
-                        f"from task text ('{item}'). Remove it."
-                    )
-                    for item in blocked_hits
-                ]
-            )
+            label = "Use-only-facts violation" if policy["is_closed_facts_mode"] else "No-invention constraint violation"
+            unsupported.extend([f"{label}: draft includes blocked claim from task text ('{item}'). Remove it." for item in blocked_hits])
 
         scope_unchanged_in_facts = any(
             "scope is unchanged" in ReviewerAgent._normalize_text(item)
@@ -285,9 +279,10 @@ class ReviewerAgent:
                 "Core fact contradiction: source says scope is unchanged, but draft adds new scope elements."
             )
 
-        if blocked_hits and not any("use-only-facts" in item.lower() for item in format_issues):
+        if blocked_hits and not any("contract was violated" in item.lower() for item in format_issues):
+            contract_label = "Use-only-facts" if policy["is_closed_facts_mode"] else "No-new-facts"
             format_issues.append(
-                "Use-only-facts contract was violated; remove unsupported claims before style or formatting polish."
+                f"{contract_label} contract was violated; remove unsupported claims before style or formatting polish."
             )
 
         normalized["unsupported_claims"] = ReviewerAgent._dedupe_preserve_order(unsupported)
@@ -295,9 +290,8 @@ class ReviewerAgent:
         normalized["format_or_structure_issues"] = ReviewerAgent._dedupe_preserve_order(format_issues)
 
         if blocked_hits:
-            normalized["overall_assessment"] = (
-                "Draft fails core grounding checks: unsupported claims violate the closed facts contract."
-            )
+            policy_name = "closed-facts" if policy["is_closed_facts_mode"] else "no-new-facts"
+            normalized["overall_assessment"] = f"Draft fails core grounding checks: unsupported claims violate the {policy_name} contract."
             normalized["recommended_next_action"] = "revise"
         return normalized
 
@@ -366,37 +360,87 @@ class ReviewerAgent:
         return feedback
 
     @staticmethod
-    def _extract_closed_fact_policy(user_task: str) -> dict:
+    def _extract_grounding_policy(user_task: str) -> dict:
         task = user_task or ""
         trigger_match = re.search(r"use only these facts\s*:\s*", task, flags=re.IGNORECASE)
-        if not trigger_match:
-            return {
-                "is_closed_facts_mode": False,
-                "allowed_facts": [],
-                "blocked_claims": [],
-            }
+        is_closed_facts_mode = trigger_match is not None
+        post_trigger = task[trigger_match.end() :] if trigger_match else task
+        source_text = ReviewerAgent._extract_primary_source_text(task)
+        is_no_invention_mode = ReviewerAgent._detect_no_invention_constraints(task)
 
-        post_trigger = task[trigger_match.end() :]
-        directive_pattern = re.compile(
-            r"\b(?:also\s+say|mention|include|note|add|state)\b(?:\s+that)?\b",
-            flags=re.IGNORECASE,
-        )
-        directive_match = directive_pattern.search(post_trigger)
-        allowlist_raw = post_trigger[: directive_match.start()] if directive_match else post_trigger
-        allowed_facts = ReviewerAgent._split_claims(allowlist_raw)
+        if is_closed_facts_mode:
+            allowlist_raw, blocked_claims = ReviewerAgent._extract_claim_scopes(post_trigger)
+            allowed_facts = ReviewerAgent._split_claims(allowlist_raw)
+        else:
+            allowed_facts = []
+            blocked_claims = []
 
-        blocked_claims: list[str] = []
-        for match in directive_pattern.finditer(post_trigger):
-            segment_start = match.end()
-            next_match = directive_pattern.search(post_trigger, segment_start)
-            segment_end = next_match.start() if next_match else len(post_trigger)
-            blocked_claims.extend(ReviewerAgent._split_claims(post_trigger[segment_start:segment_end]))
+        if is_no_invention_mode:
+            no_invention_scope = source_text or task
+            blocked_claims.extend(ReviewerAgent._extract_directive_claims(no_invention_scope))
 
         return {
-            "is_closed_facts_mode": True,
+            "is_closed_facts_mode": is_closed_facts_mode,
+            "is_no_invention_mode": is_no_invention_mode,
             "allowed_facts": allowed_facts,
             "blocked_claims": ReviewerAgent._dedupe_preserve_order(blocked_claims),
         }
+
+    @staticmethod
+    def _extract_claim_scopes(raw_task_segment: str) -> tuple[str, list[str]]:
+        directive_pattern = ReviewerAgent._directive_pattern()
+        directive_match = directive_pattern.search(raw_task_segment)
+        allowlist_raw = raw_task_segment[: directive_match.start()] if directive_match else raw_task_segment
+        blocked_claims: list[str] = []
+        for match in directive_pattern.finditer(raw_task_segment):
+            segment_start = match.end()
+            next_match = directive_pattern.search(raw_task_segment, segment_start)
+            segment_end = next_match.start() if next_match else len(raw_task_segment)
+            blocked_claims.extend(ReviewerAgent._split_claims(raw_task_segment[segment_start:segment_end]))
+        return allowlist_raw, blocked_claims
+
+    @staticmethod
+    def _extract_directive_claims(raw_text: str) -> list[str]:
+        _, blocked_claims = ReviewerAgent._extract_claim_scopes(raw_text)
+        return blocked_claims
+
+    @staticmethod
+    def _directive_pattern() -> re.Pattern[str]:
+        return re.compile(
+            r"\b(?:also\s+say|also\s+mention|mention|include|note|add|state|say)\b(?:\s+that)?\b",
+            flags=re.IGNORECASE,
+        )
+
+    @staticmethod
+    def _detect_no_invention_constraints(user_task: str) -> bool:
+        normalized = ReviewerAgent._normalize_text(user_task)
+        phrase_patterns = (
+            r"\bwithout adding (?:any )?new facts?(?: or specifics?)?\b",
+            r"\bdo not add (?:any )?new facts?\b",
+            r"\bdo not invent details?\b",
+            r"\bwithout inventing details?\b",
+            r"\buse only the information in the draft\b",
+            r"\bpreserve only the provided information\b",
+            r"\bpreserve meaning without inventing details\b",
+            r"\bno new facts?\b",
+        )
+        return any(re.search(pattern, normalized) for pattern in phrase_patterns)
+
+    @staticmethod
+    def _extract_primary_source_text(user_task: str) -> str:
+        quote_matches = re.findall(r'"([^"]{20,})"|\'([^\']{20,})\'', user_task)
+        if not quote_matches:
+            return ""
+        candidates = [left or right for left, right in quote_matches]
+        return max(candidates, key=lambda item: len(item.strip())).strip()
+
+    @staticmethod
+    def _extract_jt_rewrite_text(draft: str) -> str:
+        lines = [line.strip() for line in draft.splitlines() if line.strip()]
+        for line in lines:
+            if line.startswith("JT Rewrite:"):
+                return line.split("JT Rewrite:", maxsplit=1)[-1].strip()
+        return ""
 
     @staticmethod
     def _split_claims(raw: str) -> list[str]:
@@ -415,7 +459,23 @@ class ReviewerAgent:
             normalized,
             flags=re.IGNORECASE,
         )
-        return [part.strip(" .") for part in parts if part.strip(" .")]
+        claims: list[str] = []
+        for part in parts:
+            claim = part.strip(" .")
+            if not claim or ReviewerAgent._is_instructional_clause(claim):
+                continue
+            claims.append(claim)
+        return claims
+
+    @staticmethod
+    def _is_instructional_clause(claim: str) -> bool:
+        return bool(
+            re.match(
+                r"^(?:please\s+|return only|output only|respond with|rewrite|review)\b",
+                claim.strip(),
+                flags=re.IGNORECASE,
+            )
+        )
 
     @staticmethod
     def _normalize_text(value: str) -> str:
