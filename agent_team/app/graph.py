@@ -113,6 +113,17 @@ def build_graph(
 
     def auto_redraft_prep_node(state: SharedState) -> SharedState:
         feedback = state.get("review_feedback", [])
+        reviewer_findings = state.get("reviewer_findings", {})
+        if not feedback and isinstance(reviewer_findings, dict):
+            for key in (
+                "missing_content",
+                "unsupported_claims",
+                "contradictions_or_logic_problems",
+                "format_or_structure_issues",
+            ):
+                issues = reviewer_findings.get(key, [])
+                if isinstance(issues, list):
+                    feedback.extend([item for item in issues if isinstance(item, str)])
         revision_notes = [f"Reviewer note: {item}" for item in feedback]
         print("\nReviewer requested revisions. Triggering one automatic redraft before human review.\n")
         next_state = {
@@ -230,7 +241,13 @@ def build_graph(
         if state.get("reviewer_parse_failed", False):
             return "reviewer_parse_failure"
         is_approved = state.get("review_approved", False)
-        has_feedback = bool(state.get("review_feedback"))
+        reviewer_findings = state.get("reviewer_findings", {})
+        recommended_next_action = (
+            reviewer_findings.get("recommended_next_action")
+            if isinstance(reviewer_findings, dict)
+            else None
+        )
+        has_feedback = bool(state.get("review_feedback")) or recommended_next_action in {"revise", "reject"}
         auto_redraft_count = state.get("auto_redraft_count", 0)
         jt_review_count = state.get("jt_review_count", 0)
         should_run_jt_stage = (
@@ -245,6 +262,8 @@ def build_graph(
         return "chief_final"
 
     def route_after_chief_final(state: SharedState) -> str:
+        if state.get("critical_reviewer_blocking", False):
+            return "review_rejected_after_redraft"
         if (
             state.get("jt_requested", False)
             and state.get("jt_mode") == "commenter"
@@ -254,10 +273,16 @@ def build_graph(
         return state.get("chief_final_next_step", "human_review")
 
     def review_rejected_after_redraft_node(state: SharedState) -> SharedState:
-        message = (
-            "Reviewer verdict remains needs_revision after the automatic redraft pass. "
-            "Stopping before normal human review."
-        )
+        if state.get("critical_reviewer_blocking", False):
+            message = (
+                "Reviewer found unresolved unsupported claims or core fact contradictions. "
+                "Stopping before normal human review."
+            )
+        else:
+            message = (
+                "Reviewer verdict remains needs_revision after the automatic redraft pass. "
+                "Stopping before normal human review."
+            )
         print(f"\n{message}\n")
         if _commenter_artifacts_enabled(state):
             writer_outputs = state.get("model_metadata", {}).get("writer_outputs", [])

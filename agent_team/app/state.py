@@ -19,6 +19,15 @@ class ChiefFinalValidation(TypedDict):
     recommended_action: Literal["human_review", "redraft"]
 
 
+class ReviewerFindings(TypedDict):
+    overall_assessment: str
+    missing_content: list[str]
+    unsupported_claims: list[str]
+    contradictions_or_logic_problems: list[str]
+    format_or_structure_issues: list[str]
+    recommended_next_action: Literal["approve", "revise", "reject"]
+
+
 class SharedState(TypedDict):
     user_task: str
     dry_run: NotRequired[bool]
@@ -32,6 +41,7 @@ class SharedState(TypedDict):
     research_gaps: NotRequired[list[str]]
     approved_facts: NotRequired[list[str]]
     draft: NotRequired[str]
+    reviewer_findings: NotRequired[ReviewerFindings]
     review_feedback: NotRequired[list[str]]
     revision_targets: NotRequired[list[str]]
     redraft_source_draft: NotRequired[str]
@@ -40,6 +50,7 @@ class SharedState(TypedDict):
     reviewer_parse_error_raw: NotRequired[str]
     auto_redraft_count: NotRequired[int]
     chief_redraft_count: NotRequired[int]
+    critical_reviewer_blocking: NotRequired[bool]
     chief_final_next_step: NotRequired[Literal["writer", "human_review"]]
     chief_final_validation: NotRequired[ChiefFinalValidation]
     final_output: NotRequired[str]

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 from app.state import SharedState
 from tools.openai_client import ResponsesClient
@@ -54,8 +55,8 @@ class ChiefOfStaffAgent:
             jt_requested=state.get("jt_requested", False),
             jt_mode=state.get("jt_mode"),
         )
-        review_feedback = state.get("review_feedback", [])
-        review_block = "\n".join(f"- {item}" for item in review_feedback) or "- (none)"
+        reviewer_findings = state.get("reviewer_findings")
+        review_block = self._format_reviewer_findings_block(reviewer_findings, state)
         jt_findings = state.get("jt_findings")
         jt_block = jt_findings if jt_findings else "(JT not requested or no findings)"
         mode_specific_bar = ""
@@ -80,7 +81,7 @@ class ChiefOfStaffAgent:
                 "Use 'redraft' only when the draft should be revised before human review. "
                 "If you request a redraft, instructions must preserve factual scope and forbid adding new specifics not in the draft/review inputs.\n\n"
                 f"Draft:\n{normalized_draft}\n\n"
-                f"Reviewer findings:\n{review_block}\n\n"
+                f"Reviewer findings (structured):\n{review_block}\n\n"
                 f"JT findings:\n{jt_block}"
                 f"{mode_specific_bar}"
             ),
@@ -88,10 +89,13 @@ class ChiefOfStaffAgent:
         data = self._normalize_final_output(self._safe_parse(raw))
         current_notes = state.get("approved_facts", [])
         chief_notes = data.get("instructions", "")
+        has_critical_reviewer_findings = self._has_critical_reviewer_findings(reviewer_findings)
         chief_validation = {
             "answers_request": data["answers_request"],
             "matches_deliverable_type": data["matches_deliverable_type"],
-            "reviewer_findings_addressed": data["reviewer_findings_addressed"],
+            "reviewer_findings_addressed": (
+                data["reviewer_findings_addressed"] and not has_critical_reviewer_findings
+            ),
             "jt_findings_addressed": data["jt_findings_addressed"],
             "obvious_missing_items": data["obvious_missing_items"],
             "rationale": data["rationale"],
@@ -114,6 +118,10 @@ class ChiefOfStaffAgent:
             should_redraft = False
         if should_redraft and reviewer_rejection_blocking:
             should_redraft = False
+        if has_critical_reviewer_findings and state.get("chief_redraft_count", 0) < 1:
+            should_redraft = True
+
+        critical_reviewer_blocking = has_critical_reviewer_findings and not should_redraft
 
         if should_redraft and chief_notes:
             contract_note = ""
@@ -130,6 +138,7 @@ class ChiefOfStaffAgent:
             "draft": normalized_draft,
             "approved_facts": current_notes,
             "chief_final_next_step": "writer" if should_redraft else "human_review",
+            "critical_reviewer_blocking": critical_reviewer_blocking,
             "chief_final_validation": chief_validation,
             "chief_redraft_count": state.get("chief_redraft_count", 0) + (1 if should_redraft else 0),
             "status": "chief_finalized",
@@ -137,6 +146,7 @@ class ChiefOfStaffAgent:
                 **state.get("model_metadata", {}),
                 "chief_of_staff_final_raw": raw,
                 "chief_final_reviewer_rejection_blocking": reviewer_rejection_blocking,
+                "chief_final_critical_reviewer_findings": has_critical_reviewer_findings,
             },
         }
 
@@ -210,6 +220,45 @@ class ChiefOfStaffAgent:
     @staticmethod
     def _is_jt_commenter_mode(state: SharedState) -> bool:
         return bool(state.get("jt_requested")) and state.get("jt_mode") == "commenter"
+
+    @staticmethod
+    def _format_reviewer_findings_block(reviewer_findings: Any, state: SharedState) -> str:
+        if not isinstance(reviewer_findings, dict):
+            review_feedback = state.get("review_feedback", [])
+            return "\n".join(f"- {item}" for item in review_feedback) or "- (none)"
+
+        def _render_list(label: str, key: str) -> str:
+            items = reviewer_findings.get(key, [])
+            if isinstance(items, list) and items:
+                joined = "\n".join(f"  - {item}" for item in items if isinstance(item, str))
+                if joined:
+                    return f"- {label}:\n{joined}"
+            return f"- {label}: (none)"
+
+        overall_assessment = reviewer_findings.get("overall_assessment", "")
+        if not isinstance(overall_assessment, str):
+            overall_assessment = ""
+        recommended_next_action = reviewer_findings.get("recommended_next_action", "revise")
+        if not isinstance(recommended_next_action, str):
+            recommended_next_action = "revise"
+
+        blocks = [
+            f"- overall_assessment: {overall_assessment or '(none)'}",
+            _render_list("missing_content", "missing_content"),
+            _render_list("unsupported_claims", "unsupported_claims"),
+            _render_list("contradictions_or_logic_problems", "contradictions_or_logic_problems"),
+            _render_list("format_or_structure_issues", "format_or_structure_issues"),
+            f"- recommended_next_action: {recommended_next_action}",
+        ]
+        return "\n".join(blocks)
+
+    @staticmethod
+    def _has_critical_reviewer_findings(reviewer_findings: Any) -> bool:
+        if not isinstance(reviewer_findings, dict):
+            return False
+        unsupported = reviewer_findings.get("unsupported_claims", [])
+        contradictions = reviewer_findings.get("contradictions_or_logic_problems", [])
+        return bool(unsupported) or bool(contradictions)
 
     @staticmethod
     def _normalize_jt_commenter_draft(draft: str, jt_requested: bool, jt_mode: str | None) -> str:

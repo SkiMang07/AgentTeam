@@ -60,10 +60,10 @@ This project is succeeding in the near term if it can:
 - [x] Confirm GitHub repo and local clone are working
 - [x] Review and tighten shared state fields
 - [ ] Improve Chief of Staff routing logic
-- [ ] Add clearer reviewer output structure
+- [x] Add clearer reviewer output structure
 - [x] Add Chief of Staff final validation pass
 - [ ] Make human review behavior explicit and easy to follow
-- [ ] Ensure README matches the actual implementation
+- [x] Ensure README matches the actual implementation
 
 ### 2. JT optional challenge stage
 
@@ -97,7 +97,7 @@ This project is succeeding in the near term if it can:
 - [ ] Include open questions in the work order
 - [ ] Include whether JT is requested
 - [ ] Make Researcher return structured findings
-- [ ] Make Reviewer return structured findings
+- [x] Make Reviewer return structured findings
 
 ### 4. Local file context
 
@@ -139,9 +139,9 @@ This project is succeeding in the near term if it can:
 
 ### Immediate next issues
 
-1. Structure reviewer findings
-2. Define Chief of Staff work order format
-3. Add first local file context workflow
+1. Define Chief of Staff work order format
+2. Add first local file context workflow
+3. Add evidence extraction from local files
 
 ### After those
 
@@ -152,12 +152,12 @@ This project is succeeding in the near term if it can:
 
 ## Current next task
 
-**Issue 3:** Structure reviewer findings
+**Issue 4:** Define Chief of Staff work order format
 
 ### Done when
 
-- Reviewer output includes clearer structured findings
-- Findings are specific enough to support deterministic redraft targets
+- Chief of Staff work order includes objective, deliverable type, and success criteria
+- Work order includes open questions and routing context for downstream agents
 - README and PROJECT_PLAN remain aligned with actual behavior
 
 ## Risks to avoid
@@ -197,3 +197,5 @@ This project is succeeding in the near term if it can:
 - Added CLI debug mode to print commenter failure artifacts across pass 1/pass 2 (writer, reviewer JSON, auto-redraft handoff) for direct diagnosis
 - Updated writer redraft behavior to revise the prior draft surgically (instead of regenerating from scratch) when reviewer targets are present
 - Completed Issue 2: final Chief of Staff validation now stores a short structured alignment/completeness result in shared state before routing to human review
+- Completed Issue 3: reviewer now returns a normalized structured QC findings object with explicit categories and recommended next action, consumed by Chief of Staff/JT downstream steps
+- Tightened reviewer/core-routing guardrails so unsupported claims and core fact contradictions are prioritized above formatting issues and blocked from normal human-review routing when unresolved
