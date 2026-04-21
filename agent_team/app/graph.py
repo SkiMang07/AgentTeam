@@ -113,6 +113,17 @@ def build_graph(
 
     def auto_redraft_prep_node(state: SharedState) -> SharedState:
         feedback = state.get("review_feedback", [])
+        reviewer_findings = state.get("reviewer_findings", {})
+        if not feedback and isinstance(reviewer_findings, dict):
+            for key in (
+                "missing_content",
+                "unsupported_claims",
+                "contradictions_or_logic_problems",
+                "format_or_structure_issues",
+            ):
+                issues = reviewer_findings.get(key, [])
+                if isinstance(issues, list):
+                    feedback.extend([item for item in issues if isinstance(item, str)])
         revision_notes = [f"Reviewer note: {item}" for item in feedback]
         print("\nReviewer requested revisions. Triggering one automatic redraft before human review.\n")
         next_state = {
@@ -230,7 +241,13 @@ def build_graph(
         if state.get("reviewer_parse_failed", False):
             return "reviewer_parse_failure"
         is_approved = state.get("review_approved", False)
-        has_feedback = bool(state.get("review_feedback"))
+        reviewer_findings = state.get("reviewer_findings", {})
+        recommended_next_action = (
+            reviewer_findings.get("recommended_next_action")
+            if isinstance(reviewer_findings, dict)
+            else None
+        )
+        has_feedback = bool(state.get("review_feedback")) or recommended_next_action in {"revise", "reject"}
         auto_redraft_count = state.get("auto_redraft_count", 0)
         jt_review_count = state.get("jt_review_count", 0)
         should_run_jt_stage = (

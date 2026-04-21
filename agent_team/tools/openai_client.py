@@ -85,21 +85,47 @@ class DryRunResponsesClient:
                 if self._reviewer_calls == 1:
                     return json.dumps(
                         {
-                            "approved": False,
-                            "feedback": [
-                                "Meaning changed: rewrite adds stronger ownership not present in source. Keep support language without new commitments.",
+                            "overall_assessment": "Draft violates JT commenter meaning-preservation constraint.",
+                            "missing_content": [],
+                            "unsupported_claims": [
+                                "Rewrite adds stronger ownership not present in source tone."
                             ],
+                            "contradictions_or_logic_problems": [],
+                            "format_or_structure_issues": [],
+                            "recommended_next_action": "revise",
                         }
                     )
-                return json.dumps({"approved": True, "feedback": []})
+                return json.dumps(
+                    {
+                        "overall_assessment": "Draft meets JT commenter QC checks.",
+                        "missing_content": [],
+                        "unsupported_claims": [],
+                        "contradictions_or_logic_problems": [],
+                        "format_or_structure_issues": [],
+                        "recommended_next_action": "approve",
+                    }
+                )
             if self._reviewer_calls == 1:
                 return json.dumps(
                     {
-                        "approved": False,
-                        "feedback": ["Add one revision pass to exercise redraft flow."],
+                        "overall_assessment": "Draft needs one quality-control revision before approval.",
+                        "missing_content": ["Add one concrete revision pass note for deterministic flow coverage."],
+                        "unsupported_claims": [],
+                        "contradictions_or_logic_problems": [],
+                        "format_or_structure_issues": [],
+                        "recommended_next_action": "revise",
                     }
                 )
-            return json.dumps({"approved": True, "feedback": []})
+            return json.dumps(
+                {
+                    "overall_assessment": "Draft passes quality-control checks.",
+                    "missing_content": [],
+                    "unsupported_claims": [],
+                    "contradictions_or_logic_problems": [],
+                    "format_or_structure_issues": [],
+                    "recommended_next_action": "approve",
+                }
+            )
 
         if "Return strict JSON with keys: verdict, executive_read" in user_prompt:
             return json.dumps(
@@ -126,8 +152,9 @@ class DryRunResponsesClient:
 
         if "Run final Chief of Staff pass before human review." in user_prompt:
             self._chief_final_calls += 1
+            reviewer_approved = "recommended_next_action: approve" in user_prompt
             if "JT Feedback:" in user_prompt and "JT Rewrite:" in user_prompt:
-                if "Reviewer findings:\n- (none)" in user_prompt:
+                if reviewer_approved:
                     return json.dumps(
                         {
                             "next_step": "human_review",

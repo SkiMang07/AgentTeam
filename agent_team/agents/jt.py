@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 from app.state import SharedState
 from tools.openai_client import ResponsesClient
@@ -17,8 +18,7 @@ class JTAgent:
 
     def run(self, state: SharedState) -> SharedState:
         draft = state.get("draft", "")
-        review_feedback = state.get("review_feedback", [])
-        review_block = "\n".join(f"- {item}" for item in review_feedback) or "- (none)"
+        review_block = self._format_reviewer_findings_block(state.get("reviewer_findings"), state)
         jt_mode = state.get("jt_mode")
 
         schema_instruction = (
@@ -37,7 +37,7 @@ class JTAgent:
                 "Comments only; do not rewrite the draft.\n\n"
                 f"JT mode: {jt_mode or 'default'}\n\n"
                 f"Writer draft:\n{draft}\n\n"
-                f"Reviewer findings:\n{review_block}"
+                f"Reviewer findings (structured):\n{review_block}"
             ),
         )
         data = self._normalize_output(self._safe_parse(raw))
@@ -104,3 +104,34 @@ class JTAgent:
         header = "JT findings (full_challenge):" if jt_mode == "full_challenge" else "JT findings:"
         lines = "\n".join(f"- {item}" for item in comments)
         return f"{header}\n{lines}"
+
+    @staticmethod
+    def _format_reviewer_findings_block(reviewer_findings: Any, state: SharedState) -> str:
+        if not isinstance(reviewer_findings, dict):
+            review_feedback = state.get("review_feedback", [])
+            return "\n".join(f"- {item}" for item in review_feedback) or "- (none)"
+
+        def _render_list(label: str, key: str) -> str:
+            items = reviewer_findings.get(key, [])
+            if isinstance(items, list) and items:
+                joined = "\n".join(f"  - {item}" for item in items if isinstance(item, str))
+                if joined:
+                    return f"- {label}:\n{joined}"
+            return f"- {label}: (none)"
+
+        overall_assessment = reviewer_findings.get("overall_assessment", "")
+        if not isinstance(overall_assessment, str):
+            overall_assessment = ""
+        recommended_next_action = reviewer_findings.get("recommended_next_action", "revise")
+        if not isinstance(recommended_next_action, str):
+            recommended_next_action = "revise"
+
+        blocks = [
+            f"- overall_assessment: {overall_assessment or '(none)'}",
+            _render_list("missing_content", "missing_content"),
+            _render_list("unsupported_claims", "unsupported_claims"),
+            _render_list("contradictions_or_logic_problems", "contradictions_or_logic_problems"),
+            _render_list("format_or_structure_issues", "format_or_structure_issues"),
+            f"- recommended_next_action: {recommended_next_action}",
+        ]
+        return "\n".join(blocks)

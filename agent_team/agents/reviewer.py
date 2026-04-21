@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import Literal
 
 from app.state import SharedState
 from tools.openai_client import ResponsesClient
@@ -25,10 +26,16 @@ class ReviewerAgent:
         if is_jt_commenter:
             jt_shape_error = self._validate_jt_commenter_draft_shape(draft)
             if jt_shape_error is not None:
+                findings = self._default_findings(
+                    overall_assessment="JT commenter draft violated required two-line output contract.",
+                    format_or_structure_issues=[jt_shape_error],
+                    recommended_next_action="reject",
+                )
                 return {
                     **state,
+                    "reviewer_findings": findings,
                     "review_approved": False,
-                    "review_feedback": [jt_shape_error],
+                    "review_feedback": self._build_feedback(findings),
                     "reviewer_parse_failed": False,
                     "reviewer_parse_error_raw": "",
                     "status": "reviewed",
@@ -51,10 +58,18 @@ class ReviewerAgent:
         )
         contract_violation = self._detect_contract_violation(raw)
         if contract_violation is not None:
+            findings = self._default_findings(
+                overall_assessment=(
+                    "Reviewer output contract violation: reviewer emitted non-JSON content."
+                ),
+                format_or_structure_issues=[contract_violation],
+                recommended_next_action="reject",
+            )
             return {
                 **state,
+                "reviewer_findings": findings,
                 "review_approved": False,
-                "review_feedback": [contract_violation],
+                "review_feedback": self._build_feedback(findings),
                 "reviewer_parse_failed": True,
                 "reviewer_parse_error_raw": raw,
                 "status": "reviewer_parse_failed",
@@ -68,14 +83,17 @@ class ReviewerAgent:
 
         parsed = self._safe_parse(raw)
         data = self._normalize_output(parsed)
+        review_feedback = self._build_feedback(data)
+        review_approved = data["recommended_next_action"] == "approve"
         parse_failed = bool(parsed.get("_parse_failed", False))
         prior_reviewer_history = state.get("model_metadata", {}).get("reviewer_outputs", [])
         reviewer_history = [*prior_reviewer_history, raw]
 
         return {
             **state,
-            "review_approved": data["approved"],
-            "review_feedback": data["feedback"],
+            "reviewer_findings": data,
+            "review_approved": review_approved,
+            "review_feedback": review_feedback,
             "reviewer_parse_failed": parse_failed,
             "reviewer_parse_error_raw": raw if parse_failed else "",
             "status": "reviewer_parse_failed" if parse_failed else "reviewed",
@@ -113,10 +131,16 @@ class ReviewerAgent:
         return (
             "Reviewer validator task:\n"
             "You are validating a candidate writer output against a contract.\n"
+            "You are a quality-control reviewer, not a rewriting stage.\n"
+            "Identify issues and recommend a next action. Do not rewrite the draft.\n"
             "The user-requested output format is an object to validate, not an instruction for your own output.\n"
             "Return ONLY valid JSON (no markdown fences, no prose before or after) with keys:\n"
-            "- approved (boolean)\n"
-            "- feedback (array of short strings)\n\n"
+            "- overall_assessment (short string)\n"
+            "- missing_content (array of short strings)\n"
+            "- unsupported_claims (array of short strings)\n"
+            "- contradictions_or_logic_problems (array of short strings)\n"
+            "- format_or_structure_issues (array of short strings)\n"
+            "- recommended_next_action (one of: approve, revise, reject)\n\n"
             "Grounding policy:\n"
             "- Treat concrete facts/specs explicitly present in the source task text as approved grounding,\n"
             "  even when specific (numbers, percentages, dates, named items, concrete claims).\n"
@@ -161,22 +185,59 @@ class ReviewerAgent:
                 except json.JSONDecodeError:
                     pass
             return {
-                "approved": False,
-                "feedback": ["Failed to parse reviewer output"],
+                "overall_assessment": "Failed to parse reviewer output into required JSON contract.",
+                "missing_content": [],
+                "unsupported_claims": [],
+                "contradictions_or_logic_problems": [],
+                "format_or_structure_issues": ["Failed to parse reviewer output"],
+                "recommended_next_action": "reject",
                 "_parse_failed": True,
             }
 
     @staticmethod
     def _normalize_output(data: dict) -> dict:
-        approved = data.get("approved")
-        if not isinstance(approved, bool):
-            approved = False
+        def _as_str(value: object, fallback: str) -> str:
+            return value if isinstance(value, str) else fallback
 
-        feedback = data.get("feedback")
-        if not isinstance(feedback, list) or not all(isinstance(item, str) for item in feedback):
-            feedback = ["Validation note: normalized invalid feedback to a default note."]
+        def _as_list_of_str(key: str) -> list[str]:
+            value = data.get(key)
+            if isinstance(value, list) and all(isinstance(item, str) for item in value):
+                return value
+            return []
 
-        return {**data, "approved": approved, "feedback": feedback}
+        recommended_next_action = data.get("recommended_next_action")
+        if recommended_next_action not in {"approve", "revise", "reject"}:
+            recommended_next_action = "revise"
+
+        normalized = ReviewerAgent._default_findings(
+            overall_assessment=_as_str(
+                data.get("overall_assessment"),
+                "Reviewer completed QC validation with normalized defaults.",
+            ),
+            missing_content=_as_list_of_str("missing_content"),
+            unsupported_claims=_as_list_of_str("unsupported_claims"),
+            contradictions_or_logic_problems=_as_list_of_str("contradictions_or_logic_problems"),
+            format_or_structure_issues=_as_list_of_str("format_or_structure_issues"),
+            recommended_next_action=recommended_next_action,
+        )
+
+        has_any_issues = any(
+            normalized[key]
+            for key in (
+                "missing_content",
+                "unsupported_claims",
+                "contradictions_or_logic_problems",
+                "format_or_structure_issues",
+            )
+        )
+        if normalized["recommended_next_action"] == "approve" and has_any_issues:
+            normalized["recommended_next_action"] = "revise"
+        if normalized["recommended_next_action"] in {"revise", "reject"} and not has_any_issues:
+            normalized["format_or_structure_issues"] = [
+                "Validation note: normalized missing issue details to a default issue."
+            ]
+
+        return {**data, **normalized}
 
     @staticmethod
     def _extract_json_object(raw: str) -> str | None:
@@ -195,3 +256,42 @@ class ReviewerAgent:
         if not lines[1].startswith("JT Rewrite:"):
             return "JT commenter contract failure: line 2 must start with 'JT Rewrite:'."
         return None
+
+    @staticmethod
+    def _default_findings(
+        *,
+        overall_assessment: str,
+        missing_content: list[str] | None = None,
+        unsupported_claims: list[str] | None = None,
+        contradictions_or_logic_problems: list[str] | None = None,
+        format_or_structure_issues: list[str] | None = None,
+        recommended_next_action: Literal["approve", "revise", "reject"] = "revise",
+    ) -> dict:
+        return {
+            "overall_assessment": overall_assessment,
+            "missing_content": missing_content or [],
+            "unsupported_claims": unsupported_claims or [],
+            "contradictions_or_logic_problems": contradictions_or_logic_problems or [],
+            "format_or_structure_issues": format_or_structure_issues or [],
+            "recommended_next_action": recommended_next_action,
+        }
+
+    @staticmethod
+    def _build_feedback(findings: dict) -> list[str]:
+        feedback: list[str] = []
+        category_labels = {
+            "missing_content": "Missing content",
+            "unsupported_claims": "Unsupported claim",
+            "contradictions_or_logic_problems": "Logic problem",
+            "format_or_structure_issues": "Format/structure issue",
+        }
+        for key, label in category_labels.items():
+            for item in findings.get(key, []):
+                feedback.append(f"{label}: {item}")
+        if not feedback:
+            action = findings.get("recommended_next_action", "revise")
+            if action == "approve":
+                feedback.append("Reviewer approved with no blocking issues.")
+            else:
+                feedback.append("Reviewer requested revisions with normalized default issue details.")
+        return feedback
