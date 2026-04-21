@@ -22,15 +22,15 @@ def build_graph(
     graph_builder = StateGraph(SharedState)
     max_auto_redrafts = 1
 
-    def _debug_enabled(state: SharedState) -> bool:
-        return bool(state.get("debug", False))
+    def _commenter_artifacts_enabled(state: SharedState) -> bool:
+        return bool(state.get("jt_requested", False)) and state.get("jt_mode") == "commenter"
 
     def _print_debug_block(title: str, body: str, state: SharedState) -> None:
-        if not _debug_enabled(state):
+        if not _commenter_artifacts_enabled(state):
             return
-        print(f"\n--- DEBUG: {title} ---")
+        print(f"\n===== {title} =====")
         print(body if body.strip() else "(empty)")
-        print("--- END DEBUG ---\n")
+        print("===== END =====\n")
 
     def timed_node(node_name: str, fn):
         def _wrapped(state: SharedState) -> SharedState:
@@ -68,10 +68,10 @@ def build_graph(
 
     def writer_node(state: SharedState) -> SharedState:
         result = writer.run(state)
-        if _debug_enabled(state):
+        if _commenter_artifacts_enabled(state):
             pass_no = state.get("auto_redraft_count", 0) + 1
             _print_debug_block(
-                f"writer output pass {pass_no}",
+                f"WRITER OUTPUT PASS {pass_no}",
                 result.get("draft", ""),
                 state,
             )
@@ -79,11 +79,17 @@ def build_graph(
 
     def reviewer_node(state: SharedState) -> SharedState:
         result = reviewer.run(state)
-        if _debug_enabled(state):
+        if _commenter_artifacts_enabled(state):
             pass_no = state.get("auto_redraft_count", 0) + 1
+            reviewer_raw = str(result.get("model_metadata", {}).get("reviewer_raw", ""))
+            if not reviewer_raw:
+                reviewer_raw = (
+                    f'{{"approved": {str(result.get("review_approved", False)).lower()}, '
+                    f'"feedback": {result.get("review_feedback", [])}}}'
+                )
             _print_debug_block(
-                f"reviewer JSON pass {pass_no}",
-                str(result.get("model_metadata", {}).get("reviewer_raw", "")),
+                f"REVIEWER JSON PASS {pass_no}",
+                reviewer_raw,
                 state,
             )
         return result
@@ -117,9 +123,9 @@ def build_graph(
             "auto_redraft_count": state.get("auto_redraft_count", 0) + 1,
             "status": "needs_redraft_auto",
         }
-        if _debug_enabled(state):
+        if _commenter_artifacts_enabled(state):
             _print_debug_block(
-                "auto_redraft_prep output",
+                "AUTO REDRAFT INPUT / INSTRUCTIONS",
                 (
                     f"revision_targets={next_state.get('revision_targets', [])}\n"
                     f"redraft_source_draft={next_state.get('redraft_source_draft', '')}\n"
@@ -253,21 +259,21 @@ def build_graph(
             "Stopping before normal human review."
         )
         print(f"\n{message}\n")
-        if _debug_enabled(state):
+        if _commenter_artifacts_enabled(state):
             writer_outputs = state.get("model_metadata", {}).get("writer_outputs", [])
             reviewer_outputs = state.get("model_metadata", {}).get("reviewer_outputs", [])
             _print_debug_block(
-                "writer output pass 1",
+                "WRITER OUTPUT PASS 1",
                 writer_outputs[0] if len(writer_outputs) > 0 else "",
                 state,
             )
             _print_debug_block(
-                "reviewer JSON pass 1",
+                "REVIEWER JSON PASS 1",
                 reviewer_outputs[0] if len(reviewer_outputs) > 0 else "",
                 state,
             )
             _print_debug_block(
-                "auto_redraft_prep output",
+                "AUTO REDRAFT INPUT / INSTRUCTIONS",
                 (
                     f"revision_targets={state.get('revision_targets', [])}\n"
                     f"redraft_source_draft={state.get('redraft_source_draft', '')}"
@@ -275,12 +281,12 @@ def build_graph(
                 state,
             )
             _print_debug_block(
-                "writer output pass 2",
+                "WRITER OUTPUT PASS 2",
                 writer_outputs[1] if len(writer_outputs) > 1 else "",
                 state,
             )
             _print_debug_block(
-                "reviewer JSON pass 2",
+                "REVIEWER JSON PASS 2",
                 reviewer_outputs[1] if len(reviewer_outputs) > 1 else "",
                 state,
             )
