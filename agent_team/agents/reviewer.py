@@ -35,7 +35,7 @@ class ReviewerAgent:
                 work_order_open_questions=open_questions or "- (none provided)",
                 facts_block=facts_block,
                 draft=evaluation_draft,
-                using_jt_rewrite=bool(state.get("jt_requested") and state.get("jt_rewrite")),
+                using_jt_rewrite=bool(self._is_jt_requested(state) and state.get("jt_rewrite")),
             ),
         )
 
@@ -44,6 +44,8 @@ class ReviewerAgent:
         data = self._enforce_core_fact_violations(
             findings=data,
             user_task=user_task,
+            work_order=work_order if isinstance(work_order, dict) else {},
+            approved_facts=approved_facts,
             draft=evaluation_draft,
         )
         review_feedback = self._build_feedback(data)
@@ -73,9 +75,18 @@ class ReviewerAgent:
 
     @staticmethod
     def _select_evaluation_draft(state: SharedState) -> str:
-        if state.get("jt_requested") and state.get("jt_rewrite"):
+        jt_requested = ReviewerAgent._is_jt_requested(state)
+        if jt_requested and state.get("jt_rewrite"):
             return state.get("jt_rewrite", "")
         return state.get("draft", "")
+
+    @staticmethod
+    def _is_jt_requested(state: SharedState) -> bool:
+        work_order = state.get("work_order", {})
+        jt_requested = work_order.get("jt_requested") if isinstance(work_order, dict) else None
+        if isinstance(jt_requested, bool):
+            return jt_requested
+        return bool(state.get("jt_requested"))
 
     @staticmethod
     def _build_reviewer_user_prompt(
@@ -192,14 +203,24 @@ class ReviewerAgent:
         return {**data, **normalized}
 
     @staticmethod
-    def _enforce_core_fact_violations(findings: dict, user_task: str, draft: str) -> dict:
+    def _enforce_core_fact_violations(
+        findings: dict,
+        user_task: str,
+        work_order: dict,
+        approved_facts: list[str],
+        draft: str,
+    ) -> dict:
         normalized = {**findings}
         unsupported = list(normalized.get("unsupported_claims", []))
         contradictions = list(normalized.get("contradictions_or_logic_problems", []))
         missing = list(normalized.get("missing_content", []))
         format_issues = list(normalized.get("format_or_structure_issues", []))
 
-        policy = ReviewerAgent._extract_grounding_policy(user_task)
+        policy = ReviewerAgent._extract_grounding_policy(
+            user_task=user_task,
+            work_order=work_order,
+            approved_facts=approved_facts,
+        )
         if not policy["is_closed_facts_mode"] and not policy["is_no_invention_mode"]:
             return normalized
 
@@ -223,7 +244,9 @@ class ReviewerAgent:
 
         if blocked_hits:
             label = "Use-only-facts violation" if policy["is_closed_facts_mode"] else "No-invention constraint violation"
-            unsupported.extend([f"{label}: draft includes blocked claim from task text ('{item}'). Remove it." for item in blocked_hits])
+            unsupported.extend(
+                [f"{label}: draft includes explicitly prohibited claim ('{item}'). Remove it." for item in blocked_hits]
+            )
         if blocked_missing_items:
             label = (
                 "Use-only-facts precedence"
@@ -320,24 +343,28 @@ class ReviewerAgent:
         return feedback
 
     @staticmethod
-    def _extract_grounding_policy(user_task: str) -> dict:
+    def _extract_grounding_policy(user_task: str, work_order: dict, approved_facts: list[str]) -> dict:
         task = user_task or ""
         trigger_match = re.search(r"use only these facts\s*:\s*", task, flags=re.IGNORECASE)
         is_closed_facts_mode = trigger_match is not None
-        post_trigger = task[trigger_match.end() :] if trigger_match else task
         source_text = ReviewerAgent._extract_primary_source_text(task)
         is_no_invention_mode = ReviewerAgent._detect_no_invention_constraints(task)
 
-        if is_closed_facts_mode:
-            allowlist_raw, blocked_claims = ReviewerAgent._extract_claim_scopes(post_trigger)
+        allowed_facts = [item for item in approved_facts if isinstance(item, str) and item.strip()]
+        if not allowed_facts and is_closed_facts_mode:
+            post_trigger = task[trigger_match.end() :] if trigger_match else task
+            allowlist_raw, _ = ReviewerAgent._extract_claim_scopes(post_trigger)
             allowed_facts = ReviewerAgent._split_claims(allowlist_raw)
-        else:
-            allowed_facts = []
-            blocked_claims = []
+
+        blocked_claims = ReviewerAgent._extract_explicitly_prohibited_claims(task)
+        required_claims = ReviewerAgent._extract_required_claims_from_work_order(work_order)
+        blocked_claims = [
+            claim for claim in blocked_claims if not ReviewerAgent._claim_conflicts_with_required(claim, required_claims)
+        ]
 
         if is_no_invention_mode:
             no_invention_scope = source_text or task
-            blocked_claims.extend(ReviewerAgent._extract_directive_claims(no_invention_scope))
+            blocked_claims.extend(ReviewerAgent._extract_explicitly_prohibited_claims(no_invention_scope))
 
         return {
             "is_closed_facts_mode": is_closed_facts_mode,
@@ -363,6 +390,47 @@ class ReviewerAgent:
     def _extract_directive_claims(raw_text: str) -> list[str]:
         _, blocked_claims = ReviewerAgent._extract_claim_scopes(raw_text)
         return blocked_claims
+
+    @staticmethod
+    def _extract_explicitly_prohibited_claims(raw_text: str) -> list[str]:
+        prohibited: list[str] = []
+        patterns = (
+            r"\bdo not add\b\s*([^.;\n]+)",
+            r"\bwithout adding\b\s*([^.;\n]+)",
+            r"\bdo not include\b\s*([^.;\n]+)",
+            r"\bwithout including\b\s*([^.;\n]+)",
+            r"\bdo not invent\b\s*([^.;\n]+)",
+            r"\bwithout inventing\b\s*([^.;\n]+)",
+        )
+        for pattern in patterns:
+            for match in re.finditer(pattern, raw_text, flags=re.IGNORECASE):
+                prohibited.extend(ReviewerAgent._split_claims(match.group(1)))
+        return prohibited
+
+    @staticmethod
+    def _extract_required_claims_from_work_order(work_order: dict) -> list[str]:
+        if not isinstance(work_order, dict):
+            return []
+        required: list[str] = []
+        for key in ("success_criteria", "open_questions"):
+            value = work_order.get(key, [])
+            if isinstance(value, list):
+                required.extend([item for item in value if isinstance(item, str)])
+        return required
+
+    @staticmethod
+    def _claim_conflicts_with_required(claim: str, required_claims: list[str]) -> bool:
+        claim_text = ReviewerAgent._normalize_text(claim)
+        if not claim_text:
+            return False
+        for required in required_claims:
+            required_text = ReviewerAgent._normalize_text(required)
+            if required_text and (
+                ReviewerAgent._appears_in_text(claim_text, required_text)
+                or ReviewerAgent._appears_in_text(required_text, claim_text)
+            ):
+                return True
+        return False
 
     @staticmethod
     def _directive_pattern() -> re.Pattern[str]:

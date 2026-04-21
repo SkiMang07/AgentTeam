@@ -76,7 +76,8 @@ class ChiefOfStaffAgent:
             ),
         )
         data = self._normalize_final_output(self._safe_parse(raw))
-        current_notes = state.get("approved_facts", [])
+        current_guidance_notes = state.get("writer_guidance_notes", [])
+        current_chief_notes = state.get("chief_notes", [])
         chief_notes = data.get("instructions", "")
         has_critical_reviewer_findings = self._has_critical_reviewer_findings(reviewer_findings)
 
@@ -98,11 +99,14 @@ class ChiefOfStaffAgent:
         critical_reviewer_blocking = has_critical_reviewer_findings and not should_redraft
 
         if should_redraft and chief_notes:
-            current_notes = [*current_notes, f"Chief final pass note: {chief_notes}"]
+            guidance_note = f"Chief final pass note: {chief_notes}"
+            current_guidance_notes = [*current_guidance_notes, guidance_note]
+            current_chief_notes = [*current_chief_notes, guidance_note]
 
         return {
             **state,
-            "approved_facts": current_notes,
+            "writer_guidance_notes": current_guidance_notes,
+            "chief_notes": current_chief_notes,
             "chief_final_next_step": "writer" if should_redraft else "human_review",
             "critical_reviewer_blocking": critical_reviewer_blocking,
             "chief_final_validation": chief_validation,
@@ -285,7 +289,11 @@ class ChiefOfStaffAgent:
 
     @staticmethod
     def _format_jt_block(state: SharedState) -> str:
-        if not state.get("jt_requested"):
+        work_order = state.get("work_order", {})
+        jt_requested = work_order.get("jt_requested") if isinstance(work_order, dict) else None
+        if not isinstance(jt_requested, bool):
+            jt_requested = bool(state.get("jt_requested"))
+        if not jt_requested:
             return "(JT not requested)"
 
         feedback = state.get("jt_feedback") or []

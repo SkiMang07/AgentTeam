@@ -203,3 +203,9 @@ This project is succeeding in the near term if it can:
 - Reworked JT into a first-class graph node with explicit `jt_input`, `jt_feedback`, and `jt_rewrite` contracts; reviewer now validates the JT rewrite artifact on JT paths and commenter-mode indirection was removed
 - Fixed reviewer precedence for closed-fact tasks so blocked claims are never treated as required `missing_content` on non-JT paths
 - Completed Issue 4: Chief of Staff now creates a canonical structured `work_order` in shared state, and Researcher/Writer/Reviewer/Chief-final all consume this shared artifact directly; JT routing is aligned to `work_order.jt_requested`
+
+### 2026-04-22
+- Fixed a non-JT closed-facts regression where reviewer raw-task blocked-claim parsing could conflict with structured work-order requirements and create unsatisfiable redraft loops
+- Reviewer closed-facts enforcement now prefers canonical work-order + approved-facts contracts and only treats explicit prohibition clauses as blocked claims
+- Kept `approved_facts` evidence-only; reviewer/chief/human revision instructions now flow through explicit writer guidance note fields
+- Reduced `jt_requested` drift risk by preferring `work_order.jt_requested` when selecting reviewer artifact and formatting Chief-final JT context
