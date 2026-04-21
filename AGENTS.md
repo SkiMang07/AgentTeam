@@ -69,3 +69,14 @@ Documentation discipline:
 - if implementation changes behavior, update `README.md`
 - if implementation changes project status or priorities, update `PROJECT_PLAN.md`
 - prefer small, reviewable PRs over large bundled changes
+
+
+Branch and PR rules for this repo
+- Before making changes, sync your work to the latest state of the target branch and inspect for drift.
+- If there is already an open PR branch for this issue, continue updating that branch instead of creating a new overlapping branch.
+- Keep changes tightly scoped to the issue. Do not modify unrelated files.
+- Avoid opportunistic refactors, renames, or formatting-only edits outside the files required for the issue.
+- If the target files have changed materially since the task started, stop and summarize likely conflict risk before making broad edits.
+- Prefer one issue per branch or worktree. Do not mix multiple issue implementations in one branch.
+- When possible, minimize edits to files that are already being changed in another open PR.
+- In your final response, list exactly which files changed and call out any files likely to conflict with open PRs.
