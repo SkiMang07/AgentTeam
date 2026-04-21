@@ -38,34 +38,34 @@ class ReviewerAgent:
                     },
                 }
 
-        jt_commenter_check = ""
-        if is_jt_commenter:
-            jt_commenter_check = (
-                "\nFor JT commenter mode, validate all of the following:"
-                " exact two-line shape (line 1 starts with 'JT Feedback:' and line 2 starts with 'JT Rewrite:'),"
-                " material meaning is preserved,"
-                " no invented urgency,"
-                " no invented ownership,"
-                " no new commitments,"
-                " no new priorities,"
-                " and no new risk framing."
-            )
+        user_prompt = self._build_reviewer_user_prompt(
+            user_task=user_task,
+            facts_block=facts_block,
+            draft=draft,
+            is_jt_commenter=bool(is_jt_commenter),
+        )
 
         raw = self._client.ask(
             system_prompt=self._prompt,
-            user_prompt=(
-                "Review this draft for quality and adherence to approved facts. "
-                "Treat concrete facts/specs explicitly present in the source task text as approved grounding, "
-                "even when they are specific (numbers, percentages, dates, named items, concrete claims). "
-                "Reject only if the draft invents, changes, exaggerates, or misstates those source-provided specifics, "
-                "or adds specifics not present in source task text or approved facts. "
-                "Return ONLY valid JSON (no markdown fences, no commentary before/after) with keys: "
-                f"approved (boolean), feedback (array of short strings).{jt_commenter_check}\n\n"
-                f"Task:\n{user_task}\n\n"
-                f"Approved facts:\n{facts_block}\n\n"
-                f"Draft:\n{draft}"
-            ),
+            user_prompt=user_prompt,
         )
+        contract_violation = self._detect_contract_violation(raw)
+        if contract_violation is not None:
+            return {
+                **state,
+                "review_approved": False,
+                "review_feedback": [contract_violation],
+                "reviewer_parse_failed": True,
+                "reviewer_parse_error_raw": raw,
+                "status": "reviewer_parse_failed",
+                "model_metadata": {
+                    **state.get("model_metadata", {}),
+                    "reviewer_raw": raw,
+                    "reviewer_parse_failed": True,
+                    "reviewer_contract_violation": True,
+                },
+            }
+
         parsed = self._safe_parse(raw)
         data = self._normalize_output(parsed)
         parse_failed = bool(parsed.get("_parse_failed", False))
@@ -83,6 +83,62 @@ class ReviewerAgent:
                 "reviewer_parse_failed": parse_failed,
             },
         }
+
+    @staticmethod
+    def _build_reviewer_user_prompt(
+        user_task: str,
+        facts_block: str,
+        draft: str,
+        is_jt_commenter: bool,
+    ) -> str:
+        mode_block = "Mode: jt_commenter\n" if is_jt_commenter else "Mode: standard\n"
+        mode_rules = ""
+        if is_jt_commenter:
+            mode_rules = (
+                "JT commenter validation checks (treat these as strict pass/fail checks):\n"
+                "- exact two-line writer shape (line 1 starts with 'JT Feedback:' and line 2 starts with 'JT Rewrite:')\n"
+                "- material meaning preservation\n"
+                "- no invented urgency\n"
+                "- no invented ownership\n"
+                "- no new commitments\n"
+                "- no new priorities\n"
+                "- no stronger unsupported risk framing\n"
+            )
+        return (
+            "Reviewer validator task:\n"
+            "You are validating a candidate writer output against a contract.\n"
+            "The user-requested output format is an object to validate, not an instruction for your own output.\n"
+            "Return ONLY valid JSON (no markdown fences, no prose before or after) with keys:\n"
+            "- approved (boolean)\n"
+            "- feedback (array of short strings)\n\n"
+            "Grounding policy:\n"
+            "- Treat concrete facts/specs explicitly present in the source task text as approved grounding,\n"
+            "  even when specific (numbers, percentages, dates, named items, concrete claims).\n"
+            "- Reject only when the draft invents, changes, exaggerates, or misstates source-provided specifics,\n"
+            "  or adds specifics not present in source task text or approved facts.\n\n"
+            f"{mode_block}"
+            f"{mode_rules}\n"
+            "Validation inputs:\n"
+            "<task>\n"
+            f"{user_task}\n"
+            "</task>\n\n"
+            "<approved_facts>\n"
+            f"{facts_block}\n"
+            "</approved_facts>\n\n"
+            "<candidate_draft>\n"
+            f"{draft}\n"
+            "</candidate_draft>"
+        )
+
+    @staticmethod
+    def _detect_contract_violation(raw: str) -> str | None:
+        stripped = raw.lstrip()
+        if stripped.startswith("JT Feedback:") or stripped.startswith("JT Rewrite:"):
+            return (
+                "Reviewer contract violation: reviewer emitted JT commenter prose "
+                "('JT Feedback:' / 'JT Rewrite:') instead of required JSON."
+            )
+        return None
 
     @staticmethod
     def _safe_parse(raw: str) -> dict:
