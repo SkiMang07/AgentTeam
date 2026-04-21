@@ -69,6 +69,8 @@ class ReviewerAgent:
         parsed = self._safe_parse(raw)
         data = self._normalize_output(parsed)
         parse_failed = bool(parsed.get("_parse_failed", False))
+        prior_reviewer_history = state.get("model_metadata", {}).get("reviewer_outputs", [])
+        reviewer_history = [*prior_reviewer_history, raw]
 
         return {
             **state,
@@ -81,6 +83,7 @@ class ReviewerAgent:
                 **state.get("model_metadata", {}),
                 "reviewer_raw": raw,
                 "reviewer_parse_failed": parse_failed,
+                "reviewer_outputs": reviewer_history,
             },
         }
 
@@ -103,6 +106,9 @@ class ReviewerAgent:
                 "- no new commitments\n"
                 "- no new priorities\n"
                 "- no stronger unsupported risk framing\n"
+                "- allow sentence compression, filler removal, equivalent wording, and modest sharpening when material meaning is preserved\n"
+                "- do not reject solely because praise/support language is tightened or lightly reduced when the core supportive intent remains\n"
+                "- treat these as acceptable non-material edits when unchanged in intent: 'I appreciate the team's work', 'encouraged by momentum', 'let me know if you need anything', and similar morale language\n"
             )
         return (
             "Reviewer validator task:\n"
@@ -116,6 +122,9 @@ class ReviewerAgent:
             "  even when specific (numbers, percentages, dates, named items, concrete claims).\n"
             "- Reject only when the draft invents, changes, exaggerates, or misstates source-provided specifics,\n"
             "  or adds specifics not present in source task text or approved facts.\n\n"
+            "Feedback quality policy:\n"
+            "- When rejecting, each feedback item must name the exact problematic phrase and include a minimal concrete rewrite target.\n"
+            "- Avoid generic notes like 'preserve tone better'; make the redraft instruction specific enough for a second pass to succeed.\n\n"
             f"{mode_block}"
             f"{mode_rules}\n"
             "Validation inputs:\n"

@@ -12,6 +12,7 @@ class ModelMetadata(TypedDict, total=False):
 class SharedState(TypedDict):
     user_task: str
     dry_run: NotRequired[bool]
+    debug: NotRequired[bool]
     jt_requested: NotRequired[bool]
     jt_mode: NotRequired[str | None]
     jt_findings: NotRequired[str | None]
@@ -22,6 +23,8 @@ class SharedState(TypedDict):
     approved_facts: NotRequired[list[str]]
     draft: NotRequired[str]
     review_feedback: NotRequired[list[str]]
+    revision_targets: NotRequired[list[str]]
+    redraft_source_draft: NotRequired[str]
     review_approved: NotRequired[bool]
     reviewer_parse_failed: NotRequired[bool]
     reviewer_parse_error_raw: NotRequired[str]
