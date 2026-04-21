@@ -22,16 +22,6 @@ def build_graph(
     graph_builder = StateGraph(SharedState)
     max_auto_redrafts = 1
 
-    def _commenter_artifacts_enabled(state: SharedState) -> bool:
-        return bool(state.get("jt_requested", False)) and state.get("jt_mode") == "commenter"
-
-    def _print_debug_block(title: str, body: str, state: SharedState) -> None:
-        if not _commenter_artifacts_enabled(state):
-            return
-        print(f"\n===== {title} =====")
-        print(body if body.strip() else "(empty)")
-        print("===== END =====\n")
-
     def timed_node(node_name: str, fn):
         def _wrapped(state: SharedState) -> SharedState:
             print(f"[flow] entering node: {node_name}")
@@ -67,32 +57,7 @@ def build_graph(
         return researcher.run(state)
 
     def writer_node(state: SharedState) -> SharedState:
-        result = writer.run(state)
-        if _commenter_artifacts_enabled(state):
-            pass_no = state.get("auto_redraft_count", 0) + 1
-            _print_debug_block(
-                f"WRITER OUTPUT PASS {pass_no}",
-                result.get("draft", ""),
-                state,
-            )
-        return result
-
-    def reviewer_node(state: SharedState) -> SharedState:
-        result = reviewer.run(state)
-        if _commenter_artifacts_enabled(state):
-            pass_no = state.get("auto_redraft_count", 0) + 1
-            reviewer_raw = str(result.get("model_metadata", {}).get("reviewer_raw", ""))
-            if not reviewer_raw:
-                reviewer_raw = (
-                    f'{{"approved": {str(result.get("review_approved", False)).lower()}, '
-                    f'"feedback": {result.get("review_feedback", [])}}}'
-                )
-            _print_debug_block(
-                f"REVIEWER JSON PASS {pass_no}",
-                reviewer_raw,
-                state,
-            )
-        return result
+        return writer.run(state)
 
     def jt_node(state: SharedState) -> SharedState:
         jt_state = jt.run(state)
@@ -101,14 +66,17 @@ def build_graph(
             "jt_review_count": state.get("jt_review_count", 0) + 1,
         }
 
+    def reviewer_node(state: SharedState) -> SharedState:
+        return reviewer.run(state)
+
     def chief_final_node(state: SharedState) -> SharedState:
         return chief_of_staff.final_pass(state)
 
     timed_chief_node = timed_node("chief_of_staff", chief_node)
     timed_researcher_node = timed_node("researcher", researcher_node)
     timed_writer_node = timed_node("writer", writer_node)
-    timed_reviewer_node = timed_node("reviewer", reviewer_node)
     timed_jt_node = timed_node("jt", jt_node)
+    timed_reviewer_node = timed_node("reviewer", reviewer_node)
     timed_chief_final_node = timed_node("chief_of_staff_final", chief_final_node)
 
     def auto_redraft_prep_node(state: SharedState) -> SharedState:
@@ -124,9 +92,10 @@ def build_graph(
                 issues = reviewer_findings.get(key, [])
                 if isinstance(issues, list):
                     feedback.extend([item for item in issues if isinstance(item, str)])
+
         revision_notes = [f"Reviewer note: {item}" for item in feedback]
         print("\nReviewer requested revisions. Triggering one automatic redraft before human review.\n")
-        next_state = {
+        return {
             **state,
             "approved_facts": [*state.get("approved_facts", []), *revision_notes],
             "revision_targets": feedback,
@@ -134,17 +103,6 @@ def build_graph(
             "auto_redraft_count": state.get("auto_redraft_count", 0) + 1,
             "status": "needs_redraft_auto",
         }
-        if _commenter_artifacts_enabled(state):
-            _print_debug_block(
-                "AUTO REDRAFT INPUT / INSTRUCTIONS",
-                (
-                    f"revision_targets={next_state.get('revision_targets', [])}\n"
-                    f"redraft_source_draft={next_state.get('redraft_source_draft', '')}\n"
-                    f"approved_facts_added={revision_notes}"
-                ),
-                state,
-            )
-        return next_state
 
     def human_review_node(state: SharedState) -> SharedState:
         if state.get("dry_run"):
@@ -199,9 +157,10 @@ def build_graph(
                     ],
                     "status": "needs_redraft",
                 }
-                print("\nApplying human revision notes and re-running Writer + Reviewer.\n")
+                print("\nApplying human revision notes and re-running Writer + QC flow.\n")
                 redrafted_state = timed_writer_node(revised_state)
-                rereviewed_state = timed_reviewer_node(redrafted_state)
+                post_writer = timed_jt_node(redrafted_state) if redrafted_state.get("jt_requested") else redrafted_state
+                rereviewed_state = timed_reviewer_node(post_writer)
                 return human_review_node(rereviewed_state)
 
             return {
@@ -237,86 +196,38 @@ def build_graph(
     def route_after_chief(state: SharedState) -> str:
         return "researcher" if state.get("route") == "research" else "writer"
 
+    def route_after_writer(state: SharedState) -> str:
+        return "jt" if state.get("jt_requested", False) else "reviewer"
+
     def route_after_reviewer(state: SharedState) -> str:
         if state.get("reviewer_parse_failed", False):
             return "reviewer_parse_failure"
-        is_approved = state.get("review_approved", False)
+
         reviewer_findings = state.get("reviewer_findings", {})
         recommended_next_action = (
             reviewer_findings.get("recommended_next_action")
             if isinstance(reviewer_findings, dict)
             else None
         )
-        if recommended_next_action in {"approve", "revise", "reject"}:
-            is_approved = recommended_next_action == "approve"
+        is_approved = recommended_next_action == "approve"
         has_feedback = bool(state.get("review_feedback")) or recommended_next_action in {"revise", "reject"}
         auto_redraft_count = state.get("auto_redraft_count", 0)
-        jt_review_count = state.get("jt_review_count", 0)
-        should_run_jt_stage = (
-            state.get("jt_requested", False)
-            and state.get("jt_mode") != "commenter"
-            and jt_review_count < 1
-        )
+
         if (not is_approved) and has_feedback and auto_redraft_count < max_auto_redrafts:
             return "auto_redraft_prep"
-        if should_run_jt_stage:
-            return "jt"
         return "chief_final"
 
     def route_after_chief_final(state: SharedState) -> str:
         if state.get("critical_reviewer_blocking", False):
             return "review_rejected_after_redraft"
-        if (
-            state.get("jt_requested", False)
-            and state.get("jt_mode") == "commenter"
-            and not state.get("review_approved", False)
-        ):
-            return "review_rejected_after_redraft"
         return state.get("chief_final_next_step", "human_review")
 
     def review_rejected_after_redraft_node(state: SharedState) -> SharedState:
-        if state.get("critical_reviewer_blocking", False):
-            message = (
-                "Reviewer found unresolved unsupported claims or core fact contradictions. "
-                "Stopping before normal human review."
-            )
-        else:
-            message = (
-                "Reviewer verdict remains needs_revision after the automatic redraft pass. "
-                "Stopping before normal human review."
-            )
+        message = (
+            "Reviewer found unresolved unsupported claims or core fact contradictions. "
+            "Stopping before normal human review."
+        )
         print(f"\n{message}\n")
-        if _commenter_artifacts_enabled(state):
-            writer_outputs = state.get("model_metadata", {}).get("writer_outputs", [])
-            reviewer_outputs = state.get("model_metadata", {}).get("reviewer_outputs", [])
-            _print_debug_block(
-                "WRITER OUTPUT PASS 1",
-                writer_outputs[0] if len(writer_outputs) > 0 else "",
-                state,
-            )
-            _print_debug_block(
-                "REVIEWER JSON PASS 1",
-                reviewer_outputs[0] if len(reviewer_outputs) > 0 else "",
-                state,
-            )
-            _print_debug_block(
-                "AUTO REDRAFT INPUT / INSTRUCTIONS",
-                (
-                    f"revision_targets={state.get('revision_targets', [])}\n"
-                    f"redraft_source_draft={state.get('redraft_source_draft', '')}"
-                ),
-                state,
-            )
-            _print_debug_block(
-                "WRITER OUTPUT PASS 2",
-                writer_outputs[1] if len(writer_outputs) > 1 else "",
-                state,
-            )
-            _print_debug_block(
-                "REVIEWER JSON PASS 2",
-                reviewer_outputs[1] if len(reviewer_outputs) > 1 else "",
-                state,
-            )
         return {
             **state,
             "final_output": message,
@@ -326,8 +237,8 @@ def build_graph(
     graph_builder.add_node("chief_of_staff", timed_chief_node)
     graph_builder.add_node("researcher", timed_researcher_node)
     graph_builder.add_node("writer", timed_writer_node)
-    graph_builder.add_node("reviewer", timed_reviewer_node)
     graph_builder.add_node("jt", timed_jt_node)
+    graph_builder.add_node("reviewer", timed_reviewer_node)
     graph_builder.add_node("chief_final", timed_chief_final_node)
     graph_builder.add_node("auto_redraft_prep", timed_node("auto_redraft_prep", auto_redraft_prep_node))
     graph_builder.add_node("human_review", timed_node("human_review", human_review_node))
@@ -347,19 +258,25 @@ def build_graph(
         },
     )
     graph_builder.add_edge("researcher", "writer")
-    graph_builder.add_edge("writer", "reviewer")
+    graph_builder.add_conditional_edges(
+        "writer",
+        route_after_writer,
+        {
+            "jt": "jt",
+            "reviewer": "reviewer",
+        },
+    )
+    graph_builder.add_edge("jt", "reviewer")
     graph_builder.add_conditional_edges(
         "reviewer",
         route_after_reviewer,
         {
             "reviewer_parse_failure": "reviewer_parse_failure",
             "auto_redraft_prep": "auto_redraft_prep",
-            "jt": "jt",
             "chief_final": "chief_final",
         },
     )
     graph_builder.add_edge("auto_redraft_prep", "writer")
-    graph_builder.add_edge("jt", "chief_final")
     graph_builder.add_conditional_edges(
         "chief_final",
         route_after_chief_final,

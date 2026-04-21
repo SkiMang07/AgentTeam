@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any
 
 from app.state import SharedState
 from tools.openai_client import ResponsesClient
@@ -17,35 +16,40 @@ class JTAgent:
         self._prompt = PROMPT_PATH.read_text(encoding="utf-8")
 
     def run(self, state: SharedState) -> SharedState:
-        draft = state.get("draft", "")
-        review_block = self._format_reviewer_findings_block(state.get("reviewer_findings"), state)
+        writer_draft = state.get("draft", "")
+        approved_facts = state.get("approved_facts", [])
+        facts_block = "\n".join(f"- {fact}" for fact in approved_facts) or "- (none provided)"
         jt_mode = state.get("jt_mode")
-
-        schema_instruction = (
-            "Return strict JSON with keys: verdict, executive_read, fatal_flaws, "
-            "fixable_weaknesses, hidden_assumptions, executive_challenges, next_move. "
-            "All fields must be short strings except fatal_flaws/fixable_weaknesses/"
-            "hidden_assumptions/executive_challenges, which must be arrays of short strings."
-            if jt_mode == "full_challenge"
-            else "Return strict JSON with key: comments (array of short strings)."
-        )
 
         raw = self._client.ask(
             system_prompt=self._prompt,
             user_prompt=(
-                f"{schema_instruction} "
-                "Comments only; do not rewrite the draft.\n\n"
+                "Return strict JSON with keys: jt_feedback, jt_rewrite. "
+                "jt_feedback must be an array of short strings. "
+                "jt_rewrite must be a single string.\n\n"
                 f"JT mode: {jt_mode or 'default'}\n\n"
-                f"Writer draft:\n{draft}\n\n"
-                f"Reviewer findings (structured):\n{review_block}"
+                f"Task:\n{state['user_task']}\n\n"
+                f"Approved facts:\n{facts_block}\n\n"
+                f"Writer draft to challenge and rewrite:\n{writer_draft}"
             ),
         )
-        data = self._normalize_output(self._safe_parse(raw))
-        findings = self._format_findings(data, jt_mode)
+
+        data = self._normalize_output(self._safe_parse(raw), fallback_rewrite=writer_draft)
+        jt_feedback = data["jt_feedback"]
+        jt_rewrite = data["jt_rewrite"]
 
         return {
             **state,
-            "jt_findings": findings,
+            "jt_input": {
+                "writer_draft": writer_draft,
+                "user_task": state["user_task"],
+                "approved_facts": approved_facts,
+                "jt_mode": jt_mode,
+            },
+            "jt_feedback": jt_feedback,
+            "jt_rewrite": jt_rewrite,
+            "jt_findings": self._format_findings(jt_feedback),
+            "draft": jt_rewrite,
             "status": "jt_reviewed",
             "model_metadata": {
                 **state.get("model_metadata", {}),
@@ -64,30 +68,26 @@ class JTAgent:
                     return json.loads(candidate)
                 except json.JSONDecodeError:
                     pass
-            return {"comments": ["Failed to parse JT output"]}
+            return {}
 
     @staticmethod
-    def _normalize_output(data: dict) -> dict:
-        if "comments" not in data:
-            comments: list[str] = []
-            verdict = data.get("verdict")
-            if isinstance(verdict, str):
-                comments.append(f"Verdict: {verdict}")
-            for key in ["executive_read", "next_move"]:
-                value = data.get(key)
-                if isinstance(value, str):
-                    comments.append(f"{key.replace('_', ' ').title()}: {value}")
-            for key in ["fatal_flaws", "fixable_weaknesses", "hidden_assumptions", "executive_challenges"]:
-                value = data.get(key)
-                if isinstance(value, list):
-                    comments.extend(f"{key.replace('_', ' ').title()}: {item}" for item in value if isinstance(item, str))
-            if comments:
-                return {**data, "comments": comments}
+    def _normalize_output(data: dict, fallback_rewrite: str) -> dict:
+        jt_feedback = data.get("jt_feedback")
+        if not isinstance(jt_feedback, list) or not all(isinstance(item, str) for item in jt_feedback):
+            jt_feedback = ["JT output normalization note: feedback did not match the required schema."]
 
-        comments = data.get("comments")
-        if not isinstance(comments, list) or not all(isinstance(item, str) for item in comments):
-            comments = ["Validation note: normalized invalid JT comments to a default note."]
-        return {**data, "comments": comments}
+        jt_rewrite = data.get("jt_rewrite")
+        if not isinstance(jt_rewrite, str) or not jt_rewrite.strip():
+            jt_rewrite = fallback_rewrite
+            jt_feedback = [
+                *jt_feedback,
+                "JT output normalization note: rewrite was empty or invalid, so writer draft was reused.",
+            ]
+
+        return {
+            "jt_feedback": jt_feedback,
+            "jt_rewrite": jt_rewrite.strip(),
+        }
 
     @staticmethod
     def _extract_json_object(raw: str) -> str | None:
@@ -97,41 +97,8 @@ class JTAgent:
         return None
 
     @staticmethod
-    def _format_findings(data: dict, jt_mode: str | None) -> str | None:
-        comments = data.get("comments", [])
-        if not comments:
+    def _format_findings(feedback: list[str]) -> str | None:
+        if not feedback:
             return None
-        header = "JT findings (full_challenge):" if jt_mode == "full_challenge" else "JT findings:"
-        lines = "\n".join(f"- {item}" for item in comments)
-        return f"{header}\n{lines}"
-
-    @staticmethod
-    def _format_reviewer_findings_block(reviewer_findings: Any, state: SharedState) -> str:
-        if not isinstance(reviewer_findings, dict):
-            review_feedback = state.get("review_feedback", [])
-            return "\n".join(f"- {item}" for item in review_feedback) or "- (none)"
-
-        def _render_list(label: str, key: str) -> str:
-            items = reviewer_findings.get(key, [])
-            if isinstance(items, list) and items:
-                joined = "\n".join(f"  - {item}" for item in items if isinstance(item, str))
-                if joined:
-                    return f"- {label}:\n{joined}"
-            return f"- {label}: (none)"
-
-        overall_assessment = reviewer_findings.get("overall_assessment", "")
-        if not isinstance(overall_assessment, str):
-            overall_assessment = ""
-        recommended_next_action = reviewer_findings.get("recommended_next_action", "revise")
-        if not isinstance(recommended_next_action, str):
-            recommended_next_action = "revise"
-
-        blocks = [
-            f"- overall_assessment: {overall_assessment or '(none)'}",
-            _render_list("missing_content", "missing_content"),
-            _render_list("unsupported_claims", "unsupported_claims"),
-            _render_list("contradictions_or_logic_problems", "contradictions_or_logic_problems"),
-            _render_list("format_or_structure_issues", "format_or_structure_issues"),
-            f"- recommended_next_action: {recommended_next_action}",
-        ]
-        return "\n".join(blocks)
+        lines = "\n".join(f"- {item}" for item in feedback)
+        return f"JT findings:\n{lines}"

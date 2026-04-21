@@ -29,20 +29,10 @@ class ChiefOfStaffAgent:
             ),
         )
         data = self._normalize_output(self._safe_parse(raw))
-        route = data["route"]
-        approved_facts = state.get("approved_facts", [])
-        if self._is_jt_commenter_mode(state):
-            approved_facts = [
-                *approved_facts,
-                (
-                    "Chief JT commenter standard: keep rewrite materially faithful to source intent; "
-                    "do not add urgency, ownership, commitments, priorities, or risk framing not present in source text."
-                ),
-            ]
+
         return {
             **state,
-            "route": route,
-            "approved_facts": approved_facts,
+            "route": data["route"],
             "jt_requested": state.get("jt_requested", False),
             "jt_mode": state.get("jt_mode"),
             "status": "routed",
@@ -50,24 +40,9 @@ class ChiefOfStaffAgent:
         }
 
     def final_pass(self, state: SharedState) -> SharedState:
-        normalized_draft = self._normalize_jt_commenter_draft(
-            draft=state.get("draft", ""),
-            jt_requested=state.get("jt_requested", False),
-            jt_mode=state.get("jt_mode"),
-        )
         reviewer_findings = state.get("reviewer_findings")
         review_block = self._format_reviewer_findings_block(reviewer_findings, state)
-        jt_findings = state.get("jt_findings")
-        jt_block = jt_findings if jt_findings else "(JT not requested or no findings)"
-        mode_specific_bar = ""
-        if self._is_jt_commenter_mode(state):
-            mode_specific_bar = (
-                "\n\nJT commenter editorial bar (Chief-owned):\n"
-                "- Enforce strict meaning preservation from source text.\n"
-                "- Reject added urgency, ownership, commitments, priorities, or risk framing.\n"
-                "- Preserve helpful nuance (appreciation/support/caution) when present in source.\n"
-                "- If Reviewer approved and two-line contract is intact, default to human_review."
-            )
+        jt_block = self._format_jt_block(state)
 
         raw = self._client.ask(
             system_prompt=self._prompt,
@@ -80,26 +55,16 @@ class ChiefOfStaffAgent:
                 "next_step must be 'human_review' or 'redraft'. "
                 "Use 'redraft' only when the draft should be revised before human review. "
                 "If you request a redraft, instructions must preserve factual scope and forbid adding new specifics not in the draft/review inputs.\n\n"
-                f"Draft:\n{normalized_draft}\n\n"
+                f"Draft:\n{state.get('draft', '')}\n\n"
                 f"Reviewer findings (structured):\n{review_block}\n\n"
                 f"JT findings:\n{jt_block}"
-                f"{mode_specific_bar}"
             ),
         )
         data = self._normalize_final_output(self._safe_parse(raw))
         current_notes = state.get("approved_facts", [])
         chief_notes = data.get("instructions", "")
         has_critical_reviewer_findings = self._has_critical_reviewer_findings(reviewer_findings)
-        reviewer_action = (
-            reviewer_findings.get("recommended_next_action")
-            if isinstance(reviewer_findings, dict)
-            else None
-        )
-        reviewer_approved = (
-            reviewer_action == "approve"
-            if reviewer_action in {"approve", "revise", "reject"}
-            else state.get("review_approved", False)
-        )
+
         chief_validation = {
             "answers_request": data["answers_request"],
             "matches_deliverable_type": data["matches_deliverable_type"],
@@ -111,41 +76,17 @@ class ChiefOfStaffAgent:
             "rationale": data["rationale"],
             "recommended_action": "redraft" if data["next_step"] == "redraft" else "human_review",
         }
-        should_redraft = (
-            data["next_step"] == "redraft"
-            and state.get("chief_redraft_count", 0) < 1
-        )
-        reviewer_rejection_blocking = (
-            self._is_jt_commenter_mode(state)
-            and not reviewer_approved
-            and state.get("auto_redraft_count", 0) >= 1
-        )
-        # In JT commenter mode, once Reviewer has approved, avoid extra
-        # style-only ping-pong from a discretionary Chief final redraft.
-        # This preserves safety checks (reviewer gate already passed) while
-        # reducing unnecessary loops on simple commenter rewrites.
-        if should_redraft and self._is_jt_commenter_mode(state) and reviewer_approved:
-            should_redraft = False
-        if should_redraft and reviewer_rejection_blocking:
-            should_redraft = False
+        should_redraft = data["next_step"] == "redraft" and state.get("chief_redraft_count", 0) < 1
         if has_critical_reviewer_findings and state.get("chief_redraft_count", 0) < 1:
             should_redraft = True
 
         critical_reviewer_blocking = has_critical_reviewer_findings and not should_redraft
 
         if should_redraft and chief_notes:
-            contract_note = ""
-            if self._is_jt_commenter_mode(state):
-                contract_note = (
-                    " Return exactly two lines in this exact structure: "
-                    "'JT Feedback: ...' and 'JT Rewrite: ...'. "
-                    "Do not add any other labels, commentary, wrappers, or notes."
-                )
-            current_notes = [*current_notes, f"Chief final pass note: {chief_notes}{contract_note}"]
+            current_notes = [*current_notes, f"Chief final pass note: {chief_notes}"]
 
         return {
             **state,
-            "draft": normalized_draft,
             "approved_facts": current_notes,
             "chief_final_next_step": "writer" if should_redraft else "human_review",
             "critical_reviewer_blocking": critical_reviewer_blocking,
@@ -155,7 +96,6 @@ class ChiefOfStaffAgent:
             "model_metadata": {
                 **state.get("model_metadata", {}),
                 "chief_of_staff_final_raw": raw,
-                "chief_final_reviewer_rejection_blocking": reviewer_rejection_blocking,
                 "chief_final_critical_reviewer_findings": has_critical_reviewer_findings,
             },
         }
@@ -228,10 +168,6 @@ class ChiefOfStaffAgent:
         return None
 
     @staticmethod
-    def _is_jt_commenter_mode(state: SharedState) -> bool:
-        return bool(state.get("jt_requested")) and state.get("jt_mode") == "commenter"
-
-    @staticmethod
     def _format_reviewer_findings_block(reviewer_findings: Any, state: SharedState) -> str:
         if not isinstance(reviewer_findings, dict):
             review_feedback = state.get("review_feedback", [])
@@ -263,44 +199,23 @@ class ChiefOfStaffAgent:
         return "\n".join(blocks)
 
     @staticmethod
+    def _format_jt_block(state: SharedState) -> str:
+        if not state.get("jt_requested"):
+            return "(JT not requested)"
+
+        feedback = state.get("jt_feedback") or []
+        rewrite = state.get("jt_rewrite") or ""
+        feedback_block = "\n".join(f"- {item}" for item in feedback) or "- (none)"
+        return (
+            f"mode: {state.get('jt_mode') or 'default'}\n"
+            f"feedback:\n{feedback_block}\n"
+            f"rewrite:\n{rewrite}"
+        )
+
+    @staticmethod
     def _has_critical_reviewer_findings(reviewer_findings: Any) -> bool:
         if not isinstance(reviewer_findings, dict):
             return False
         unsupported = reviewer_findings.get("unsupported_claims", [])
         contradictions = reviewer_findings.get("contradictions_or_logic_problems", [])
         return bool(unsupported) or bool(contradictions)
-
-    @staticmethod
-    def _normalize_jt_commenter_draft(draft: str, jt_requested: bool, jt_mode: str | None) -> str:
-        if not jt_requested or jt_mode != "commenter":
-            return draft
-        return ChiefOfStaffAgent._enforce_jt_commenter_contract(draft)
-
-    @staticmethod
-    def _enforce_jt_commenter_contract(text: str) -> str:
-        feedback = ""
-        rewrite = ""
-
-        feedback_match = re.search(
-            r"JT Feedback:\s*(.*?)(?=\n\s*JT Rewrite:|\Z)",
-            text,
-            flags=re.IGNORECASE | re.DOTALL,
-        )
-        rewrite_match = re.search(
-            r"JT Rewrite:\s*(.*?)(?=\n\s*[A-Za-z][^:\n]{0,40}:|\Z)",
-            text,
-            flags=re.IGNORECASE | re.DOTALL,
-        )
-
-        if feedback_match:
-            feedback = feedback_match.group(1).strip()
-        if rewrite_match:
-            rewrite = rewrite_match.group(1).strip()
-
-        stripped = text.strip()
-        if not feedback and not rewrite and stripped:
-            parts = [part.strip() for part in stripped.splitlines() if part.strip()]
-            feedback = parts[0] if parts else ""
-            rewrite = " ".join(parts[1:]).strip() if len(parts) > 1 else ""
-
-        return f"JT Feedback: {feedback}\nJT Rewrite: {rewrite}".strip()

@@ -84,6 +84,8 @@ def main() -> None:
         "debug": args.debug,
         "jt_requested": jt_requested,
         "jt_mode": jt_mode,
+        "jt_feedback": [],
+        "jt_rewrite": None,
         "jt_findings": None,
     }
 
