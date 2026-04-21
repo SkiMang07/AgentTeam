@@ -19,7 +19,10 @@ class ReviewerAgent:
     def run(self, state: SharedState) -> SharedState:
         user_task = state["user_task"]
         evaluation_draft = self._select_evaluation_draft(state)
-        approved_facts = state.get("approved_facts", [])
+        approved_facts = self._grounding_facts_for_review(
+            user_task=user_task,
+            approved_facts=state.get("approved_facts", []),
+        )
         facts_block = "\n".join(f"- {fact}" for fact in approved_facts) or "- (none provided)"
         work_order = state.get("work_order", {})
         success_criteria = "\n".join(f"- {item}" for item in work_order.get("success_criteria", []))
@@ -72,6 +75,21 @@ class ReviewerAgent:
                 "reviewer_evaluated_draft": evaluation_draft,
             },
         }
+
+    @staticmethod
+    def _grounding_facts_for_review(user_task: str, approved_facts: list[str]) -> list[str]:
+        facts = [item for item in approved_facts if isinstance(item, str) and item.strip()]
+        if not ReviewerAgent._detect_no_invention_constraints(user_task):
+            return facts
+
+        source_text = ReviewerAgent._extract_primary_source_text(user_task)
+        if not source_text:
+            return facts
+
+        source_fact = f"Source text grounding (verbatim): {source_text}"
+        if any(ReviewerAgent._normalize_text(item) == ReviewerAgent._normalize_text(source_fact) for item in facts):
+            return facts
+        return [*facts, source_fact]
 
     @staticmethod
     def _select_evaluation_draft(state: SharedState) -> str:
