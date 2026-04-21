@@ -177,6 +177,7 @@ class ReviewerAgent:
         normalized = {**findings}
         unsupported = list(normalized.get("unsupported_claims", []))
         contradictions = list(normalized.get("contradictions_or_logic_problems", []))
+        missing = list(normalized.get("missing_content", []))
         format_issues = list(normalized.get("format_or_structure_issues", []))
 
         policy = ReviewerAgent._extract_grounding_policy(user_task)
@@ -193,9 +194,32 @@ class ReviewerAgent:
             if claim_normalized and ReviewerAgent._appears_in_text(claim_normalized, draft_normalized):
                 blocked_hits.append(claim)
 
+        blocked_missing_items: list[str] = []
+        filtered_missing: list[str] = []
+        for item in missing:
+            if ReviewerAgent._references_any_blocked_claim(item, blocked_claims):
+                blocked_missing_items.append(item)
+            else:
+                filtered_missing.append(item)
+
         if blocked_hits:
             label = "Use-only-facts violation" if policy["is_closed_facts_mode"] else "No-invention constraint violation"
             unsupported.extend([f"{label}: draft includes blocked claim from task text ('{item}'). Remove it." for item in blocked_hits])
+        if blocked_missing_items:
+            label = (
+                "Use-only-facts precedence"
+                if policy["is_closed_facts_mode"]
+                else "No-invention precedence"
+            )
+            unsupported.extend(
+                [
+                    (
+                        f"{label}: blocked claim was incorrectly treated as required content ('{item}'). "
+                        "Keep this out of missing_content and out of the draft."
+                    )
+                    for item in blocked_missing_items
+                ]
+            )
 
         scope_unchanged_in_facts = any(
             "scope is unchanged" in ReviewerAgent._normalize_text(item)
@@ -212,6 +236,7 @@ class ReviewerAgent:
                 f"{contract_label} contract was violated; remove unsupported claims before style or formatting polish."
             )
 
+        normalized["missing_content"] = ReviewerAgent._dedupe_preserve_order(filtered_missing)
         normalized["unsupported_claims"] = ReviewerAgent._dedupe_preserve_order(unsupported)
         normalized["contradictions_or_logic_problems"] = ReviewerAgent._dedupe_preserve_order(contradictions)
         normalized["format_or_structure_issues"] = ReviewerAgent._dedupe_preserve_order(format_issues)
@@ -349,6 +374,31 @@ class ReviewerAgent:
             return ""
         candidates = [left or right for left, right in quote_matches]
         return max(candidates, key=lambda item: len(item.strip())).strip()
+
+    @staticmethod
+    def _references_any_blocked_claim(item: str, blocked_claims: list[str]) -> bool:
+        item_text = ReviewerAgent._normalize_text(item)
+        if not item_text:
+            return False
+        quoted = ReviewerAgent._extract_quoted_phrase(item)
+        if quoted:
+            quoted_text = ReviewerAgent._normalize_text(quoted)
+            for claim in blocked_claims:
+                claim_text = ReviewerAgent._normalize_text(claim)
+                if claim_text and ReviewerAgent._appears_in_text(claim_text, quoted_text):
+                    return True
+        for claim in blocked_claims:
+            claim_text = ReviewerAgent._normalize_text(claim)
+            if claim_text and ReviewerAgent._appears_in_text(claim_text, item_text):
+                return True
+        return False
+
+    @staticmethod
+    def _extract_quoted_phrase(text: str) -> str:
+        match = re.search(r"'([^']+)'|\"([^\"]+)\"", text)
+        if not match:
+            return ""
+        return match.group(1) or match.group(2) or ""
 
     @staticmethod
     def _split_claims(raw: str) -> list[str]:

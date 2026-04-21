@@ -201,3 +201,4 @@ This project is succeeding in the near term if it can:
 - Tightened reviewer/core-routing guardrails so unsupported claims and core fact contradictions are prioritized above formatting issues and blocked from normal human-review routing when unresolved
 - Fixed JT commenter redraft consistency bug: reviewer now validates current-pass JT Rewrite content, stale pass findings are scrubbed before verdicting, and reviewer routing/Chief-final gating now derives approval from the same current-pass recommended action
 - Reworked JT into a first-class graph node with explicit `jt_input`, `jt_feedback`, and `jt_rewrite` contracts; reviewer now validates the JT rewrite artifact on JT paths and commenter-mode indirection was removed
+- Fixed reviewer precedence for closed-fact tasks so blocked claims are never treated as required `missing_content` on non-JT paths
