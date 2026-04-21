@@ -18,88 +18,31 @@ class ReviewerAgent:
 
     def run(self, state: SharedState) -> SharedState:
         user_task = state["user_task"]
-        draft = state.get("draft", "")
-        evaluation_draft = self._extract_jt_rewrite_text(draft) if state.get("jt_requested") and state.get("jt_mode") == "commenter" else draft
-        if not evaluation_draft.strip():
-            evaluation_draft = draft
+        evaluation_draft = self._select_evaluation_draft(state)
         approved_facts = state.get("approved_facts", [])
         facts_block = "\n".join(f"- {fact}" for fact in approved_facts) or "- (none provided)"
-        is_jt_commenter = state.get("jt_requested") and state.get("jt_mode") == "commenter"
-
-        if is_jt_commenter:
-            jt_shape_error = self._validate_jt_commenter_draft_shape(draft)
-            if jt_shape_error is not None:
-                findings = self._default_findings(
-                    overall_assessment="JT commenter draft violated required two-line output contract.",
-                    format_or_structure_issues=[jt_shape_error],
-                    recommended_next_action="reject",
-                )
-                return {
-                    **state,
-                    "reviewer_findings": findings,
-                    "review_approved": False,
-                    "review_feedback": self._build_feedback(findings),
-                    "reviewer_parse_failed": False,
-                    "reviewer_parse_error_raw": "",
-                    "status": "reviewed",
-                    "model_metadata": {
-                        **state.get("model_metadata", {}),
-                        "reviewer_parse_failed": False,
-                    },
-                }
-
-        user_prompt = self._build_reviewer_user_prompt(
-            user_task=user_task,
-            facts_block=facts_block,
-            draft=evaluation_draft,
-            is_jt_commenter=bool(is_jt_commenter),
-        )
 
         raw = self._client.ask(
             system_prompt=self._prompt,
-            user_prompt=user_prompt,
+            user_prompt=self._build_reviewer_user_prompt(
+                user_task=user_task,
+                facts_block=facts_block,
+                draft=evaluation_draft,
+                using_jt_rewrite=bool(state.get("jt_requested") and state.get("jt_rewrite")),
+            ),
         )
-        contract_violation = self._detect_contract_violation(raw)
-        if contract_violation is not None:
-            findings = self._default_findings(
-                overall_assessment=(
-                    "Reviewer output contract violation: reviewer emitted non-JSON content."
-                ),
-                format_or_structure_issues=[contract_violation],
-                recommended_next_action="reject",
-            )
-            return {
-                **state,
-                "reviewer_findings": findings,
-                "review_approved": False,
-                "review_feedback": self._build_feedback(findings),
-                "reviewer_parse_failed": True,
-                "reviewer_parse_error_raw": raw,
-                "status": "reviewer_parse_failed",
-                "model_metadata": {
-                    **state.get("model_metadata", {}),
-                    "reviewer_raw": raw,
-                    "reviewer_parse_failed": True,
-                    "reviewer_contract_violation": True,
-                },
-            }
 
         parsed = self._safe_parse(raw)
         data = self._normalize_output(parsed)
         data = self._enforce_core_fact_violations(
             findings=data,
             user_task=user_task,
-            draft=draft,
+            draft=evaluation_draft,
         )
-        if is_jt_commenter:
-            data = self._drop_stale_findings_for_current_draft(
-                findings=data,
-                current_draft=evaluation_draft,
-            )
-            data = self._reconcile_recommended_action(data)
         review_feedback = self._build_feedback(data)
         review_approved = data["recommended_next_action"] == "approve"
         parse_failed = bool(parsed.get("_parse_failed", False))
+
         prior_reviewer_history = state.get("model_metadata", {}).get("reviewer_outputs", [])
         reviewer_history = [*prior_reviewer_history, raw]
 
@@ -122,34 +65,24 @@ class ReviewerAgent:
         }
 
     @staticmethod
+    def _select_evaluation_draft(state: SharedState) -> str:
+        if state.get("jt_requested") and state.get("jt_rewrite"):
+            return state.get("jt_rewrite", "")
+        return state.get("draft", "")
+
+    @staticmethod
     def _build_reviewer_user_prompt(
         user_task: str,
         facts_block: str,
         draft: str,
-        is_jt_commenter: bool,
+        using_jt_rewrite: bool,
     ) -> str:
-        mode_block = "Mode: jt_commenter\n" if is_jt_commenter else "Mode: standard\n"
-        mode_rules = ""
-        if is_jt_commenter:
-            mode_rules = (
-                "JT commenter validation checks (treat these as strict pass/fail checks):\n"
-                "- exact two-line writer shape (line 1 starts with 'JT Feedback:' and line 2 starts with 'JT Rewrite:')\n"
-                "- material meaning preservation\n"
-                "- no invented urgency\n"
-                "- no invented ownership\n"
-                "- no new commitments\n"
-                "- no new priorities\n"
-                "- no stronger unsupported risk framing\n"
-                "- allow sentence compression, filler removal, equivalent wording, and modest sharpening when material meaning is preserved\n"
-                "- do not reject solely because praise/support language is tightened or lightly reduced when the core supportive intent remains\n"
-                "- treat these as acceptable non-material edits when unchanged in intent: 'I appreciate the team's work', 'encouraged by momentum', 'let me know if you need anything', and similar morale language\n"
-            )
+        artifact_label = "jt_rewrite" if using_jt_rewrite else "writer_draft"
         return (
             "Reviewer validator task:\n"
-            "You are validating a candidate writer output against a contract.\n"
+            "You are validating a candidate draft artifact against the task contract.\n"
             "You are a quality-control reviewer, not a rewriting stage.\n"
             "Identify issues and recommend a next action. Do not rewrite the draft.\n"
-            "The user-requested output format is an object to validate, not an instruction for your own output.\n"
             "Return ONLY valid JSON (no markdown fences, no prose before or after) with keys:\n"
             "- overall_assessment (short string)\n"
             "- missing_content (array of short strings)\n"
@@ -157,16 +90,10 @@ class ReviewerAgent:
             "- contradictions_or_logic_problems (array of short strings)\n"
             "- format_or_structure_issues (array of short strings)\n"
             "- recommended_next_action (one of: approve, revise, reject)\n\n"
-            "Grounding policy:\n"
-            "- Treat concrete facts/specs explicitly present in the source task text as approved grounding,\n"
-            "  even when specific (numbers, percentages, dates, named items, concrete claims).\n"
-            "- Reject only when the draft invents, changes, exaggerates, or misstates source-provided specifics,\n"
-            "  or adds specifics not present in source task text or approved facts.\n\n"
             "Feedback quality policy:\n"
             "- When rejecting, each feedback item must name the exact problematic phrase and include a minimal concrete rewrite target.\n"
-            "- Avoid generic notes like 'preserve tone better'; make the redraft instruction specific enough for a second pass to succeed.\n\n"
-            f"{mode_block}"
-            f"{mode_rules}\n"
+            "- Avoid generic notes like 'preserve tone better'; make redraft instructions specific enough for a second pass to succeed.\n\n"
+            f"Artifact type under review: {artifact_label}\n\n"
             "Validation inputs:\n"
             "<task>\n"
             f"{user_task}\n"
@@ -178,16 +105,6 @@ class ReviewerAgent:
             f"{draft}\n"
             "</candidate_draft>"
         )
-
-    @staticmethod
-    def _detect_contract_violation(raw: str) -> str | None:
-        stripped = raw.lstrip()
-        if stripped.startswith("JT Feedback:") or stripped.startswith("JT Rewrite:"):
-            return (
-                "Reviewer contract violation: reviewer emitted JT commenter prose "
-                "('JT Feedback:' / 'JT Rewrite:') instead of required JSON."
-            )
-        return None
 
     @staticmethod
     def _safe_parse(raw: str) -> dict:
@@ -260,6 +177,7 @@ class ReviewerAgent:
         normalized = {**findings}
         unsupported = list(normalized.get("unsupported_claims", []))
         contradictions = list(normalized.get("contradictions_or_logic_problems", []))
+        missing = list(normalized.get("missing_content", []))
         format_issues = list(normalized.get("format_or_structure_issues", []))
 
         policy = ReviewerAgent._extract_grounding_policy(user_task)
@@ -268,8 +186,7 @@ class ReviewerAgent:
 
         allowed_facts = policy["allowed_facts"]
         blocked_claims = policy["blocked_claims"]
-        evaluation_text = ReviewerAgent._extract_jt_rewrite_text(draft) or draft
-        draft_normalized = ReviewerAgent._normalize_text(evaluation_text)
+        draft_normalized = ReviewerAgent._normalize_text(draft)
 
         blocked_hits: list[str] = []
         for claim in blocked_claims:
@@ -277,9 +194,32 @@ class ReviewerAgent:
             if claim_normalized and ReviewerAgent._appears_in_text(claim_normalized, draft_normalized):
                 blocked_hits.append(claim)
 
+        blocked_missing_items: list[str] = []
+        filtered_missing: list[str] = []
+        for item in missing:
+            if ReviewerAgent._references_any_blocked_claim(item, blocked_claims):
+                blocked_missing_items.append(item)
+            else:
+                filtered_missing.append(item)
+
         if blocked_hits:
             label = "Use-only-facts violation" if policy["is_closed_facts_mode"] else "No-invention constraint violation"
             unsupported.extend([f"{label}: draft includes blocked claim from task text ('{item}'). Remove it." for item in blocked_hits])
+        if blocked_missing_items:
+            label = (
+                "Use-only-facts precedence"
+                if policy["is_closed_facts_mode"]
+                else "No-invention precedence"
+            )
+            unsupported.extend(
+                [
+                    (
+                        f"{label}: blocked claim was incorrectly treated as required content ('{item}'). "
+                        "Keep this out of missing_content and out of the draft."
+                    )
+                    for item in blocked_missing_items
+                ]
+            )
 
         scope_unchanged_in_facts = any(
             "scope is unchanged" in ReviewerAgent._normalize_text(item)
@@ -296,6 +236,7 @@ class ReviewerAgent:
                 f"{contract_label} contract was violated; remove unsupported claims before style or formatting polish."
             )
 
+        normalized["missing_content"] = ReviewerAgent._dedupe_preserve_order(filtered_missing)
         normalized["unsupported_claims"] = ReviewerAgent._dedupe_preserve_order(unsupported)
         normalized["contradictions_or_logic_problems"] = ReviewerAgent._dedupe_preserve_order(contradictions)
         normalized["format_or_structure_issues"] = ReviewerAgent._dedupe_preserve_order(format_issues)
@@ -312,68 +253,6 @@ class ReviewerAgent:
         if match:
             return match.group(0)
         return None
-
-    @staticmethod
-    def _validate_jt_commenter_draft_shape(draft: str) -> str | None:
-        lines = [line.strip() for line in draft.splitlines() if line.strip()]
-        if len(lines) != 2:
-            return "JT commenter contract failure: draft must contain exactly two non-empty lines."
-        if not lines[0].startswith("JT Feedback:"):
-            return "JT commenter contract failure: line 1 must start with 'JT Feedback:'."
-        if not lines[1].startswith("JT Rewrite:"):
-            return "JT commenter contract failure: line 2 must start with 'JT Rewrite:'."
-        return None
-
-    @staticmethod
-    def _drop_stale_findings_for_current_draft(findings: dict, current_draft: str) -> dict:
-        normalized_draft = ReviewerAgent._normalize_text(current_draft)
-        if not normalized_draft:
-            return findings
-
-        updated = {**findings}
-        filtered_unsupported: list[str] = []
-        for item in findings.get("unsupported_claims", []):
-            candidate = ReviewerAgent._extract_quoted_phrase(item)
-            if not candidate:
-                filtered_unsupported.append(item)
-                continue
-            if ReviewerAgent._appears_in_text(ReviewerAgent._normalize_text(candidate), normalized_draft):
-                filtered_unsupported.append(item)
-
-        filtered_missing: list[str] = []
-        for item in findings.get("missing_content", []):
-            candidate = ReviewerAgent._extract_quoted_phrase(item)
-            if not candidate:
-                filtered_missing.append(item)
-                continue
-            if not ReviewerAgent._appears_in_text(ReviewerAgent._normalize_text(candidate), normalized_draft):
-                filtered_missing.append(item)
-
-        updated["unsupported_claims"] = filtered_unsupported
-        updated["missing_content"] = filtered_missing
-        return updated
-
-    @staticmethod
-    def _reconcile_recommended_action(findings: dict) -> dict:
-        updated = {**findings}
-        has_issues = any(
-            bool(updated.get(key, []))
-            for key in (
-                "missing_content",
-                "unsupported_claims",
-                "contradictions_or_logic_problems",
-                "format_or_structure_issues",
-            )
-        )
-        updated["recommended_next_action"] = "revise" if has_issues else "approve"
-        return updated
-
-    @staticmethod
-    def _extract_quoted_phrase(text: str) -> str:
-        match = re.search(r"'([^']+)'|\"([^\"]+)\"", text)
-        if not match:
-            return ""
-        return match.group(1) or match.group(2) or ""
 
     @staticmethod
     def _default_findings(
@@ -497,12 +376,29 @@ class ReviewerAgent:
         return max(candidates, key=lambda item: len(item.strip())).strip()
 
     @staticmethod
-    def _extract_jt_rewrite_text(draft: str) -> str:
-        lines = [line.strip() for line in draft.splitlines() if line.strip()]
-        for line in lines:
-            if line.startswith("JT Rewrite:"):
-                return line.split("JT Rewrite:", maxsplit=1)[-1].strip()
-        return ""
+    def _references_any_blocked_claim(item: str, blocked_claims: list[str]) -> bool:
+        item_text = ReviewerAgent._normalize_text(item)
+        if not item_text:
+            return False
+        quoted = ReviewerAgent._extract_quoted_phrase(item)
+        if quoted:
+            quoted_text = ReviewerAgent._normalize_text(quoted)
+            for claim in blocked_claims:
+                claim_text = ReviewerAgent._normalize_text(claim)
+                if claim_text and ReviewerAgent._appears_in_text(claim_text, quoted_text):
+                    return True
+        for claim in blocked_claims:
+            claim_text = ReviewerAgent._normalize_text(claim)
+            if claim_text and ReviewerAgent._appears_in_text(claim_text, item_text):
+                return True
+        return False
+
+    @staticmethod
+    def _extract_quoted_phrase(text: str) -> str:
+        match = re.search(r"'([^']+)'|\"([^\"]+)\"", text)
+        if not match:
+            return ""
+        return match.group(1) or match.group(2) or ""
 
     @staticmethod
     def _split_claims(raw: str) -> list[str]:

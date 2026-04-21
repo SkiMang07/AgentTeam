@@ -36,7 +36,7 @@ This project is succeeding in the near term if it can:
 1. Take a real user task
 2. Route it clearly through the core workflow
 3. Use structured research and drafting
-4. Optionally run JT challenge stage only when explicitly requested (commenter mode handled without JT node)
+4. Optionally run JT agent stage only when explicitly requested with explicit contracts
 5. Return a final output that is reviewable and grounded
 6. Move toward local file context so outputs are more useful than a normal chat window
 
@@ -46,7 +46,7 @@ This project is succeeding in the near term if it can:
 2. Researcher gathers facts and gaps when needed
 3. Writer produces a draft
 4. Reviewer checks the draft
-5. JT challenge stage runs only if explicitly requested (except commenter mode, which stays in core flow)
+5. JT agent stage runs only if explicitly requested, between Writer and Reviewer
 6. Chief of Staff does a final structure and completeness pass
 7. Human review approves or sends back for revision
 
@@ -71,11 +71,11 @@ This project is succeeding in the near term if it can:
 
 **Rules:**
 - JT runs only when explicitly requested
-- JT comments only
-- JT does not rewrite
-- JT sees only the writer draft and reviewer findings
-- Chief of Staff decides what to do with JT feedback
-- JT commenter mode is enforced in Chief/Writer/Reviewer flow without a separate JT node
+- JT produces structured feedback and a rewritten artifact
+- JT runs after Writer and before Reviewer
+- Reviewer validates JT rewrite content on JT paths
+- Chief of Staff final consumes JT structured output for alignment checks
+- JT is always a distinct graph step when requested
 
 - [x] Add `jt_requested` field to shared state
 - [x] Add `jt_mode` field to shared state
@@ -200,3 +200,5 @@ This project is succeeding in the near term if it can:
 - Completed Issue 3: reviewer now returns a normalized structured QC findings object with explicit categories and recommended next action, consumed by Chief of Staff/JT downstream steps
 - Tightened reviewer/core-routing guardrails so unsupported claims and core fact contradictions are prioritized above formatting issues and blocked from normal human-review routing when unresolved
 - Fixed JT commenter redraft consistency bug: reviewer now validates current-pass JT Rewrite content, stale pass findings are scrubbed before verdicting, and reviewer routing/Chief-final gating now derives approval from the same current-pass recommended action
+- Reworked JT into a first-class graph node with explicit `jt_input`, `jt_feedback`, and `jt_rewrite` contracts; reviewer now validates the JT rewrite artifact on JT paths and commenter-mode indirection was removed
+- Fixed reviewer precedence for closed-fact tasks so blocked claims are never treated as required `missing_content` on non-JT paths

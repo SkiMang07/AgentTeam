@@ -28,12 +28,22 @@ class ReviewerFindings(TypedDict):
     recommended_next_action: Literal["approve", "revise", "reject"]
 
 
+class JTInput(TypedDict):
+    writer_draft: str
+    user_task: str
+    approved_facts: list[str]
+    jt_mode: str | None
+
+
 class SharedState(TypedDict):
     user_task: str
     dry_run: NotRequired[bool]
     debug: NotRequired[bool]
     jt_requested: NotRequired[bool]
     jt_mode: NotRequired[str | None]
+    jt_input: NotRequired[JTInput]
+    jt_feedback: NotRequired[list[str]]
+    jt_rewrite: NotRequired[str | None]
     jt_findings: NotRequired[str | None]
     jt_review_count: NotRequired[int]
     route: NotRequired[Literal["research", "write_direct"]]
