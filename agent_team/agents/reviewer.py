@@ -83,6 +83,11 @@ class ReviewerAgent:
 
         parsed = self._safe_parse(raw)
         data = self._normalize_output(parsed)
+        data = self._enforce_core_fact_violations(
+            findings=data,
+            user_task=user_task,
+            draft=draft,
+        )
         review_feedback = self._build_feedback(data)
         review_approved = data["recommended_next_action"] == "approve"
         parse_failed = bool(parsed.get("_parse_failed", False))
@@ -240,6 +245,63 @@ class ReviewerAgent:
         return {**data, **normalized}
 
     @staticmethod
+    def _enforce_core_fact_violations(findings: dict, user_task: str, draft: str) -> dict:
+        normalized = {**findings}
+        unsupported = list(normalized.get("unsupported_claims", []))
+        contradictions = list(normalized.get("contradictions_or_logic_problems", []))
+        format_issues = list(normalized.get("format_or_structure_issues", []))
+
+        policy = ReviewerAgent._extract_closed_fact_policy(user_task)
+        if not policy["is_closed_facts_mode"]:
+            return normalized
+
+        allowed_facts = policy["allowed_facts"]
+        blocked_claims = policy["blocked_claims"]
+        draft_normalized = ReviewerAgent._normalize_text(draft)
+
+        blocked_hits: list[str] = []
+        for claim in blocked_claims:
+            claim_normalized = ReviewerAgent._normalize_text(claim)
+            if claim_normalized and ReviewerAgent._appears_in_text(claim_normalized, draft_normalized):
+                blocked_hits.append(claim)
+
+        if blocked_hits:
+            unsupported.extend(
+                [
+                    (
+                        "Use-only-facts violation: draft includes blocked claim "
+                        f"from task text ('{item}'). Remove it."
+                    )
+                    for item in blocked_hits
+                ]
+            )
+
+        scope_unchanged_in_facts = any(
+            "scope is unchanged" in ReviewerAgent._normalize_text(item)
+            for item in allowed_facts
+        )
+        if scope_unchanged_in_facts and blocked_hits:
+            contradictions.append(
+                "Core fact contradiction: source says scope is unchanged, but draft adds new scope elements."
+            )
+
+        if blocked_hits and not any("use-only-facts" in item.lower() for item in format_issues):
+            format_issues.append(
+                "Use-only-facts contract was violated; remove unsupported claims before style or formatting polish."
+            )
+
+        normalized["unsupported_claims"] = ReviewerAgent._dedupe_preserve_order(unsupported)
+        normalized["contradictions_or_logic_problems"] = ReviewerAgent._dedupe_preserve_order(contradictions)
+        normalized["format_or_structure_issues"] = ReviewerAgent._dedupe_preserve_order(format_issues)
+
+        if blocked_hits:
+            normalized["overall_assessment"] = (
+                "Draft fails core grounding checks: unsupported claims violate the closed facts contract."
+            )
+            normalized["recommended_next_action"] = "revise"
+        return normalized
+
+    @staticmethod
     def _extract_json_object(raw: str) -> str | None:
         match = re.search(r"\{[\s\S]*\}", raw)
         if match:
@@ -280,11 +342,18 @@ class ReviewerAgent:
     def _build_feedback(findings: dict) -> list[str]:
         feedback: list[str] = []
         category_labels = {
-            "missing_content": "Missing content",
             "unsupported_claims": "Unsupported claim",
             "contradictions_or_logic_problems": "Logic problem",
+            "missing_content": "Missing content",
             "format_or_structure_issues": "Format/structure issue",
         }
+        has_core_grounding_violations = bool(
+            findings.get("unsupported_claims") or findings.get("contradictions_or_logic_problems")
+        )
+        if has_core_grounding_violations:
+            feedback.append(
+                "Priority: remove unsupported claims and resolve core fact contradictions before any formatting edits."
+            )
         for key, label in category_labels.items():
             for item in findings.get(key, []):
                 feedback.append(f"{label}: {item}")
@@ -295,3 +364,63 @@ class ReviewerAgent:
             else:
                 feedback.append("Reviewer requested revisions with normalized default issue details.")
         return feedback
+
+    @staticmethod
+    def _extract_closed_fact_policy(user_task: str) -> dict:
+        task = user_task or ""
+        facts_match = re.search(
+            r"use only these facts:\s*(.*?)(?:\n|(?:also say that)|(?:format it)|$)",
+            task,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        blocked_match = re.search(
+            r"also say that\s*(.*?)(?:\n|(?:format it)|$)",
+            task,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+
+        allowed_facts = ReviewerAgent._split_claims(facts_match.group(1) if facts_match else "")
+        blocked_claims = ReviewerAgent._split_claims(blocked_match.group(1) if blocked_match else "")
+        return {
+            "is_closed_facts_mode": bool(facts_match),
+            "allowed_facts": allowed_facts,
+            "blocked_claims": blocked_claims,
+        }
+
+    @staticmethod
+    def _split_claims(raw: str) -> list[str]:
+        cleaned = raw.strip().strip(".")
+        if not cleaned:
+            return []
+        normalized = re.sub(r"\s+", " ", cleaned)
+        parts = re.split(r";|,\s+and that\s+|,\s+that\s+|\band that\b", normalized, flags=re.IGNORECASE)
+        return [part.strip(" .") for part in parts if part.strip(" .")]
+
+    @staticmethod
+    def _normalize_text(value: str) -> str:
+        return re.sub(r"[^a-z0-9\s]", " ", value.lower()).strip()
+
+    @staticmethod
+    def _appears_in_text(claim: str, draft: str) -> bool:
+        if not claim or not draft:
+            return False
+        if claim in draft:
+            return True
+
+        claim_tokens = [token for token in claim.split() if len(token) > 2]
+        if not claim_tokens:
+            return False
+        draft_tokens = set(draft.split())
+        overlap = sum(1 for token in claim_tokens if token in draft_tokens)
+        return overlap >= max(2, len(claim_tokens) // 2)
+
+    @staticmethod
+    def _dedupe_preserve_order(items: list[str]) -> list[str]:
+        seen: set[str] = set()
+        deduped: list[str] = []
+        for item in items:
+            key = item.strip()
+            if key and key not in seen:
+                seen.add(key)
+                deduped.append(key)
+        return deduped

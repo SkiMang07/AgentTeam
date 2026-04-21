@@ -89,10 +89,13 @@ class ChiefOfStaffAgent:
         data = self._normalize_final_output(self._safe_parse(raw))
         current_notes = state.get("approved_facts", [])
         chief_notes = data.get("instructions", "")
+        has_critical_reviewer_findings = self._has_critical_reviewer_findings(reviewer_findings)
         chief_validation = {
             "answers_request": data["answers_request"],
             "matches_deliverable_type": data["matches_deliverable_type"],
-            "reviewer_findings_addressed": data["reviewer_findings_addressed"],
+            "reviewer_findings_addressed": (
+                data["reviewer_findings_addressed"] and not has_critical_reviewer_findings
+            ),
             "jt_findings_addressed": data["jt_findings_addressed"],
             "obvious_missing_items": data["obvious_missing_items"],
             "rationale": data["rationale"],
@@ -115,6 +118,10 @@ class ChiefOfStaffAgent:
             should_redraft = False
         if should_redraft and reviewer_rejection_blocking:
             should_redraft = False
+        if has_critical_reviewer_findings and state.get("chief_redraft_count", 0) < 1:
+            should_redraft = True
+
+        critical_reviewer_blocking = has_critical_reviewer_findings and not should_redraft
 
         if should_redraft and chief_notes:
             contract_note = ""
@@ -131,6 +138,7 @@ class ChiefOfStaffAgent:
             "draft": normalized_draft,
             "approved_facts": current_notes,
             "chief_final_next_step": "writer" if should_redraft else "human_review",
+            "critical_reviewer_blocking": critical_reviewer_blocking,
             "chief_final_validation": chief_validation,
             "chief_redraft_count": state.get("chief_redraft_count", 0) + (1 if should_redraft else 0),
             "status": "chief_finalized",
@@ -138,6 +146,7 @@ class ChiefOfStaffAgent:
                 **state.get("model_metadata", {}),
                 "chief_of_staff_final_raw": raw,
                 "chief_final_reviewer_rejection_blocking": reviewer_rejection_blocking,
+                "chief_final_critical_reviewer_findings": has_critical_reviewer_findings,
             },
         }
 
@@ -242,6 +251,14 @@ class ChiefOfStaffAgent:
             f"- recommended_next_action: {recommended_next_action}",
         ]
         return "\n".join(blocks)
+
+    @staticmethod
+    def _has_critical_reviewer_findings(reviewer_findings: Any) -> bool:
+        if not isinstance(reviewer_findings, dict):
+            return False
+        unsupported = reviewer_findings.get("unsupported_claims", [])
+        contradictions = reviewer_findings.get("contradictions_or_logic_problems", [])
+        return bool(unsupported) or bool(contradictions)
 
     @staticmethod
     def _normalize_jt_commenter_draft(draft: str, jt_requested: bool, jt_mode: str | None) -> str:

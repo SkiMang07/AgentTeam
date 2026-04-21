@@ -132,6 +132,7 @@ Downstream use of reviewer findings:
 - Graph routing continues using deterministic approval + feedback fields derived from the structured reviewer findings
 - Chief of Staff final pass consumes the structured reviewer findings block directly
 - JT challenge stage (when requested) consumes the same structured reviewer findings block
+- Unsupported claims and core fact contradictions are treated as higher-priority blockers than cosmetic format polish
 Design principles
 
 This repo follows a few simple rules:

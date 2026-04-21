@@ -198,3 +198,4 @@ This project is succeeding in the near term if it can:
 - Updated writer redraft behavior to revise the prior draft surgically (instead of regenerating from scratch) when reviewer targets are present
 - Completed Issue 2: final Chief of Staff validation now stores a short structured alignment/completeness result in shared state before routing to human review
 - Completed Issue 3: reviewer now returns a normalized structured QC findings object with explicit categories and recommended next action, consumed by Chief of Staff/JT downstream steps
+- Tightened reviewer/core-routing guardrails so unsupported claims and core fact contradictions are prioritized above formatting issues and blocked from normal human-review routing when unresolved

@@ -262,6 +262,8 @@ def build_graph(
         return "chief_final"
 
     def route_after_chief_final(state: SharedState) -> str:
+        if state.get("critical_reviewer_blocking", False):
+            return "review_rejected_after_redraft"
         if (
             state.get("jt_requested", False)
             and state.get("jt_mode") == "commenter"
@@ -271,10 +273,16 @@ def build_graph(
         return state.get("chief_final_next_step", "human_review")
 
     def review_rejected_after_redraft_node(state: SharedState) -> SharedState:
-        message = (
-            "Reviewer verdict remains needs_revision after the automatic redraft pass. "
-            "Stopping before normal human review."
-        )
+        if state.get("critical_reviewer_blocking", False):
+            message = (
+                "Reviewer found unresolved unsupported claims or core fact contradictions. "
+                "Stopping before normal human review."
+            )
+        else:
+            message = (
+                "Reviewer verdict remains needs_revision after the automatic redraft pass. "
+                "Stopping before normal human review."
+            )
         print(f"\n{message}\n")
         if _commenter_artifacts_enabled(state):
             writer_outputs = state.get("model_metadata", {}).get("writer_outputs", [])

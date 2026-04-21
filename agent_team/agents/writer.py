@@ -18,7 +18,18 @@ class WriterAgent:
         facts_block = "\n".join(f"- {fact}" for fact in approved_facts)
         revision_targets = state.get("revision_targets", [])
         prior_draft = state.get("redraft_source_draft", "")
+        reviewer_findings = state.get("reviewer_findings", {})
         revision_target_block = ""
+        priority_block = ""
+        if isinstance(reviewer_findings, dict):
+            unsupported = reviewer_findings.get("unsupported_claims", [])
+            contradictions = reviewer_findings.get("contradictions_or_logic_problems", [])
+            if (isinstance(unsupported, list) and unsupported) or (isinstance(contradictions, list) and contradictions):
+                priority_block = (
+                    "\n\nPriority redraft rule:\n"
+                    "- First remove unsupported claims and resolve core fact contradictions.\n"
+                    "- Only after grounding issues are fixed should you adjust style or format details.\n"
+                )
         if revision_targets:
             bullets = "\n".join(f"- {item}" for item in revision_targets)
             revision_target_block = (
@@ -50,6 +61,7 @@ class WriterAgent:
                 "If facts are missing, state assumptions and limits clearly. "
                 "Do not introduce new factual specifics beyond the source task text and approved facts."
                 f"{jt_commenter_contract}"
+                f"{priority_block}"
                 f"{revision_target_block}\n\n"
                 f"{redraft_source_block}\n\n"
                 f"Task:\n{user_task}\n\n"
