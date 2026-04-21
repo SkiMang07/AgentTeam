@@ -70,10 +70,15 @@ class DryRunResponsesClient:
                 "This draft is deterministic and intended for workflow validation."
             )
 
-        if "Review this draft for quality" in user_prompt:
+        if "Review this draft for quality" in user_prompt or "Reviewer validator task:" in user_prompt:
             self._reviewer_calls += 1
             task_block = user_prompt.split("Task:\n", maxsplit=1)[-1].lower()
-            is_jt_commenter = "for jt commenter mode" in user_prompt.lower()
+            if "<task>" in user_prompt and "</task>" in user_prompt:
+                task_block = user_prompt.split("<task>", maxsplit=1)[-1].split("</task>", maxsplit=1)[0].lower()
+            is_jt_commenter = (
+                "for jt commenter mode" in user_prompt.lower()
+                or "mode: jt_commenter" in user_prompt.lower()
+            )
             if "simulate reviewer parse failure" in task_block:
                 return "not-json-reviewer-output"
             if is_jt_commenter:

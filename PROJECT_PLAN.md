@@ -192,3 +192,4 @@ This project is succeeding in the near term if it can:
 - Refactored JT commenter mode to remove separate JT-node dependency
 - JT node now skips commenter mode and remains available for challenge-mode requests
 - Chief of Staff now carries JT commenter editorial bar in active flow
+- Hardened Reviewer commenter contract: validator-only prompt assembly, strict JSON isolation, and explicit contract-violation handling for JT-style prose outputs

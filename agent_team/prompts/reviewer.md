@@ -37,7 +37,9 @@ Forcefulness and risk policy:
   - new risk framing, consequences, or alarm language not present,
   - new commitment language, guarantees, or certainty beyond source.
 - In JT commenter mode, also validate output shape strictly: exactly two non-empty lines with `JT Feedback:` then `JT Rewrite:`.
-- Reviewer validates only; do not emulate or output JT-style two-line content yourself. Return JSON only.
+- Reviewer validates only; the writer's required two-line shape is a validation target, not instructions for your own response.
+- Never output `JT Feedback:` or `JT Rewrite:` yourself.
+- Return JSON only.
 
 Feedback style:
 - If rejecting, name the exact unsupported escalation and the minimal fix.
