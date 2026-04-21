@@ -72,7 +72,10 @@ class ChiefOfStaffAgent:
             system_prompt=self._prompt,
             user_prompt=(
                 "Run final Chief of Staff pass before human review. "
-                "Return strict JSON with keys: next_step, rationale, instructions. "
+                "This is an alignment/completeness validation, not a rewrite task. "
+                "Return strict JSON with keys: next_step, rationale, instructions, "
+                "answers_request, matches_deliverable_type, reviewer_findings_addressed, "
+                "jt_findings_addressed, obvious_missing_items. "
                 "next_step must be 'human_review' or 'redraft'. "
                 "Use 'redraft' only when the draft should be revised before human review. "
                 "If you request a redraft, instructions must preserve factual scope and forbid adding new specifics not in the draft/review inputs.\n\n"
@@ -85,6 +88,15 @@ class ChiefOfStaffAgent:
         data = self._normalize_final_output(self._safe_parse(raw))
         current_notes = state.get("approved_facts", [])
         chief_notes = data.get("instructions", "")
+        chief_validation = {
+            "answers_request": data["answers_request"],
+            "matches_deliverable_type": data["matches_deliverable_type"],
+            "reviewer_findings_addressed": data["reviewer_findings_addressed"],
+            "jt_findings_addressed": data["jt_findings_addressed"],
+            "obvious_missing_items": data["obvious_missing_items"],
+            "rationale": data["rationale"],
+            "recommended_action": "redraft" if data["next_step"] == "redraft" else "human_review",
+        }
         should_redraft = (
             data["next_step"] == "redraft"
             and state.get("chief_redraft_count", 0) < 1
@@ -118,6 +130,7 @@ class ChiefOfStaffAgent:
             "draft": normalized_draft,
             "approved_facts": current_notes,
             "chief_final_next_step": "writer" if should_redraft else "human_review",
+            "chief_final_validation": chief_validation,
             "chief_redraft_count": state.get("chief_redraft_count", 0) + (1 if should_redraft else 0),
             "status": "chief_finalized",
             "model_metadata": {
@@ -156,14 +169,35 @@ class ChiefOfStaffAgent:
         if next_step not in {"human_review", "redraft"}:
             next_step = "human_review"
 
+        rationale = data.get("rationale")
+        if not isinstance(rationale, str):
+            rationale = ""
+
         instructions = data.get("instructions")
         if not isinstance(instructions, str):
             instructions = ""
 
+        obvious_missing_items = data.get("obvious_missing_items")
+        if (
+            not isinstance(obvious_missing_items, list)
+            or not all(isinstance(item, str) for item in obvious_missing_items)
+        ):
+            obvious_missing_items = []
+
+        def _as_bool(key: str, fallback: bool) -> bool:
+            value = data.get(key)
+            return value if isinstance(value, bool) else fallback
+
         return {
             **data,
             "next_step": next_step,
+            "rationale": rationale,
             "instructions": instructions,
+            "answers_request": _as_bool("answers_request", True),
+            "matches_deliverable_type": _as_bool("matches_deliverable_type", True),
+            "reviewer_findings_addressed": _as_bool("reviewer_findings_addressed", True),
+            "jt_findings_addressed": _as_bool("jt_findings_addressed", True),
+            "obvious_missing_items": obvious_missing_items,
         }
 
     @staticmethod
