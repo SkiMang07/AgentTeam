@@ -9,6 +9,15 @@ class ModelMetadata(TypedDict, total=False):
     execution_path: list[str]
 
 
+class ChiefWorkOrder(TypedDict):
+    objective: str
+    deliverable_type: str
+    success_criteria: list[str]
+    research_needed: bool
+    open_questions: list[str]
+    jt_requested: bool
+
+
 class ChiefFinalValidation(TypedDict):
     answers_request: bool
     matches_deliverable_type: bool
@@ -39,6 +48,7 @@ class SharedState(TypedDict):
     user_task: str
     dry_run: NotRequired[bool]
     debug: NotRequired[bool]
+    work_order: NotRequired[ChiefWorkOrder]
     jt_requested: NotRequired[bool]
     jt_mode: NotRequired[str | None]
     jt_input: NotRequired[JTInput]

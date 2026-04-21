@@ -29,12 +29,29 @@ class DryRunResponsesClient:
         self._chief_final_calls = 0
 
     def ask(self, system_prompt: str, user_prompt: str) -> str:  # noqa: ARG002
-        if "Classify and route this task." in user_prompt:
+        if "Create and route the Chief of Staff work order." in user_prompt:
             task = user_prompt.split("Task:\n", maxsplit=1)[-1].lower()
             route = "write_direct" if "write_direct" in task else "research"
-            return json.dumps({"route": route, "rationale": "dry-run deterministic routing"})
+            work_order = {
+                "objective": "Complete the requested task.",
+                "deliverable_type": "draft_response",
+                "success_criteria": [
+                    "Address the user's stated objective.",
+                    "Keep the output grounded in approved facts.",
+                ],
+                "research_needed": route == "research",
+                "open_questions": [],
+                "jt_requested": "jt" in task,
+            }
+            return json.dumps(
+                {
+                    "work_order": work_order,
+                    "route": route,
+                    "rationale": "dry-run deterministic routing",
+                }
+            )
 
-        if "Extract facts and gaps." in user_prompt:
+        if "Extract facts and gaps for the Chief of Staff work order." in user_prompt:
             return json.dumps(
                 {
                     "facts": [
@@ -45,7 +62,7 @@ class DryRunResponsesClient:
                 }
             )
 
-        if "Draft output for the user task" in user_prompt:
+        if "Draft output for the Chief of Staff work order" in user_prompt:
             approved_facts = user_prompt.count("\n- ")
             return (
                 "DRY RUN DRAFT\n"

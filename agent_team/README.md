@@ -14,11 +14,12 @@ A local CLI-based multi-agent scaffold using:
 
 ## What v1 does
 - Accepts a user task from CLI input.
-- Chief of Staff classifies and routes the task.
-- Researcher extracts structured facts and gaps.
-- Writer drafts output from approved facts.
-- Reviewer performs a quality/factuality pass on the draft.
+- Chief of Staff creates a structured work order (objective, deliverable type, success criteria, research flag, open questions, JT request) and routes the task.
+- Researcher extracts structured facts and gaps using the work order.
+- Writer drafts output from approved facts and the same work order contract.
+- Reviewer validates the draft against approved facts and the same work order contract.
 - If Reviewer flags issues, the system performs one automatic redraft before human review.
+- Chief of Staff final pass validates alignment to the structured work order before human review.
 - Human review pauses before finalization.
 
 ## Project structure

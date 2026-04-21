@@ -22,6 +22,14 @@ def build_graph(
     graph_builder = StateGraph(SharedState)
     max_auto_redrafts = 1
 
+    def get_work_order_jt_requested(state: SharedState) -> bool:
+        work_order = state.get("work_order")
+        if isinstance(work_order, dict):
+            value = work_order.get("jt_requested")
+            if isinstance(value, bool):
+                return value
+        return bool(state.get("jt_requested", False))
+
     def timed_node(node_name: str, fn):
         def _wrapped(state: SharedState) -> SharedState:
             print(f"[flow] entering node: {node_name}")
@@ -122,7 +130,7 @@ def build_graph(
         execution_path = state.get("model_metadata", {}).get("execution_path", [])
         if execution_path:
             print(f"Execution path: {' -> '.join(execution_path)}")
-        print(f"jt_requested: {state.get('jt_requested', False)}")
+        print(f"jt_requested: {get_work_order_jt_requested(state)}")
         print(f"jt_mode: {state.get('jt_mode')}")
         print(f"Reviewer verdict: {'approved' if review_approved else 'needs_revision'}")
         if review_feedback:
@@ -194,10 +202,13 @@ def build_graph(
         }
 
     def route_after_chief(state: SharedState) -> str:
+        work_order = state.get("work_order")
+        if isinstance(work_order, dict) and isinstance(work_order.get("research_needed"), bool):
+            return "researcher" if work_order["research_needed"] else "writer"
         return "researcher" if state.get("route") == "research" else "writer"
 
     def route_after_writer(state: SharedState) -> str:
-        return "jt" if state.get("jt_requested", False) else "reviewer"
+        return "jt" if get_work_order_jt_requested(state) else "reviewer"
 
     def route_after_reviewer(state: SharedState) -> str:
         if state.get("reviewer_parse_failed", False):

@@ -21,11 +21,18 @@ class ReviewerAgent:
         evaluation_draft = self._select_evaluation_draft(state)
         approved_facts = state.get("approved_facts", [])
         facts_block = "\n".join(f"- {fact}" for fact in approved_facts) or "- (none provided)"
+        work_order = state.get("work_order", {})
+        success_criteria = "\n".join(f"- {item}" for item in work_order.get("success_criteria", []))
+        open_questions = "\n".join(f"- {item}" for item in work_order.get("open_questions", []))
 
         raw = self._client.ask(
             system_prompt=self._prompt,
             user_prompt=self._build_reviewer_user_prompt(
                 user_task=user_task,
+                work_order_objective=work_order.get("objective", ""),
+                work_order_deliverable_type=work_order.get("deliverable_type", ""),
+                work_order_success_criteria=success_criteria or "- (none provided)",
+                work_order_open_questions=open_questions or "- (none provided)",
                 facts_block=facts_block,
                 draft=evaluation_draft,
                 using_jt_rewrite=bool(state.get("jt_requested") and state.get("jt_rewrite")),
@@ -73,6 +80,10 @@ class ReviewerAgent:
     @staticmethod
     def _build_reviewer_user_prompt(
         user_task: str,
+        work_order_objective: str,
+        work_order_deliverable_type: str,
+        work_order_success_criteria: str,
+        work_order_open_questions: str,
         facts_block: str,
         draft: str,
         using_jt_rewrite: bool,
@@ -98,6 +109,14 @@ class ReviewerAgent:
             "<task>\n"
             f"{user_task}\n"
             "</task>\n\n"
+            "<work_order>\n"
+            f"objective: {work_order_objective}\n"
+            f"deliverable_type: {work_order_deliverable_type}\n"
+            "success_criteria:\n"
+            f"{work_order_success_criteria}\n"
+            "open_questions:\n"
+            f"{work_order_open_questions}\n"
+            "</work_order>\n\n"
             "<approved_facts>\n"
             f"{facts_block}\n"
             "</approved_facts>\n\n"

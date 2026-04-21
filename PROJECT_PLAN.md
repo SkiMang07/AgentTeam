@@ -90,13 +90,13 @@ This project is succeeding in the near term if it can:
 
 **Objective:** Make each stage work from a clearer contract instead of loose narrative handoffs.
 
-- [ ] Define Chief of Staff work order structure
-- [ ] Include objective in the work order
-- [ ] Include deliverable type in the work order
-- [ ] Include success criteria in the work order
-- [ ] Include open questions in the work order
-- [ ] Include whether JT is requested
-- [ ] Make Researcher return structured findings
+- [x] Define Chief of Staff work order structure
+- [x] Include objective in the work order
+- [x] Include deliverable type in the work order
+- [x] Include success criteria in the work order
+- [x] Include open questions in the work order
+- [x] Include whether JT is requested
+- [x] Make Researcher return structured findings
 - [x] Make Reviewer return structured findings
 
 ### 4. Local file context
@@ -152,7 +152,7 @@ This project is succeeding in the near term if it can:
 
 ## Current next task
 
-**Issue 4:** Define Chief of Staff work order format
+**Issue 5:** Make human review behavior explicit and easy to follow
 
 ### Done when
 
@@ -202,3 +202,4 @@ This project is succeeding in the near term if it can:
 - Fixed JT commenter redraft consistency bug: reviewer now validates current-pass JT Rewrite content, stale pass findings are scrubbed before verdicting, and reviewer routing/Chief-final gating now derives approval from the same current-pass recommended action
 - Reworked JT into a first-class graph node with explicit `jt_input`, `jt_feedback`, and `jt_rewrite` contracts; reviewer now validates the JT rewrite artifact on JT paths and commenter-mode indirection was removed
 - Fixed reviewer precedence for closed-fact tasks so blocked claims are never treated as required `missing_content` on non-JT paths
+- Completed Issue 4: Chief of Staff now creates a canonical structured `work_order` in shared state, and Researcher/Writer/Reviewer/Chief-final all consume this shared artifact directly; JT routing is aligned to `work_order.jt_requested`
