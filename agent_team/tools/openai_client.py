@@ -133,6 +133,11 @@ class DryRunResponsesClient:
                             "next_step": "human_review",
                             "rationale": "JT commenter rewrite approved; no extra style redraft needed.",
                             "instructions": "",
+                            "answers_request": True,
+                            "matches_deliverable_type": True,
+                            "reviewer_findings_addressed": True,
+                            "jt_findings_addressed": True,
+                            "obvious_missing_items": [],
                         }
                     )
                 return json.dumps(
@@ -140,6 +145,11 @@ class DryRunResponsesClient:
                         "next_step": "redraft",
                         "rationale": "Reviewer still reports meaning issues.",
                         "instructions": "Fix reviewer-noted meaning changes only; preserve source scope and commenter contract.",
+                        "answers_request": True,
+                        "matches_deliverable_type": False,
+                        "reviewer_findings_addressed": False,
+                        "jt_findings_addressed": True,
+                        "obvious_missing_items": ["Resolve reviewer-noted meaning drift in JT rewrite."],
                     }
                 )
             if "JT findings:\n(JT not requested or no findings)" in user_prompt:
@@ -148,6 +158,11 @@ class DryRunResponsesClient:
                         "next_step": "human_review",
                         "rationale": "No JT challenge requested.",
                         "instructions": "",
+                        "answers_request": True,
+                        "matches_deliverable_type": True,
+                        "reviewer_findings_addressed": True,
+                        "jt_findings_addressed": True,
+                        "obvious_missing_items": [],
                     }
                 )
             if self._chief_final_calls == 1:
@@ -156,6 +171,11 @@ class DryRunResponsesClient:
                         "next_step": "redraft",
                         "rationale": "Apply JT feedback once.",
                         "instructions": "Incorporate JT comments without changing scope.",
+                        "answers_request": True,
+                        "matches_deliverable_type": True,
+                        "reviewer_findings_addressed": True,
+                        "jt_findings_addressed": False,
+                        "obvious_missing_items": ["Address JT precision concerns before human review."],
                     }
                 )
             return json.dumps(
@@ -163,6 +183,11 @@ class DryRunResponsesClient:
                     "next_step": "human_review",
                     "rationale": "One JT-informed redraft completed.",
                     "instructions": "",
+                    "answers_request": True,
+                    "matches_deliverable_type": True,
+                    "reviewer_findings_addressed": True,
+                    "jt_findings_addressed": True,
+                    "obvious_missing_items": [],
                 }
             )
 

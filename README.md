@@ -112,6 +112,7 @@ Reviewer checks the draft
 JT challenge stage runs only when explicitly requested in non-commenter JT modes (`--jt`, `--jt-mode advisory`, `--jt-mode full_challenge`, or task text)
 JT commenter mode does not run a separate JT node; Chief of Staff applies the stricter commenter standard, Writer produces the final two-line output, and Reviewer validates grounding and shape
 Chief of Staff runs a final pass and can request one final redraft
+The final Chief of Staff pass stores a short structured alignment/completeness validation result in shared state
 human review pauses the flow as the final approval gate
 final output is approved or sent back for revision
 Design principles

@@ -61,7 +61,7 @@ This project is succeeding in the near term if it can:
 - [x] Review and tighten shared state fields
 - [ ] Improve Chief of Staff routing logic
 - [ ] Add clearer reviewer output structure
-- [ ] Add Chief of Staff final validation pass
+- [x] Add Chief of Staff final validation pass
 - [ ] Make human review behavior explicit and easy to follow
 - [ ] Ensure README matches the actual implementation
 
@@ -139,10 +139,9 @@ This project is succeeding in the near term if it can:
 
 ### Immediate next issues
 
-1. Add Chief of Staff final validation pass
-2. Structure reviewer findings
-3. Define Chief of Staff work order format
-4. Add first local file context workflow
+1. Structure reviewer findings
+2. Define Chief of Staff work order format
+3. Add first local file context workflow
 
 ### After those
 
@@ -153,13 +152,13 @@ This project is succeeding in the near term if it can:
 
 ## Current next task
 
-**Issue 2:** Add Chief of Staff final validation pass
+**Issue 3:** Structure reviewer findings
 
 ### Done when
 
-- Chief of Staff receives reviewer and JT findings before human review
-- Chief of Staff can request one final redraft before human review
-- Human review still remains the final approval step
+- Reviewer output includes clearer structured findings
+- Findings are specific enough to support deterministic redraft targets
+- README and PROJECT_PLAN remain aligned with actual behavior
 
 ## Risks to avoid
 
@@ -197,3 +196,4 @@ This project is succeeding in the near term if it can:
 - Added explicit redraft handoff targets (`revision_targets`) so second-pass writer edits are concrete and reviewer-actionable
 - Added CLI debug mode to print commenter failure artifacts across pass 1/pass 2 (writer, reviewer JSON, auto-redraft handoff) for direct diagnosis
 - Updated writer redraft behavior to revise the prior draft surgically (instead of regenerating from scratch) when reviewer targets are present
+- Completed Issue 2: final Chief of Staff validation now stores a short structured alignment/completeness result in shared state before routing to human review

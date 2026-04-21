@@ -9,6 +9,16 @@ class ModelMetadata(TypedDict, total=False):
     execution_path: list[str]
 
 
+class ChiefFinalValidation(TypedDict):
+    answers_request: bool
+    matches_deliverable_type: bool
+    reviewer_findings_addressed: bool
+    jt_findings_addressed: bool
+    obvious_missing_items: list[str]
+    rationale: str
+    recommended_action: Literal["human_review", "redraft"]
+
+
 class SharedState(TypedDict):
     user_task: str
     dry_run: NotRequired[bool]
@@ -31,6 +41,7 @@ class SharedState(TypedDict):
     auto_redraft_count: NotRequired[int]
     chief_redraft_count: NotRequired[int]
     chief_final_next_step: NotRequired[Literal["writer", "human_review"]]
+    chief_final_validation: NotRequired[ChiefFinalValidation]
     final_output: NotRequired[str]
     status: NotRequired[str]
     model_metadata: NotRequired[ModelMetadata | dict[str, Any]]
