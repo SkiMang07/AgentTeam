@@ -247,6 +247,8 @@ def build_graph(
             if isinstance(reviewer_findings, dict)
             else None
         )
+        if recommended_next_action in {"approve", "revise", "reject"}:
+            is_approved = recommended_next_action == "approve"
         has_feedback = bool(state.get("review_feedback")) or recommended_next_action in {"revise", "reject"}
         auto_redraft_count = state.get("auto_redraft_count", 0)
         jt_review_count = state.get("jt_review_count", 0)

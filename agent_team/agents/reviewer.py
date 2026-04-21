@@ -19,6 +19,9 @@ class ReviewerAgent:
     def run(self, state: SharedState) -> SharedState:
         user_task = state["user_task"]
         draft = state.get("draft", "")
+        evaluation_draft = self._extract_jt_rewrite_text(draft) if state.get("jt_requested") and state.get("jt_mode") == "commenter" else draft
+        if not evaluation_draft.strip():
+            evaluation_draft = draft
         approved_facts = state.get("approved_facts", [])
         facts_block = "\n".join(f"- {fact}" for fact in approved_facts) or "- (none provided)"
         is_jt_commenter = state.get("jt_requested") and state.get("jt_mode") == "commenter"
@@ -48,7 +51,7 @@ class ReviewerAgent:
         user_prompt = self._build_reviewer_user_prompt(
             user_task=user_task,
             facts_block=facts_block,
-            draft=draft,
+            draft=evaluation_draft,
             is_jt_commenter=bool(is_jt_commenter),
         )
 
@@ -88,6 +91,12 @@ class ReviewerAgent:
             user_task=user_task,
             draft=draft,
         )
+        if is_jt_commenter:
+            data = self._drop_stale_findings_for_current_draft(
+                findings=data,
+                current_draft=evaluation_draft,
+            )
+            data = self._reconcile_recommended_action(data)
         review_feedback = self._build_feedback(data)
         review_approved = data["recommended_next_action"] == "approve"
         parse_failed = bool(parsed.get("_parse_failed", False))
@@ -99,6 +108,7 @@ class ReviewerAgent:
             "reviewer_findings": data,
             "review_approved": review_approved,
             "review_feedback": review_feedback,
+            "reviewer_evaluated_draft": evaluation_draft,
             "reviewer_parse_failed": parse_failed,
             "reviewer_parse_error_raw": raw if parse_failed else "",
             "status": "reviewer_parse_failed" if parse_failed else "reviewed",
@@ -107,6 +117,7 @@ class ReviewerAgent:
                 "reviewer_raw": raw,
                 "reviewer_parse_failed": parse_failed,
                 "reviewer_outputs": reviewer_history,
+                "reviewer_evaluated_draft": evaluation_draft,
             },
         }
 
@@ -312,6 +323,57 @@ class ReviewerAgent:
         if not lines[1].startswith("JT Rewrite:"):
             return "JT commenter contract failure: line 2 must start with 'JT Rewrite:'."
         return None
+
+    @staticmethod
+    def _drop_stale_findings_for_current_draft(findings: dict, current_draft: str) -> dict:
+        normalized_draft = ReviewerAgent._normalize_text(current_draft)
+        if not normalized_draft:
+            return findings
+
+        updated = {**findings}
+        filtered_unsupported: list[str] = []
+        for item in findings.get("unsupported_claims", []):
+            candidate = ReviewerAgent._extract_quoted_phrase(item)
+            if not candidate:
+                filtered_unsupported.append(item)
+                continue
+            if ReviewerAgent._appears_in_text(ReviewerAgent._normalize_text(candidate), normalized_draft):
+                filtered_unsupported.append(item)
+
+        filtered_missing: list[str] = []
+        for item in findings.get("missing_content", []):
+            candidate = ReviewerAgent._extract_quoted_phrase(item)
+            if not candidate:
+                filtered_missing.append(item)
+                continue
+            if not ReviewerAgent._appears_in_text(ReviewerAgent._normalize_text(candidate), normalized_draft):
+                filtered_missing.append(item)
+
+        updated["unsupported_claims"] = filtered_unsupported
+        updated["missing_content"] = filtered_missing
+        return updated
+
+    @staticmethod
+    def _reconcile_recommended_action(findings: dict) -> dict:
+        updated = {**findings}
+        has_issues = any(
+            bool(updated.get(key, []))
+            for key in (
+                "missing_content",
+                "unsupported_claims",
+                "contradictions_or_logic_problems",
+                "format_or_structure_issues",
+            )
+        )
+        updated["recommended_next_action"] = "revise" if has_issues else "approve"
+        return updated
+
+    @staticmethod
+    def _extract_quoted_phrase(text: str) -> str:
+        match = re.search(r"'([^']+)'|\"([^\"]+)\"", text)
+        if not match:
+            return ""
+        return match.group(1) or match.group(2) or ""
 
     @staticmethod
     def _default_findings(

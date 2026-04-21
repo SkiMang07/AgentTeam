@@ -90,6 +90,16 @@ class ChiefOfStaffAgent:
         current_notes = state.get("approved_facts", [])
         chief_notes = data.get("instructions", "")
         has_critical_reviewer_findings = self._has_critical_reviewer_findings(reviewer_findings)
+        reviewer_action = (
+            reviewer_findings.get("recommended_next_action")
+            if isinstance(reviewer_findings, dict)
+            else None
+        )
+        reviewer_approved = (
+            reviewer_action == "approve"
+            if reviewer_action in {"approve", "revise", "reject"}
+            else state.get("review_approved", False)
+        )
         chief_validation = {
             "answers_request": data["answers_request"],
             "matches_deliverable_type": data["matches_deliverable_type"],
@@ -107,14 +117,14 @@ class ChiefOfStaffAgent:
         )
         reviewer_rejection_blocking = (
             self._is_jt_commenter_mode(state)
-            and not state.get("review_approved", False)
+            and not reviewer_approved
             and state.get("auto_redraft_count", 0) >= 1
         )
         # In JT commenter mode, once Reviewer has approved, avoid extra
         # style-only ping-pong from a discretionary Chief final redraft.
         # This preserves safety checks (reviewer gate already passed) while
         # reducing unnecessary loops on simple commenter rewrites.
-        if should_redraft and self._is_jt_commenter_mode(state) and state.get("review_approved", False):
+        if should_redraft and self._is_jt_commenter_mode(state) and reviewer_approved:
             should_redraft = False
         if should_redraft and reviewer_rejection_blocking:
             should_redraft = False

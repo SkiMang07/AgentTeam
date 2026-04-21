@@ -199,3 +199,4 @@ This project is succeeding in the near term if it can:
 - Completed Issue 2: final Chief of Staff validation now stores a short structured alignment/completeness result in shared state before routing to human review
 - Completed Issue 3: reviewer now returns a normalized structured QC findings object with explicit categories and recommended next action, consumed by Chief of Staff/JT downstream steps
 - Tightened reviewer/core-routing guardrails so unsupported claims and core fact contradictions are prioritized above formatting issues and blocked from normal human-review routing when unresolved
+- Fixed JT commenter redraft consistency bug: reviewer now validates current-pass JT Rewrite content, stale pass findings are scrubbed before verdicting, and reviewer routing/Chief-final gating now derives approval from the same current-pass recommended action
