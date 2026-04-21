@@ -105,7 +105,8 @@ def build_graph(
         print("\nReviewer requested revisions. Triggering one automatic redraft before human review.\n")
         return {
             **state,
-            "approved_facts": [*state.get("approved_facts", []), *revision_notes],
+            "writer_guidance_notes": [*state.get("writer_guidance_notes", []), *revision_notes],
+            "reviewer_notes": [*state.get("reviewer_notes", []), *revision_notes],
             "revision_targets": feedback,
             "redraft_source_draft": state.get("draft", ""),
             "auto_redraft_count": state.get("auto_redraft_count", 0) + 1,
@@ -159,10 +160,11 @@ def build_graph(
             if notes:
                 revised_state = {
                     **state,
-                    "approved_facts": [
-                        *state.get("approved_facts", []),
+                    "writer_guidance_notes": [
+                        *state.get("writer_guidance_notes", []),
                         f"Human reviewer note: {notes}",
                     ],
+                    "human_notes": [*state.get("human_notes", []), notes],
                     "status": "needs_redraft",
                 }
                 print("\nApplying human revision notes and re-running Writer + QC flow.\n")

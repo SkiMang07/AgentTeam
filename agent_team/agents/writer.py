@@ -16,6 +16,8 @@ class WriterAgent:
     def run(self, state: SharedState) -> SharedState:
         approved_facts = state.get("approved_facts", [])
         facts_block = "\n".join(f"- {fact}" for fact in approved_facts)
+        guidance_notes = state.get("writer_guidance_notes", [])
+        guidance_block = "\n".join(f"- {note}" for note in guidance_notes)
         work_order = state.get("work_order", {})
         success_criteria = "\n".join(f"- {item}" for item in work_order.get("success_criteria", []))
         open_questions = "\n".join(f"- {item}" for item in work_order.get("open_questions", []))
@@ -62,6 +64,7 @@ class WriterAgent:
                 f"Work order deliverable_type:\n{work_order.get('deliverable_type', '')}\n\n"
                 f"Work order success_criteria:\n{success_criteria if success_criteria else '- (none provided)'}\n\n"
                 f"Work order open_questions:\n{open_questions if open_questions else '- (none provided)'}\n\n"
+                f"Writer guidance notes (non-fact revision guidance):\n{guidance_block if guidance_block else '- (none provided)'}\n\n"
                 f"Approved facts:\n{facts_block if facts_block else '- (none provided)'}"
             ),
         )
