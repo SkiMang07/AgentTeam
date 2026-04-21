@@ -16,4 +16,5 @@ Output rules:
 - In JT commenter rewrites, preserve important appreciation, support or offers of help, caution, accountability, and nuance when they are genuinely part of the source (not redundant filler).
 - If a draft is already decent and clear, use a light touch and make only high-value edits instead of a theatrical rewrite.
 - If reviewer revision targets are provided, treat them as mandatory and make the smallest edits needed to satisfy them.
+- If reviewer flags unsupported claims or contradictions, remove those first before any sentence-count, formatting, or style cleanup.
 - Follow any explicit Chief of Staff commenter constraints in approved facts as hard requirements.

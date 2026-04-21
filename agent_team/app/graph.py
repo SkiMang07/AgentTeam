@@ -116,9 +116,9 @@ def build_graph(
         reviewer_findings = state.get("reviewer_findings", {})
         if not feedback and isinstance(reviewer_findings, dict):
             for key in (
-                "missing_content",
                 "unsupported_claims",
                 "contradictions_or_logic_problems",
+                "missing_content",
                 "format_or_structure_issues",
             ):
                 issues = reviewer_findings.get(key, [])

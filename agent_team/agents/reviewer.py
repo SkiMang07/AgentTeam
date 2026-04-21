@@ -368,23 +368,34 @@ class ReviewerAgent:
     @staticmethod
     def _extract_closed_fact_policy(user_task: str) -> dict:
         task = user_task or ""
-        facts_match = re.search(
-            r"use only these facts:\s*(.*?)(?:\n|(?:also say that)|(?:format it)|$)",
-            task,
-            flags=re.IGNORECASE | re.DOTALL,
-        )
-        blocked_match = re.search(
-            r"also say that\s*(.*?)(?:\n|(?:format it)|$)",
-            task,
-            flags=re.IGNORECASE | re.DOTALL,
-        )
+        trigger_match = re.search(r"use only these facts\s*:\s*", task, flags=re.IGNORECASE)
+        if not trigger_match:
+            return {
+                "is_closed_facts_mode": False,
+                "allowed_facts": [],
+                "blocked_claims": [],
+            }
 
-        allowed_facts = ReviewerAgent._split_claims(facts_match.group(1) if facts_match else "")
-        blocked_claims = ReviewerAgent._split_claims(blocked_match.group(1) if blocked_match else "")
+        post_trigger = task[trigger_match.end() :]
+        directive_pattern = re.compile(
+            r"\b(?:also\s+say|mention|include|note|add|state)\b(?:\s+that)?\b",
+            flags=re.IGNORECASE,
+        )
+        directive_match = directive_pattern.search(post_trigger)
+        allowlist_raw = post_trigger[: directive_match.start()] if directive_match else post_trigger
+        allowed_facts = ReviewerAgent._split_claims(allowlist_raw)
+
+        blocked_claims: list[str] = []
+        for match in directive_pattern.finditer(post_trigger):
+            segment_start = match.end()
+            next_match = directive_pattern.search(post_trigger, segment_start)
+            segment_end = next_match.start() if next_match else len(post_trigger)
+            blocked_claims.extend(ReviewerAgent._split_claims(post_trigger[segment_start:segment_end]))
+
         return {
-            "is_closed_facts_mode": bool(facts_match),
+            "is_closed_facts_mode": True,
             "allowed_facts": allowed_facts,
-            "blocked_claims": blocked_claims,
+            "blocked_claims": ReviewerAgent._dedupe_preserve_order(blocked_claims),
         }
 
     @staticmethod
@@ -393,7 +404,17 @@ class ReviewerAgent:
         if not cleaned:
             return []
         normalized = re.sub(r"\s+", " ", cleaned)
-        parts = re.split(r";|,\s+and that\s+|,\s+that\s+|\band that\b", normalized, flags=re.IGNORECASE)
+        normalized = re.split(
+            r"\b(?:keep|make|ensure|format|write|draft)\b",
+            normalized,
+            maxsplit=1,
+            flags=re.IGNORECASE,
+        )[0]
+        parts = re.split(
+            r";|,\s+and that\s+|,\s+that\s+|\band that\b|\.\s+|\s+\band\b\s+",
+            normalized,
+            flags=re.IGNORECASE,
+        )
         return [part.strip(" .") for part in parts if part.strip(" .")]
 
     @staticmethod
