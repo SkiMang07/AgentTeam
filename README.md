@@ -117,6 +117,21 @@ The final Chief of Staff pass stores a short structured alignment/completeness v
 human review pauses the flow as the final approval gate
 final output is approved or sent back for revision
 
+Chief of Staff structured work order (canonical shared contract):
+
+- `objective` (string)
+- `deliverable_type` (string)
+- `success_criteria` (list of strings)
+- `research_needed` (boolean)
+- `open_questions` (list of strings)
+- `jt_requested` (boolean)
+
+JT routing precedence:
+
+- `work_order.jt_requested` is the canonical routing source.
+- The top-level `jt_requested` field is maintained for compatibility and derived flow state, but routing decisions should resolve from the canonical work order value.
+- Explicit JT requests from CLI flags or explicit task text are preserved through normalization and cannot be silently downgraded by model output.
+
 Reviewer structured contract (canonical QC artifact in shared state):
 
 Reviewer is a QC validator only: it identifies issues and recommends next action; it does not produce rewrites.

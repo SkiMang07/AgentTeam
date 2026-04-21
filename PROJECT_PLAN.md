@@ -209,3 +209,4 @@ This project is succeeding in the near term if it can:
 - Reviewer closed-facts enforcement now prefers canonical work-order + approved-facts contracts and only treats explicit prohibition clauses as blocked claims
 - Kept `approved_facts` evidence-only; reviewer/chief/human revision instructions now flow through explicit writer guidance note fields
 - Reduced `jt_requested` drift risk by preferring `work_order.jt_requested` when selecting reviewer artifact and formatting Chief-final JT context
+- Completed Issue 4 cleanup: added a shared canonical JT resolver, aligned graph + human-redraft JT routing to `work_order.jt_requested`, and preserved explicit JT requests during Chief-of-Staff work-order normalization

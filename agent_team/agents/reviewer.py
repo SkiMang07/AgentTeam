@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 from typing import Literal
 
-from app.state import SharedState
+from app.state import SharedState, get_canonical_jt_requested
 from tools.openai_client import ResponsesClient
 
 PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "reviewer.md"
@@ -82,11 +82,7 @@ class ReviewerAgent:
 
     @staticmethod
     def _is_jt_requested(state: SharedState) -> bool:
-        work_order = state.get("work_order", {})
-        jt_requested = work_order.get("jt_requested") if isinstance(work_order, dict) else None
-        if isinstance(jt_requested, bool):
-            return jt_requested
-        return bool(state.get("jt_requested"))
+        return get_canonical_jt_requested(state)
 
     @staticmethod
     def _build_reviewer_user_prompt(

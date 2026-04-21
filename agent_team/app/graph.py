@@ -9,7 +9,7 @@ from agents.jt import JTAgent
 from agents.researcher import ResearcherAgent
 from agents.reviewer import ReviewerAgent
 from agents.writer import WriterAgent
-from app.state import SharedState
+from app.state import SharedState, get_canonical_jt_requested
 
 
 def build_graph(
@@ -21,14 +21,6 @@ def build_graph(
 ):
     graph_builder = StateGraph(SharedState)
     max_auto_redrafts = 1
-
-    def get_work_order_jt_requested(state: SharedState) -> bool:
-        work_order = state.get("work_order")
-        if isinstance(work_order, dict):
-            value = work_order.get("jt_requested")
-            if isinstance(value, bool):
-                return value
-        return bool(state.get("jt_requested", False))
 
     def timed_node(node_name: str, fn):
         def _wrapped(state: SharedState) -> SharedState:
@@ -131,7 +123,7 @@ def build_graph(
         execution_path = state.get("model_metadata", {}).get("execution_path", [])
         if execution_path:
             print(f"Execution path: {' -> '.join(execution_path)}")
-        print(f"jt_requested: {get_work_order_jt_requested(state)}")
+        print(f"jt_requested: {get_canonical_jt_requested(state)}")
         print(f"jt_mode: {state.get('jt_mode')}")
         print(f"Reviewer verdict: {'approved' if review_approved else 'needs_revision'}")
         if review_feedback:
@@ -169,7 +161,9 @@ def build_graph(
                 }
                 print("\nApplying human revision notes and re-running Writer + QC flow.\n")
                 redrafted_state = timed_writer_node(revised_state)
-                post_writer = timed_jt_node(redrafted_state) if redrafted_state.get("jt_requested") else redrafted_state
+                post_writer = (
+                    timed_jt_node(redrafted_state) if get_canonical_jt_requested(redrafted_state) else redrafted_state
+                )
                 rereviewed_state = timed_reviewer_node(post_writer)
                 return human_review_node(rereviewed_state)
 
@@ -210,7 +204,7 @@ def build_graph(
         return "researcher" if state.get("route") == "research" else "writer"
 
     def route_after_writer(state: SharedState) -> str:
-        return "jt" if get_work_order_jt_requested(state) else "reviewer"
+        return "jt" if get_canonical_jt_requested(state) else "reviewer"
 
     def route_after_reviewer(state: SharedState) -> str:
         if state.get("reviewer_parse_failed", False):
