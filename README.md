@@ -11,7 +11,7 @@ Version one includes:
 1. A **Chief of Staff** agent that interprets the task and routes work
 2. A **Researcher** agent that extracts facts and gaps
 3. A **Writer** agent that drafts output using approved facts
-4. A **Reviewer** agent that checks the draft for quality and grounding
+4. A **Reviewer** agent that runs a structured quality-control pass on the draft
 5. An optional **JT** challenge stage for explicit JT challenge requests
 6. A **human review** step before finalization
 7. A local **CLI** entry point for testing workflows
@@ -108,13 +108,30 @@ user submits task
 Chief of Staff classifies and routes
 Researcher gathers facts if needed
 Writer drafts the response
-Reviewer checks the draft
+Reviewer runs a structured QC pass and returns normalized findings
 JT challenge stage runs only when explicitly requested in non-commenter JT modes (`--jt`, `--jt-mode advisory`, `--jt-mode full_challenge`, or task text)
 JT commenter mode does not run a separate JT node; Chief of Staff applies the stricter commenter standard, Writer produces the final two-line output, and Reviewer validates grounding and shape
 Chief of Staff runs a final pass and can request one final redraft
 The final Chief of Staff pass stores a short structured alignment/completeness validation result in shared state
 human review pauses the flow as the final approval gate
 final output is approved or sent back for revision
+
+Reviewer structured contract (canonical QC artifact in shared state):
+
+Reviewer is a QC validator only: it identifies issues and recommends next action; it does not produce rewrites.
+
+- `overall_assessment` (string)
+- `missing_content` (list of strings)
+- `unsupported_claims` (list of strings)
+- `contradictions_or_logic_problems` (list of strings)
+- `format_or_structure_issues` (list of strings)
+- `recommended_next_action` (`approve` | `revise` | `reject`)
+
+Downstream use of reviewer findings:
+
+- Graph routing continues using deterministic approval + feedback fields derived from the structured reviewer findings
+- Chief of Staff final pass consumes the structured reviewer findings block directly
+- JT challenge stage (when requested) consumes the same structured reviewer findings block
 Design principles
 
 This repo follows a few simple rules:

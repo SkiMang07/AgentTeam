@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 from app.state import SharedState
 from tools.openai_client import ResponsesClient
@@ -54,8 +55,8 @@ class ChiefOfStaffAgent:
             jt_requested=state.get("jt_requested", False),
             jt_mode=state.get("jt_mode"),
         )
-        review_feedback = state.get("review_feedback", [])
-        review_block = "\n".join(f"- {item}" for item in review_feedback) or "- (none)"
+        reviewer_findings = state.get("reviewer_findings")
+        review_block = self._format_reviewer_findings_block(reviewer_findings, state)
         jt_findings = state.get("jt_findings")
         jt_block = jt_findings if jt_findings else "(JT not requested or no findings)"
         mode_specific_bar = ""
@@ -80,7 +81,7 @@ class ChiefOfStaffAgent:
                 "Use 'redraft' only when the draft should be revised before human review. "
                 "If you request a redraft, instructions must preserve factual scope and forbid adding new specifics not in the draft/review inputs.\n\n"
                 f"Draft:\n{normalized_draft}\n\n"
-                f"Reviewer findings:\n{review_block}\n\n"
+                f"Reviewer findings (structured):\n{review_block}\n\n"
                 f"JT findings:\n{jt_block}"
                 f"{mode_specific_bar}"
             ),
@@ -210,6 +211,37 @@ class ChiefOfStaffAgent:
     @staticmethod
     def _is_jt_commenter_mode(state: SharedState) -> bool:
         return bool(state.get("jt_requested")) and state.get("jt_mode") == "commenter"
+
+    @staticmethod
+    def _format_reviewer_findings_block(reviewer_findings: Any, state: SharedState) -> str:
+        if not isinstance(reviewer_findings, dict):
+            review_feedback = state.get("review_feedback", [])
+            return "\n".join(f"- {item}" for item in review_feedback) or "- (none)"
+
+        def _render_list(label: str, key: str) -> str:
+            items = reviewer_findings.get(key, [])
+            if isinstance(items, list) and items:
+                joined = "\n".join(f"  - {item}" for item in items if isinstance(item, str))
+                if joined:
+                    return f"- {label}:\n{joined}"
+            return f"- {label}: (none)"
+
+        overall_assessment = reviewer_findings.get("overall_assessment", "")
+        if not isinstance(overall_assessment, str):
+            overall_assessment = ""
+        recommended_next_action = reviewer_findings.get("recommended_next_action", "revise")
+        if not isinstance(recommended_next_action, str):
+            recommended_next_action = "revise"
+
+        blocks = [
+            f"- overall_assessment: {overall_assessment or '(none)'}",
+            _render_list("missing_content", "missing_content"),
+            _render_list("unsupported_claims", "unsupported_claims"),
+            _render_list("contradictions_or_logic_problems", "contradictions_or_logic_problems"),
+            _render_list("format_or_structure_issues", "format_or_structure_issues"),
+            f"- recommended_next_action: {recommended_next_action}",
+        ]
+        return "\n".join(blocks)
 
     @staticmethod
     def _normalize_jt_commenter_draft(draft: str, jt_requested: bool, jt_mode: str | None) -> str:
