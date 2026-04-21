@@ -193,3 +193,5 @@ This project is succeeding in the near term if it can:
 - JT node now skips commenter mode and remains available for challenge-mode requests
 - Chief of Staff now carries JT commenter editorial bar in active flow
 - Hardened Reviewer commenter contract: validator-only prompt assembly, strict JSON isolation, and explicit contract-violation handling for JT-style prose outputs
+- Calibrated Reviewer commenter rubric to allow non-material tightening of soft leadership language while still rejecting unsupported escalation
+- Added explicit redraft handoff targets (`revision_targets`) so second-pass writer edits are concrete and reviewer-actionable
