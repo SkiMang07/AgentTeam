@@ -48,6 +48,7 @@ class SharedState(TypedDict):
     review_approved: NotRequired[bool]
     reviewer_parse_failed: NotRequired[bool]
     reviewer_parse_error_raw: NotRequired[str]
+    reviewer_evaluated_draft: NotRequired[str]
     auto_redraft_count: NotRequired[int]
     chief_redraft_count: NotRequired[int]
     critical_reviewer_blocking: NotRequired[bool]
