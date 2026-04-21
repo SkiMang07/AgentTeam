@@ -12,7 +12,7 @@ Version one includes:
 2. A **Researcher** agent that extracts facts and gaps
 3. A **Writer** agent that drafts output using approved facts
 4. A **Reviewer** agent that runs a structured quality-control pass on the draft
-5. An optional **JT** challenge stage for explicit JT challenge requests
+5. An optional **JT** agent stage for explicit JT requests
 6. A **human review** step before finalization
 7. A local **CLI** entry point for testing workflows
 
@@ -109,8 +109,9 @@ Chief of Staff classifies and routes
 Researcher gathers facts if needed
 Writer drafts the response
 Reviewer runs a structured QC pass and returns normalized findings
-JT challenge stage runs only when explicitly requested in non-commenter JT modes (`--jt`, `--jt-mode advisory`, `--jt-mode full_challenge`, or task text)
-JT commenter mode does not run a separate JT node; Chief of Staff applies the stricter commenter standard, Writer produces the final two-line output, and Reviewer validates grounding and shape
+JT node runs only when explicitly requested (`--jt`, `--jt-mode advisory`, `--jt-mode full_challenge`, or task text)
+JT returns structured feedback plus a rewritten artifact (`jt_feedback`, `jt_rewrite`) in shared state
+Reviewer validates the JT rewrite artifact on JT paths (and writer draft on non-JT paths)
 Chief of Staff runs a final pass and can request one final redraft
 The final Chief of Staff pass stores a short structured alignment/completeness validation result in shared state
 human review pauses the flow as the final approval gate
@@ -185,13 +186,13 @@ python -m app.main --jt "your task here"
 
 Optional JT mode label:
 
-python -m app.main --jt-mode commenter "your task here"
+python -m app.main --jt-mode advisory "your task here"
 
-Optional debug mode (prints intermediate writer/reviewer/redraft artifacts):
+Optional debug mode:
 
-python -m app.main --debug --jt-mode commenter "your task here"
+python -m app.main --debug --jt-mode advisory "your task here"
 
-To run explicit JT challenge stage routing:
+To run explicit JT challenge routing:
 
 python -m app.main --jt-mode full_challenge "your task here"
 

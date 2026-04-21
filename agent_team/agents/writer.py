@@ -44,23 +44,12 @@ class WriterAgent:
                 f"{prior_draft}"
             )
         user_task = state["user_task"]
-        jt_commenter_contract = ""
-        if state.get("jt_requested") and state.get("jt_mode") == "commenter":
-            jt_commenter_contract = (
-                "\n\nJT commenter output contract (required):\n"
-                "Return exactly two lines and nothing else.\n"
-                "Line 1 must start with: JT Feedback: \n"
-                "Line 2 must start with: JT Rewrite: \n"
-                "No extra headings, notes, bullets, JSON, or meta commentary."
-            )
-
         raw = self._client.ask(
             system_prompt=self._prompt,
             user_prompt=(
                 "Draft output for the user task using only approved facts. "
                 "If facts are missing, state assumptions and limits clearly. "
                 "Do not introduce new factual specifics beyond the source task text and approved facts."
-                f"{jt_commenter_contract}"
                 f"{priority_block}"
                 f"{revision_target_block}\n\n"
                 f"{redraft_source_block}\n\n"
