@@ -188,9 +188,14 @@ def build_graph(
         has_feedback = bool(state.get("review_feedback"))
         auto_redraft_count = state.get("auto_redraft_count", 0)
         jt_review_count = state.get("jt_review_count", 0)
+        should_run_jt_stage = (
+            state.get("jt_requested", False)
+            and state.get("jt_mode") != "commenter"
+            and jt_review_count < 1
+        )
         if (not is_approved) and has_feedback and auto_redraft_count < max_auto_redrafts:
             return "auto_redraft_prep"
-        if state.get("jt_requested", False) and jt_review_count < 1:
+        if should_run_jt_stage:
             return "jt"
         return "chief_final"
 

@@ -36,6 +36,8 @@ Forcefulness and risk policy:
   - new asks, directives, or priorities not present in source,
   - new risk framing, consequences, or alarm language not present,
   - new commitment language, guarantees, or certainty beyond source.
+- In JT commenter mode, also validate output shape strictly: exactly two non-empty lines with `JT Feedback:` then `JT Rewrite:`.
+- Reviewer validates only; do not emulate or output JT-style two-line content yourself. Return JSON only.
 
 Feedback style:
 - If rejecting, name the exact unsupported escalation and the minimal fix.

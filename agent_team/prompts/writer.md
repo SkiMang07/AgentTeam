@@ -15,3 +15,4 @@ Output rules:
 - For JT commenter rewrites, tighten without flattening: cut filler, hedging, and soft corporate phrasing while preserving the source's material meaning and intent.
 - In JT commenter rewrites, preserve important appreciation, support or offers of help, caution, accountability, and nuance when they are genuinely part of the source (not redundant filler).
 - If a draft is already decent and clear, use a light touch and make only high-value edits instead of a theatrical rewrite.
+- Follow any explicit Chief of Staff commenter constraints in approved facts as hard requirements.

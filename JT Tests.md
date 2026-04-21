@@ -6,13 +6,14 @@ It is intentionally lightweight and focused on draft-quality failure modes that 
 
 ## How to use this artifact
 
-1. Run each prompt through the JT path (`--jt` or `--jt-mode`).
-2. Save:
+1. Run commenter-mode prompts through core flow with `--jt-mode commenter` (no separate JT node).
+2. Run full-challenge prompts through JT stage with `--jt-mode full_challenge`.
+3. Save:
    - source draft
    - JT critique output
    - JT revised draft (if produced)
-3. Score each run using the pass/fail checks below.
-4. Treat any **Fail** as a regression candidate and track before changing prompts.
+4. Score each run using the pass/fail checks below.
+5. Treat any **Fail** as a regression candidate and track before changing prompts.
 
 ## Pass/Fail checks
 
