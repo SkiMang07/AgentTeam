@@ -17,6 +17,7 @@ class WriterAgent:
         approved_facts = state.get("approved_facts", [])
         facts_block = "\n".join(f"- {fact}" for fact in approved_facts)
         revision_targets = state.get("revision_targets", [])
+        prior_draft = state.get("redraft_source_draft", "")
         revision_target_block = ""
         if revision_targets:
             bullets = "\n".join(f"- {item}" for item in revision_targets)
@@ -24,6 +25,12 @@ class WriterAgent:
                 "\n\nRevision targets from Reviewer (address each one directly):\n"
                 f"{bullets}\n"
                 "Make the smallest possible edits to satisfy these notes while preserving source meaning."
+            )
+        redraft_source_block = ""
+        if revision_targets and prior_draft:
+            redraft_source_block = (
+                "\n\nCurrent draft to revise (do a surgical revision, not a full rewrite):\n"
+                f"{prior_draft}"
             )
         user_task = state["user_task"]
         jt_commenter_contract = ""
@@ -44,6 +51,7 @@ class WriterAgent:
                 "Do not introduce new factual specifics beyond the source task text and approved facts."
                 f"{jt_commenter_contract}"
                 f"{revision_target_block}\n\n"
+                f"{redraft_source_block}\n\n"
                 f"Task:\n{user_task}\n\n"
                 f"Approved facts:\n{facts_block if facts_block else '- (none provided)'}"
             ),

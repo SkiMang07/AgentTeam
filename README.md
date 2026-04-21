@@ -168,6 +168,10 @@ Optional JT mode label:
 
 python -m app.main --jt-mode commenter "your task here"
 
+Optional debug mode (prints intermediate writer/reviewer/redraft artifacts):
+
+python -m app.main --debug --jt-mode commenter "your task here"
+
 To run explicit JT challenge stage routing:
 
 python -m app.main --jt-mode full_challenge "your task here"

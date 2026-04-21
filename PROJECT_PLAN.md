@@ -195,3 +195,5 @@ This project is succeeding in the near term if it can:
 - Hardened Reviewer commenter contract: validator-only prompt assembly, strict JSON isolation, and explicit contract-violation handling for JT-style prose outputs
 - Calibrated Reviewer commenter rubric to allow non-material tightening of soft leadership language while still rejecting unsupported escalation
 - Added explicit redraft handoff targets (`revision_targets`) so second-pass writer edits are concrete and reviewer-actionable
+- Added CLI debug mode to print commenter failure artifacts across pass 1/pass 2 (writer, reviewer JSON, auto-redraft handoff) for direct diagnosis
+- Updated writer redraft behavior to revise the prior draft surgically (instead of regenerating from scratch) when reviewer targets are present
