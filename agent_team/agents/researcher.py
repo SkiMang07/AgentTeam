@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from app.state import SharedState
+from app.state import SharedState, normalize_project_memory
 from tools.local_file_reader import build_evidence_bundle
 from tools.openai_client import ResponsesClient
 
@@ -17,6 +17,7 @@ class ResearcherAgent:
 
     def run(self, state: SharedState) -> SharedState:
         work_order = state.get("work_order", {})
+        project_memory = normalize_project_memory(state.get("project_memory"))
         evidence_bundle = self._load_structured_evidence(state)
         evidence_block = self._render_evidence_block(evidence_bundle)
         has_file_evidence = bool(evidence_bundle)
@@ -26,14 +27,20 @@ class ResearcherAgent:
                 "Extract facts and gaps for the Chief of Staff work order. Return strict JSON with keys: facts, gaps. "
                 "Both must be arrays of short strings.\n"
                 "When local file evidence is provided, use it as grounding context for both facts and gaps.\n\n"
-                f"Task:\n{state['user_task']}\n\n"
+                f"Current task:\n{state['user_task']}\n\n"
                 f"Work order objective: {work_order.get('objective', '')}\n"
                 f"Work order deliverable_type: {work_order.get('deliverable_type', '')}\n"
                 f"Work order success_criteria: {work_order.get('success_criteria', [])}\n"
                 f"Work order open_questions: {work_order.get('open_questions', [])}\n\n"
-                f"Files read: {state.get('files_read', [])}\n"
+                f"Current evidence:\n"
+                f"- Files read: {state.get('files_read', [])}\n"
                 f"Local file evidence available: {has_file_evidence}\n"
-                f"Structured local file evidence:\n{evidence_block}"
+                f"Structured local file evidence:\n{evidence_block}\n\n"
+                "Continuity memory (context only; not default evidence):\n"
+                f"- current_objective: {project_memory.get('current_objective', '')}\n"
+                f"- active_deliverable_type: {project_memory.get('active_deliverable_type', '')}\n"
+                f"- open_questions: {project_memory.get('open_questions', [])}\n"
+                f"- latest_approved_output_present: {bool(project_memory.get('latest_approved_output', '').strip())}"
             ),
         )
         data = self._normalize_output(self._safe_parse(raw))

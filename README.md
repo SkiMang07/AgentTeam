@@ -128,11 +128,13 @@ Project memory (session-local, explicit, narrow):
   - `latest_approved_output`
 - Memory is carried only within the same local CLI process and printed in the terminal for inspection.
 - Chief of Staff may use memory as continuity context for planning, but memory is not treated as grounded evidence/fact by default.
+- If a task explicitly asks to inspect stored session memory (for example, asks for `latest_approved_output`), routing switches to a memory-lookup path that reads the stored memory value directly instead of paraphrasing the current prompt.
 
 What project memory does in v1:
 
 - Carries objective/deliverable/open questions forward into the next run in the same local session.
 - Carries latest draft and latest approved output across runs in the same local session.
+- Supports explicit same-session retrieval of `project_memory.latest_approved_output` and returns the stored artifact value when present.
 - Keeps the memory contract explicit and typed in shared state.
 
 What project memory does not do in v1:
