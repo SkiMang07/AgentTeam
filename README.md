@@ -130,6 +130,8 @@ Project memory (session-local, explicit, narrow):
 - Chief of Staff may use memory as continuity context for planning, but memory is not treated as grounded evidence/fact by default.
 - If a task explicitly asks to inspect stored session memory (for example, asks for `latest_approved_output`), routing switches to a memory-lookup path that reads the stored memory value directly instead of paraphrasing the current prompt.
 - Memory lookup is intent-aware for supported fields: `latest_approved_output`, `current_objective`, and `active_deliverable_type` (including combined field requests).
+- Memory lookup intent parsing also supports "object type"/"output type" wording for deliverable-type retrieval, and supports combined requests like "latest stored output and object type".
+- Generic memory inspection requests now return a structured snapshot of key canonical fields (`current_objective`, `active_deliverable_type`, `latest_approved_output`) instead of defaulting to output-only.
 - Memory inspection turns are read-only by default: approving a lookup response does **not** overwrite canonical `project_memory` fields (`current_objective`, `active_deliverable_type`, `latest_approved_output`, `latest_draft`).
 - Transformational requests (for example, “rewrite the latest approved output…”) continue through normal drafting flow and do not force lookup-only routing.
 

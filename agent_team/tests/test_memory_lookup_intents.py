@@ -52,6 +52,11 @@ class MemoryLookupIntentTests(unittest.TestCase):
         fields = get_memory_lookup_fields(task)
         self.assertEqual(fields, ["current_objective", "active_deliverable_type"])
 
+    def test_get_memory_lookup_fields_supports_output_plus_object_type(self) -> None:
+        task = "Please share the latest stored output and object type from this session."
+        fields = get_memory_lookup_fields(task)
+        self.assertEqual(fields, ["latest_approved_output", "active_deliverable_type"])
+
     def test_chief_memory_lookup_detection_excludes_transformational_requests(self) -> None:
         self.assertTrue(
             ChiefOfStaffAgent._is_memory_lookup_request(
@@ -118,6 +123,35 @@ class MemoryLookupIntentTests(unittest.TestCase):
         )
 
         final_output = result.get("final_output", "")
+        self.assertIn("latest_approved_output: approved artifact text", final_output)
+
+    def test_memory_lookup_graph_defaults_to_key_memory_snapshot_not_output_only(self) -> None:
+        graph = build_graph(
+            _ChiefMemoryLookupStub(),
+            _NoopAgent(),
+            _NoopAgent(),
+            _NoopAgent(),
+            WriterAgent(_NoopModelClient()),
+        )
+
+        result = graph.invoke(
+            {
+                "user_task": "Please share what is currently stored in session memory.",
+                "dry_run": True,
+                "project_memory": {
+                    "current_objective": "Ship onboarding brief",
+                    "active_deliverable_type": "status_update",
+                    "open_questions": [],
+                    "latest_draft": "draft text",
+                    "latest_approved_output": "approved artifact text",
+                },
+                "model_metadata": {},
+            }
+        )
+
+        final_output = result.get("final_output", "")
+        self.assertIn("current_objective: Ship onboarding brief", final_output)
+        self.assertIn("active_deliverable_type: status_update", final_output)
         self.assertIn("latest_approved_output: approved artifact text", final_output)
 
     def test_memory_lookup_approval_does_not_overwrite_project_memory(self) -> None:
