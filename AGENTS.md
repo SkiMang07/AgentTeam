@@ -45,7 +45,7 @@ This project is an early stage scaffold for an "Agent Team" system with:
 
 1. The code should run
 2. The graph should be understandable
-3. The human review step should be real, not hand waved
+3. The human  step should be real, not hand waved
 4. Keep the first pass boring and solid
 
 ## Planning and task tracking
@@ -68,7 +68,7 @@ Scope discipline:
 Documentation discipline:
 - if implementation changes behavior, update `README.md`
 - if implementation changes project status or priorities, update `PROJECT_PLAN.md`
-- prefer small, reviewable PRs over large bundled changes
+- prefer small, able PRs over large bundled changes
 
 
 Branch and PR rules for this repo
@@ -78,5 +78,39 @@ Branch and PR rules for this repo
 - Avoid opportunistic refactors, renames, or formatting-only edits outside the files required for the issue.
 - If the target files have changed materially since the task started, stop and summarize likely conflict risk before making broad edits.
 - Prefer one issue per branch or worktree. Do not mix multiple issue implementations in one branch.
+
+## Review guidelines
+
+When reviewing pull requests in this repo, focus on correctness, scope control, and behavior drift.
+
+Priorities, in order:
+
+1. Check whether the change actually solves the issue it claims to solve.
+2. Check whether graph behavior is still explicit and understandable.
+3. Check whether shared state remains typed, canonical, and internally consistent.
+4. Check whether routing logic is deterministic where it should be deterministic.
+5. Check whether human review remains a real approval step and was not weakened or bypassed.
+6. Check whether JT behavior remains optional and only runs when explicitly requested.
+7. Check whether the change introduced unsupported assumptions, hidden side effects, or silent behavior changes.
+8. Check whether README.md and PROJECT_PLAN.md were updated when behavior or project status changed.
+9. Check whether the PR stayed tightly scoped to the issue and avoided unrelated refactors.
+10. Check whether tests, smoke checks, or manual validation are adequate for the risk level of the change.
+
+Flag issues aggressively when you see any of the following:
+
+1. State fields duplicated without a clear canonical source
+2. Routing decisions based on loose prose parsing when structured state should drive them
+3. Reviewer or Chief of Staff outputs being treated as authoritative without structured validation
+4. Silent downgrade of explicit JT requests
+5. Unsupported claims, contradictory facts, or fake grounding
+6. Human review being reduced to a cosmetic step
+7. Docs drifting away from real implementation
+8. Broad abstractions that add complexity without clear value
+9. Unrelated file churn that increases merge conflict risk
+10. New integrations, UI work, or new core agents added without explicit approval
+
+Do not spend review energy on minor style preferences unless they affect readability, maintainability, or correctness.
+
+Prefer comments that are concrete and actionable. Call out the exact risk, why it matters, and what should change.
 - When possible, minimize edits to files that are already being changed in another open PR.
 - In your final response, list exactly which files changed and call out any files likely to conflict with open PRs.
