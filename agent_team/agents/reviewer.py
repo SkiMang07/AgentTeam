@@ -38,6 +38,8 @@ class ReviewerAgent:
                 work_order_open_questions=open_questions or "- (none provided)",
                 facts_block=facts_block,
                 draft=evaluation_draft,
+                files_read=state.get("files_read", []),
+                files_skipped=state.get("files_skipped", []),
                 using_jt_rewrite=bool(self._is_jt_requested(state) and state.get("jt_rewrite")),
             ),
         )
@@ -56,6 +58,12 @@ class ReviewerAgent:
             user_task=user_task,
             approved_facts=approved_facts,
             draft=evaluation_draft,
+        )
+        data = self._enforce_file_scope_honesty(
+            findings=data,
+            draft=evaluation_draft,
+            files_read=state.get("files_read", []),
+            files_skipped=state.get("files_skipped", []),
         )
         review_feedback = self._build_feedback(data)
         review_approved = data["recommended_next_action"] == "approve"
@@ -117,6 +125,8 @@ class ReviewerAgent:
         work_order_open_questions: str,
         facts_block: str,
         draft: str,
+        files_read: list[str],
+        files_skipped: list[str],
         using_jt_rewrite: bool,
     ) -> str:
         artifact_label = "jt_rewrite" if using_jt_rewrite else "writer_draft"
@@ -151,6 +161,11 @@ class ReviewerAgent:
             "<approved_facts>\n"
             f"{facts_block}\n"
             "</approved_facts>\n\n"
+            "<file_read_scope>\n"
+            f"files_read: {files_read}\n"
+            f"files_skipped: {files_skipped}\n"
+            "Flag any draft claim that implies reading a skipped/unread file as unsupported.\n"
+            "</file_read_scope>\n\n"
             "<candidate_draft>\n"
             f"{draft}\n"
             "</candidate_draft>"
@@ -306,6 +321,41 @@ class ReviewerAgent:
         if blocked_hits:
             policy_name = "closed-facts" if policy["is_closed_facts_mode"] else "no-new-facts"
             normalized["overall_assessment"] = f"Draft fails core grounding checks: unsupported claims violate the {policy_name} contract."
+            normalized["recommended_next_action"] = "revise"
+        return normalized
+
+
+    @staticmethod
+    def _enforce_file_scope_honesty(
+        findings: dict,
+        draft: str,
+        files_read: list[str],
+        files_skipped: list[str],
+    ) -> dict:
+        normalized = {**findings}
+        unsupported = list(normalized.get("unsupported_claims", []))
+        draft_lower = draft.lower()
+
+        read_names = [Path(path).name.lower() for path in files_read if isinstance(path, str)]
+        skipped_names = [Path(path).name.lower() for path in files_skipped if isinstance(path, str)]
+
+        for skipped_name in skipped_names:
+            if skipped_name and skipped_name in draft_lower and skipped_name not in read_names:
+                unsupported.append(
+                    f"File-scope honesty violation: draft references '{skipped_name}' but it was not read."
+                )
+
+        normalized["unsupported_claims"] = ReviewerAgent._dedupe_preserve_order(unsupported)
+        has_any_issues = any(
+            normalized[key]
+            for key in (
+                "missing_content",
+                "unsupported_claims",
+                "contradictions_or_logic_problems",
+                "format_or_structure_issues",
+            )
+        )
+        if has_any_issues and normalized.get("recommended_next_action") == "approve":
             normalized["recommended_next_action"] = "revise"
         return normalized
 

@@ -10,6 +10,7 @@ from agents.researcher import ResearcherAgent
 from agents.reviewer import ReviewerAgent
 from agents.writer import WriterAgent
 from app.state import SharedState, get_canonical_jt_requested
+from tools.local_file_reader import build_evidence_bundle
 
 
 def build_graph(
@@ -56,6 +57,37 @@ def build_graph(
     def researcher_node(state: SharedState) -> SharedState:
         return researcher.run(state)
 
+    def evidence_extract_node(state: SharedState) -> SharedState:
+        model_metadata = state.get("model_metadata", {})
+        file_contents = model_metadata.get("file_contents", {}) if isinstance(model_metadata, dict) else {}
+        if not isinstance(file_contents, dict):
+            file_contents = {}
+
+        evidence_bundle = build_evidence_bundle(file_contents)
+        research_facts = [fact for fact in state.get("research_facts", []) if isinstance(fact, str)]
+
+        evidence_facts: list[str] = []
+        for item in evidence_bundle:
+            file_path = item.get("file_path", "")
+            evidence_points = item.get("evidence_points", [])
+            for point in evidence_points:
+                if isinstance(point, str) and point.strip():
+                    evidence_facts.append(f"[{file_path}] {point}")
+
+        approved_facts = [*research_facts, *evidence_facts]
+        requested = len(state.get("files_requested", []))
+        read = len(state.get("files_read", []))
+        skipped = len(state.get("files_skipped", []))
+        file_read_summary = f"requested={requested}, read={read}, skipped={skipped}"
+
+        return {
+            **state,
+            "evidence_bundle": evidence_bundle,
+            "approved_facts": approved_facts,
+            "file_read_summary": file_read_summary,
+            "status": "evidence_extracted",
+        }
+
     def writer_node(state: SharedState) -> SharedState:
         return writer.run(state)
 
@@ -74,6 +106,7 @@ def build_graph(
 
     timed_chief_node = timed_node("chief_of_staff", chief_node)
     timed_researcher_node = timed_node("researcher", researcher_node)
+    timed_evidence_extract_node = timed_node("evidence_extract", evidence_extract_node)
     timed_writer_node = timed_node("writer", writer_node)
     timed_jt_node = timed_node("jt", jt_node)
     timed_reviewer_node = timed_node("reviewer", reviewer_node)
@@ -126,6 +159,8 @@ def build_graph(
         print(f"jt_requested: {get_canonical_jt_requested(state)}")
         print(f"jt_mode: {state.get('jt_mode')}")
         print(f"Reviewer verdict: {'approved' if review_approved else 'needs_revision'}")
+        if state.get("file_read_summary"):
+            print(f"File read summary: {state.get('file_read_summary')}")
         if review_feedback:
             print("Reviewer feedback:")
             for item in review_feedback:
@@ -200,8 +235,8 @@ def build_graph(
     def route_after_chief(state: SharedState) -> str:
         work_order = state.get("work_order")
         if isinstance(work_order, dict) and isinstance(work_order.get("research_needed"), bool):
-            return "researcher" if work_order["research_needed"] else "writer"
-        return "researcher" if state.get("route") == "research" else "writer"
+            return "researcher" if work_order["research_needed"] else "evidence_extract"
+        return "researcher" if state.get("route") == "research" else "evidence_extract"
 
     def route_after_writer(state: SharedState) -> str:
         return "jt" if get_canonical_jt_requested(state) else "reviewer"
@@ -243,6 +278,7 @@ def build_graph(
 
     graph_builder.add_node("chief_of_staff", timed_chief_node)
     graph_builder.add_node("researcher", timed_researcher_node)
+    graph_builder.add_node("evidence_extract", timed_evidence_extract_node)
     graph_builder.add_node("writer", timed_writer_node)
     graph_builder.add_node("jt", timed_jt_node)
     graph_builder.add_node("reviewer", timed_reviewer_node)
@@ -261,10 +297,11 @@ def build_graph(
         route_after_chief,
         {
             "researcher": "researcher",
-            "writer": "writer",
+            "evidence_extract": "evidence_extract",
         },
     )
-    graph_builder.add_edge("researcher", "writer")
+    graph_builder.add_edge("researcher", "evidence_extract")
+    graph_builder.add_edge("evidence_extract", "writer")
     graph_builder.add_conditional_edges(
         "writer",
         route_after_writer,

@@ -13,6 +13,7 @@ from app.config import get_settings
 from app.graph import build_graph
 from app.jt_request import detect_jt_request
 from app.state import SharedState
+from tools.local_file_reader import load_local_files
 from tools.openai_client import DryRunResponsesClient, ResponsesClient
 
 
@@ -39,6 +40,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Print detailed node artifacts for diagnosis.",
     )
+    parser.add_argument(
+        "--files-path",
+        action="append",
+        default=[],
+        help="Explicit local file or folder path to include as bounded evidence input. Repeat to add multiple paths.",
+    )
     parser.add_argument("task", type=str, nargs="*", help="Task for the agent team")
     return parser.parse_args()
 
@@ -55,6 +62,8 @@ def main() -> None:
 
     if not task:
         raise ValueError("A task is required.")
+
+    file_read_result = load_local_files(args.files_path)
 
     if args.dry_run:
         print("\nMode: DRY RUN (no OpenAI calls)\n")
@@ -77,6 +86,7 @@ def main() -> None:
     jt_requested, jt_mode = detect_jt_request(task=task, cli_jt=args.jt, cli_mode=args.jt_mode)
     print(f"JT requested (CLI): {jt_requested}")
     print(f"JT mode (CLI): {jt_mode}")
+
     initial_state: SharedState = {
         "user_task": task,
         "status": "received",
@@ -87,6 +97,13 @@ def main() -> None:
         "jt_feedback": [],
         "jt_rewrite": None,
         "jt_findings": None,
+        "files_requested": file_read_result["files_requested"],
+        "files_read": file_read_result["files_read"],
+        "files_skipped": file_read_result["files_skipped"],
+        "skip_reasons": file_read_result["skip_reasons"],
+        "model_metadata": {
+            "file_contents": file_read_result["file_contents"],
+        },
     }
 
     try:
@@ -114,6 +131,10 @@ def main() -> None:
     print(f"Status: {result.get('status', 'unknown')}")
     if args.dry_run:
         print("Mode: DRY RUN (no OpenAI calls)")
+
+    file_summary = result.get("file_read_summary")
+    if file_summary:
+        print(f"File read summary: {file_summary}")
 
     node_timings = result.get("model_metadata", {}).get("node_timings_ms", {})
     if node_timings:

@@ -22,6 +22,21 @@ class WriterAgent:
         success_criteria = "\n".join(f"- {item}" for item in work_order.get("success_criteria", []))
         open_questions = "\n".join(f"- {item}" for item in work_order.get("open_questions", []))
 
+        evidence_bundle = state.get("evidence_bundle", [])
+        evidence_lines: list[str] = []
+        if isinstance(evidence_bundle, list):
+            for item in evidence_bundle:
+                if not isinstance(item, dict):
+                    continue
+                file_path = item.get("file_path", "")
+                evidence_points = item.get("evidence_points", [])
+                evidence_lines.append(f"- file: {file_path}")
+                if isinstance(evidence_points, list):
+                    for point in evidence_points:
+                        if isinstance(point, str):
+                            evidence_lines.append(f"  - {point}")
+        evidence_block = "\n".join(evidence_lines) if evidence_lines else "- (no local file evidence loaded)"
+
         revision_targets = state.get("revision_targets", [])
         prior_draft = state.get("redraft_source_draft", "")
         reviewer_findings = state.get("reviewer_findings", {})
@@ -53,9 +68,10 @@ class WriterAgent:
         raw = self._client.ask(
             system_prompt=self._prompt,
             user_prompt=(
-                "Draft output for the Chief of Staff work order using only approved facts. "
+                "Draft output for the Chief of Staff work order using only approved facts and structured evidence. "
                 "If facts are missing, state assumptions and limits clearly. "
-                "Do not introduce new factual specifics beyond the source task text and approved facts."
+                "Do not introduce new factual specifics beyond the source task text and approved facts. "
+                "Never claim you read files outside files_read."
                 f"{priority_block}"
                 f"{revision_target_block}\n\n"
                 f"{redraft_source_block}\n\n"
@@ -64,7 +80,10 @@ class WriterAgent:
                 f"Work order deliverable_type:\n{work_order.get('deliverable_type', '')}\n\n"
                 f"Work order success_criteria:\n{success_criteria if success_criteria else '- (none provided)'}\n\n"
                 f"Work order open_questions:\n{open_questions if open_questions else '- (none provided)'}\n\n"
+                f"Files read:\n{state.get('files_read', [])}\n"
+                f"Files skipped:\n{state.get('files_skipped', [])}\n"
                 f"Writer guidance notes (non-fact revision guidance):\n{guidance_block if guidance_block else '- (none provided)'}\n\n"
+                f"Structured evidence bundle:\n{evidence_block}\n\n"
                 f"Approved facts:\n{facts_block if facts_block else '- (none provided)'}"
             ),
         )
