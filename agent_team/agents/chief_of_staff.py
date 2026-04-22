@@ -5,7 +5,12 @@ import re
 from pathlib import Path
 from typing import Any
 
-from app.state import ChiefWorkOrder, SharedState, get_canonical_jt_requested
+from app.state import (
+    ChiefWorkOrder,
+    SharedState,
+    get_canonical_jt_requested,
+    normalize_project_memory,
+)
 from tools.openai_client import ResponsesClient
 
 PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "chief_of_staff.md"
@@ -19,6 +24,8 @@ class ChiefOfStaffAgent:
     def run(self, state: SharedState) -> SharedState:
         user_task = state["user_task"]
         inferred_jt_requested = state.get("jt_requested", False)
+        project_memory = normalize_project_memory(state.get("project_memory"))
+        memory_open_questions = project_memory.get("open_questions", [])
 
         raw = self._client.ask(
             system_prompt=self._prompt,
@@ -30,13 +37,31 @@ class ChiefOfStaffAgent:
                 "open_questions (array of strings), jt_requested (boolean). "
                 "route must be 'research' or 'write_direct'. "
                 "Set work_order.jt_requested from explicit task text only; do not infer hidden intent. "
+                "If project memory is provided, use it only as continuity context for planning; "
+                "do not treat memory as evidence or claimed facts unless they are present in current task inputs. "
                 "Do not include extra keys.\n\n"
                 f"CLI JT requested flag: {inferred_jt_requested}\n\n"
+                "Session project memory (continuity only):\n"
+                f"- current_objective: {project_memory.get('current_objective', '')}\n"
+                f"- active_deliverable_type: {project_memory.get('active_deliverable_type', '')}\n"
+                f"- open_questions: {memory_open_questions}\n"
+                f"- latest_draft: {project_memory.get('latest_draft', '')}\n"
+                f"- latest_approved_output: {project_memory.get('latest_approved_output', '')}\n\n"
                 f"Task:\n{user_task}"
             ),
         )
-        data = self._normalize_output(self._safe_parse(raw), inferred_jt_requested)
+        data = self._normalize_output(
+            self._safe_parse(raw),
+            inferred_jt_requested=inferred_jt_requested,
+            prior_memory=project_memory,
+        )
         work_order = data["work_order"]
+        updated_project_memory = {
+            **project_memory,
+            "current_objective": work_order["objective"],
+            "active_deliverable_type": work_order["deliverable_type"],
+            "open_questions": work_order["open_questions"],
+        }
 
         return {
             **state,
@@ -44,6 +69,14 @@ class ChiefOfStaffAgent:
             "route": data["route"],
             "jt_requested": work_order["jt_requested"],
             "jt_mode": state.get("jt_mode"),
+            "current_run": {
+                "objective": work_order["objective"],
+                "deliverable_type": work_order["deliverable_type"],
+                "open_questions": work_order["open_questions"],
+                "latest_draft": state.get("draft", ""),
+                "latest_approved_output": state.get("final_output", ""),
+            },
+            "project_memory": updated_project_memory,
             "status": "routed",
             "model_metadata": {
                 **state.get("model_metadata", {}),
@@ -136,8 +169,12 @@ class ChiefOfStaffAgent:
             return {"route": "research", "rationale": "fallback due to parse error"}
 
     @staticmethod
-    def _normalize_output(data: dict, inferred_jt_requested: bool) -> dict:
-        work_order = ChiefOfStaffAgent._normalize_work_order(data.get("work_order"), inferred_jt_requested)
+    def _normalize_output(data: dict, inferred_jt_requested: bool, prior_memory: dict) -> dict:
+        work_order = ChiefOfStaffAgent._normalize_work_order(
+            data.get("work_order"),
+            inferred_jt_requested,
+            prior_memory=prior_memory,
+        )
 
         route = data.get("route")
         if route not in {"research", "write_direct"}:
@@ -150,17 +187,22 @@ class ChiefOfStaffAgent:
         }
 
     @staticmethod
-    def _normalize_work_order(raw_work_order: Any, inferred_jt_requested: bool) -> ChiefWorkOrder:
+    def _normalize_work_order(
+        raw_work_order: Any,
+        inferred_jt_requested: bool,
+        prior_memory: dict | None = None,
+    ) -> ChiefWorkOrder:
         if not isinstance(raw_work_order, dict):
             raw_work_order = {}
+        memory = normalize_project_memory(prior_memory or {})
 
         objective = raw_work_order.get("objective")
         if not isinstance(objective, str) or not objective.strip():
-            objective = "Clarify and complete the user request."
+            objective = memory.get("current_objective", "") or "Clarify and complete the user request."
 
         deliverable_type = raw_work_order.get("deliverable_type")
         if not isinstance(deliverable_type, str) or not deliverable_type.strip():
-            deliverable_type = "general_response"
+            deliverable_type = memory.get("active_deliverable_type", "") or "general_response"
 
         success_criteria = raw_work_order.get("success_criteria")
         if not isinstance(success_criteria, list) or not all(isinstance(item, str) for item in success_criteria):
@@ -168,7 +210,7 @@ class ChiefOfStaffAgent:
 
         open_questions = raw_work_order.get("open_questions")
         if not isinstance(open_questions, list) or not all(isinstance(item, str) for item in open_questions):
-            open_questions = []
+            open_questions = memory.get("open_questions", [])
 
         research_needed = raw_work_order.get("research_needed")
         if not isinstance(research_needed, bool):
@@ -191,14 +233,21 @@ class ChiefOfStaffAgent:
     def _get_work_order(state: SharedState) -> ChiefWorkOrder:
         existing = state.get("work_order")
         if isinstance(existing, dict):
-            return ChiefOfStaffAgent._normalize_work_order(existing, get_canonical_jt_requested(state))
+            return ChiefOfStaffAgent._normalize_work_order(
+                existing,
+                get_canonical_jt_requested(state),
+                prior_memory=normalize_project_memory(state.get("project_memory")),
+            )
         user_task = state.get("user_task", "")
+        project_memory = normalize_project_memory(state.get("project_memory"))
         return {
-            "objective": user_task.strip() or "Clarify and complete the user request.",
-            "deliverable_type": "general_response",
+            "objective": user_task.strip()
+            or project_memory.get("current_objective", "")
+            or "Clarify and complete the user request.",
+            "deliverable_type": project_memory.get("active_deliverable_type", "") or "general_response",
             "success_criteria": ["Answer the user task directly and clearly."],
             "research_needed": True,
-            "open_questions": [],
+            "open_questions": project_memory.get("open_questions", []),
             "jt_requested": get_canonical_jt_requested(state),
         }
 
