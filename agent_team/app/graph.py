@@ -74,7 +74,7 @@ def build_graph(
                 if isinstance(point, str) and point.strip():
                     evidence_facts.append(f"[{file_path}] {point}")
 
-        approved_facts = [*research_facts, *evidence_facts]
+        approved_facts = _dedupe_preserving_order([*research_facts, *evidence_facts])
         requested = len(state.get("files_requested", []))
         read = len(state.get("files_read", []))
         skipped = len(state.get("files_skipped", []))
@@ -87,6 +87,16 @@ def build_graph(
             "file_read_summary": file_read_summary,
             "status": "evidence_extracted",
         }
+
+    def _dedupe_preserving_order(items: list[str]) -> list[str]:
+        seen: set[str] = set()
+        deduped: list[str] = []
+        for item in items:
+            if item in seen:
+                continue
+            seen.add(item)
+            deduped.append(item)
+        return deduped
 
     def writer_node(state: SharedState) -> SharedState:
         return writer.run(state)

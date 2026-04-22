@@ -248,7 +248,14 @@ State fields captured each run:
 - `files_skipped`
 - `skip_reasons`
 
-The graph builds a structured evidence bundle from files actually read, passes that into Writer, and asks Reviewer to validate both content grounding and file-scope honesty.
+The graph builds a structured evidence bundle from files actually read and includes:
+- headings
+- bullet lines
+- short key content snippets
+- non-empty line counts
+
+Researcher and Writer both consume this evidence bundle so facts and drafts are grounded in selected local files rather than generic responses.
+Reviewer validates both content grounding and file-scope honesty.
 The system should not claim it read files that were skipped or unsupported.
 
 Expected behavior
