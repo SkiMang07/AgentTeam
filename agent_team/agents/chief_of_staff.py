@@ -344,6 +344,19 @@ class ChiefOfStaffAgent:
                 "project memory",
                 "stored memory",
                 "memory currently stored",
+                "memory from this session",
+                "from session memory",
+            )
+        )
+        mentions_stored_session_context = any(
+            phrase in normalized
+            for phrase in (
+                "from this session",
+                "in this session",
+                "currently stored",
+                "stored output",
+                "stored objective",
+                "stored deliverable",
             )
         )
         asks_transformational_rewrite = any(
@@ -359,7 +372,7 @@ class ChiefOfStaffAgent:
             )
         )
         requested_fields = get_memory_lookup_fields(task)
-        return mentions_memory and bool(requested_fields) and not asks_transformational_rewrite
+        return (mentions_memory or mentions_stored_session_context) and bool(requested_fields) and not asks_transformational_rewrite
 
     @staticmethod
     def _get_memory_turn_type(task: str) -> str:
@@ -376,6 +389,9 @@ class ChiefOfStaffAgent:
                 "stored memory",
                 "latest approved output",
                 "latest_approved_output",
+                "stored output",
+                "from this session",
+                "in this session",
             )
         )
         asks_transformational_rewrite = any(

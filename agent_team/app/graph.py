@@ -132,7 +132,7 @@ def build_graph(
         project_memory = normalize_project_memory(state.get("project_memory"))
         lookup_fields = get_memory_lookup_fields(state.get("user_task", ""))
         if not lookup_fields:
-            lookup_fields = ["latest_approved_output"]
+            lookup_fields = ["current_objective", "active_deliverable_type", "latest_approved_output"]
 
         lines: list[str] = []
         approved_fact_lines: list[str] = []

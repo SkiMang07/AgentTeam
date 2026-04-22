@@ -174,6 +174,11 @@ def get_memory_lookup_fields(
             "latest approved output",
             "latest_approved_output",
             "approved output currently stored",
+            "latest stored output",
+            "latest output from this session",
+            "latest output in this session",
+            "latest output",
+            "stored output",
         )
     )
     wants_objective = any(
@@ -184,6 +189,7 @@ def get_memory_lookup_fields(
             "objective in project memory",
             "objective in session memory",
             "what objective",
+            "stored objective",
         )
     )
     wants_deliverable_type = any(
@@ -194,6 +200,10 @@ def get_memory_lookup_fields(
             "deliverable currently stored",
             "deliverable in project memory",
             "deliverable in session memory",
+            "stored deliverable type",
+            "object type",
+            "output type",
+            "deliverable/object type",
         )
     )
 
