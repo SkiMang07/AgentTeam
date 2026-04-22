@@ -209,4 +209,4 @@ This project is succeeding in the near term if it can:
 - Reduced `jt_requested` drift risk by preferring `work_order.jt_requested` when selecting reviewer artifact and formatting Chief-final JT context
 - Completed Issue 4 cleanup: added a shared canonical JT resolver, aligned graph + human-redraft JT routing to `work_order.jt_requested`, and preserved explicit JT requests during Chief-of-Staff work-order normalization
 - Completed Issue 5: added bounded local file evidence workflow (`--files-path`) with strict extension allowlist, max-depth/max-file limits, explicit read/skip tracking (`files_requested`, `files_read`, `files_skipped`, `skip_reasons`), structured evidence extraction, and writer/reviewer grounding on actual read scope
-
+- Tightened file-grounded output quality for Issue 5: evidence extraction now captures headings, bullets, and short snippets; Researcher now receives structured file evidence in prompt assembly; and approved-facts bundling now deduplicates richer file evidence before writing

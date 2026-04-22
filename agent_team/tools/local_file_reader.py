@@ -24,6 +24,12 @@ class EvidenceItem(TypedDict):
     evidence_points: list[str]
 
 
+MAX_HEADINGS = 4
+MAX_BULLETS = 6
+MAX_SNIPPETS = 4
+MAX_SNIPPET_CHARS = 180
+
+
 
 def load_local_files(
     paths: list[str],
@@ -114,12 +120,14 @@ def build_evidence_bundle(file_contents: dict[str, str]) -> list[EvidenceItem]:
         lines = [line.strip() for line in content.splitlines() if line.strip()]
         points: list[str] = []
 
-        if lines:
-            points.append(f"First line: {lines[0][:200]}")
-        if len(lines) > 1:
-            points.append(f"Second line: {lines[1][:200]}")
+        headings = _extract_headings(lines)
+        bullets = _extract_bullets(lines)
+        snippets = _extract_key_snippets(lines)
 
         points.append(f"Total non-empty lines: {len(lines)}")
+        points.extend(headings)
+        points.extend(bullets)
+        points.extend(snippets)
 
         bundle.append(
             {
@@ -148,3 +156,54 @@ def _read_text_friendly_file(file_path: Path) -> str:
         return "\n".join(rows)[:MAX_CHARS_PER_FILE]
 
     return file_path.read_text(encoding="utf-8")[:MAX_CHARS_PER_FILE]
+
+
+def _extract_headings(lines: list[str]) -> list[str]:
+    headings: list[str] = []
+    for line in lines:
+        if line.startswith("#"):
+            normalized = line.lstrip("#").strip()
+            if normalized:
+                headings.append(f"Heading: {normalized[:MAX_SNIPPET_CHARS]}")
+        if len(headings) >= MAX_HEADINGS:
+            break
+    return headings
+
+
+def _extract_bullets(lines: list[str]) -> list[str]:
+    bullets: list[str] = []
+    for line in lines:
+        if line.startswith(("- ", "* ")):
+            normalized = line[2:].strip()
+        elif _is_numbered_bullet(line):
+            normalized = line.split(".", 1)[1].strip()
+        else:
+            continue
+        if normalized:
+            bullets.append(f"Bullet: {normalized[:MAX_SNIPPET_CHARS]}")
+        if len(bullets) >= MAX_BULLETS:
+            break
+    return bullets
+
+
+def _extract_key_snippets(lines: list[str]) -> list[str]:
+    snippets: list[str] = []
+    seen: set[str] = set()
+    for line in lines:
+        if line.startswith("#") or line.startswith(("- ", "* ")) or _is_numbered_bullet(line):
+            continue
+        normalized = " ".join(line.split())
+        if len(normalized) < 45 or normalized in seen:
+            continue
+        seen.add(normalized)
+        snippets.append(f"Snippet: {normalized[:MAX_SNIPPET_CHARS]}")
+        if len(snippets) >= MAX_SNIPPETS:
+            break
+    return snippets
+
+
+def _is_numbered_bullet(line: str) -> bool:
+    parts = line.split(".", 1)
+    if len(parts) != 2:
+        return False
+    return parts[0].isdigit()
