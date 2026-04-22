@@ -118,6 +118,22 @@ def build_graph(
             },
         }
 
+    def memory_lookup_prep_node(state: SharedState) -> SharedState:
+        project_memory = normalize_project_memory(state.get("project_memory"))
+        latest_approved_output = project_memory.get("latest_approved_output", "")
+        lookup_result = (
+            latest_approved_output
+            if isinstance(latest_approved_output, str) and latest_approved_output.strip()
+            else "No latest approved output is currently stored in session project memory."
+        )
+        return {
+            **state,
+            "memory_lookup_requested": True,
+            "memory_lookup_result": lookup_result,
+            "approved_facts": [f"Session memory latest_approved_output: {lookup_result}"],
+            "status": "memory_lookup_prepared",
+        }
+
     def jt_node(state: SharedState) -> SharedState:
         jt_state = jt.run(state)
         return {
@@ -135,6 +151,7 @@ def build_graph(
     timed_researcher_node = timed_node("researcher", researcher_node)
     timed_evidence_extract_node = timed_node("evidence_extract", evidence_extract_node)
     timed_writer_node = timed_node("writer", writer_node)
+    timed_memory_lookup_prep_node = timed_node("memory_lookup_prep", memory_lookup_prep_node)
     timed_jt_node = timed_node("jt", jt_node)
     timed_reviewer_node = timed_node("reviewer", reviewer_node)
     timed_chief_final_node = timed_node("chief_of_staff_final", chief_final_node)
@@ -283,11 +300,15 @@ def build_graph(
 
     def route_after_chief(state: SharedState) -> str:
         work_order = state.get("work_order")
+        if state.get("route") == "memory_lookup" or state.get("memory_lookup_requested", False):
+            return "memory_lookup_prep"
         if isinstance(work_order, dict) and isinstance(work_order.get("research_needed"), bool):
             return "researcher" if work_order["research_needed"] else "evidence_extract"
         return "researcher" if state.get("route") == "research" else "evidence_extract"
 
     def route_after_writer(state: SharedState) -> str:
+        if state.get("memory_lookup_requested", False):
+            return "human_review"
         return "jt" if get_canonical_jt_requested(state) else "reviewer"
 
     def route_after_reviewer(state: SharedState) -> str:
@@ -328,6 +349,7 @@ def build_graph(
     graph_builder.add_node("chief_of_staff", timed_chief_node)
     graph_builder.add_node("researcher", timed_researcher_node)
     graph_builder.add_node("evidence_extract", timed_evidence_extract_node)
+    graph_builder.add_node("memory_lookup_prep", timed_memory_lookup_prep_node)
     graph_builder.add_node("writer", timed_writer_node)
     graph_builder.add_node("jt", timed_jt_node)
     graph_builder.add_node("reviewer", timed_reviewer_node)
@@ -347,14 +369,17 @@ def build_graph(
         {
             "researcher": "researcher",
             "evidence_extract": "evidence_extract",
+            "memory_lookup_prep": "memory_lookup_prep",
         },
     )
+    graph_builder.add_edge("memory_lookup_prep", "writer")
     graph_builder.add_edge("researcher", "evidence_extract")
     graph_builder.add_edge("evidence_extract", "writer")
     graph_builder.add_conditional_edges(
         "writer",
         route_after_writer,
         {
+            "human_review": "human_review",
             "jt": "jt",
             "reviewer": "reviewer",
         },

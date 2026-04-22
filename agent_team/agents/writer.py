@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.state import SharedState
+from app.state import SharedState, normalize_project_memory
 from tools.openai_client import ResponsesClient
 
 PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "writer.md"
@@ -14,11 +14,34 @@ class WriterAgent:
         self._prompt = PROMPT_PATH.read_text(encoding="utf-8")
 
     def run(self, state: SharedState) -> SharedState:
+        if state.get("memory_lookup_requested", False):
+            memory = normalize_project_memory(state.get("project_memory"))
+            latest_approved_output = memory.get("latest_approved_output", "")
+            memory_lookup_result = (
+                latest_approved_output
+                if isinstance(latest_approved_output, str) and latest_approved_output.strip()
+                else "No latest approved output is currently stored in session project memory."
+            )
+            prior_writer_history = state.get("model_metadata", {}).get("writer_outputs", [])
+            writer_history = [*prior_writer_history, memory_lookup_result]
+            return {
+                **state,
+                "draft": memory_lookup_result,
+                "memory_lookup_result": memory_lookup_result,
+                "status": "drafted",
+                "model_metadata": {
+                    **state.get("model_metadata", {}),
+                    "writer_raw": memory_lookup_result,
+                    "writer_outputs": writer_history,
+                },
+            }
+
         approved_facts = state.get("approved_facts", [])
         facts_block = "\n".join(f"- {fact}" for fact in approved_facts)
         guidance_notes = state.get("writer_guidance_notes", [])
         guidance_block = "\n".join(f"- {note}" for note in guidance_notes)
         work_order = state.get("work_order", {})
+        project_memory = normalize_project_memory(state.get("project_memory"))
         success_criteria = "\n".join(f"- {item}" for item in work_order.get("success_criteria", []))
         open_questions = "\n".join(f"- {item}" for item in work_order.get("open_questions", []))
 
@@ -76,16 +99,22 @@ class WriterAgent:
                 f"{priority_block}"
                 f"{revision_target_block}\n\n"
                 f"{redraft_source_block}\n\n"
-                f"Original task:\n{state['user_task']}\n\n"
+                f"Current task:\n{state['user_task']}\n\n"
                 f"Work order objective:\n{work_order.get('objective', '')}\n\n"
                 f"Work order deliverable_type:\n{work_order.get('deliverable_type', '')}\n\n"
                 f"Work order success_criteria:\n{success_criteria if success_criteria else '- (none provided)'}\n\n"
                 f"Work order open_questions:\n{open_questions if open_questions else '- (none provided)'}\n\n"
-                f"Files read:\n{state.get('files_read', [])}\n"
-                f"Files skipped:\n{state.get('files_skipped', [])}\n"
+                f"Current evidence:\n"
+                f"- Files read: {state.get('files_read', [])}\n"
+                f"- Files skipped: {state.get('files_skipped', [])}\n"
                 f"Writer guidance notes (non-fact revision guidance):\n{guidance_block if guidance_block else '- (none provided)'}\n\n"
                 f"Structured evidence bundle:\n{evidence_block}\n\n"
-                f"Approved facts:\n{facts_block if facts_block else '- (none provided)'}"
+                f"Approved facts:\n{facts_block if facts_block else '- (none provided)'}\n\n"
+                "Continuity memory (context only unless the task explicitly asks to inspect/reuse it):\n"
+                f"- current_objective: {project_memory.get('current_objective', '')}\n"
+                f"- active_deliverable_type: {project_memory.get('active_deliverable_type', '')}\n"
+                f"- open_questions: {project_memory.get('open_questions', [])}\n"
+                f"- latest_approved_output: {project_memory.get('latest_approved_output', '')}"
             ),
         )
 

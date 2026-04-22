@@ -26,6 +26,7 @@ class ChiefOfStaffAgent:
         inferred_jt_requested = state.get("jt_requested", False)
         project_memory = normalize_project_memory(state.get("project_memory"))
         memory_open_questions = project_memory.get("open_questions", [])
+        memory_lookup_requested = self._is_memory_lookup_request(user_task)
 
         raw = self._client.ask(
             system_prompt=self._prompt,
@@ -35,25 +36,33 @@ class ChiefOfStaffAgent:
                 "work_order must include: objective (string), deliverable_type (string), "
                 "success_criteria (array of strings), research_needed (boolean), "
                 "open_questions (array of strings), jt_requested (boolean). "
-                "route must be 'research' or 'write_direct'. "
+                "route must be 'research', 'write_direct', or 'memory_lookup'. "
+                "Use route='memory_lookup' only when the task explicitly asks to inspect stored session/project memory "
+                "(for example asking for latest approved output currently stored). "
                 "Set work_order.jt_requested from explicit task text only; do not infer hidden intent. "
                 "If project memory is provided, use it only as continuity context for planning; "
                 "do not treat memory as evidence or claimed facts unless they are present in current task inputs. "
                 "Do not include extra keys.\n\n"
                 f"CLI JT requested flag: {inferred_jt_requested}\n\n"
+                "Current task:\n"
+                f"{user_task}\n\n"
                 "Session project memory (continuity only):\n"
                 f"- current_objective: {project_memory.get('current_objective', '')}\n"
                 f"- active_deliverable_type: {project_memory.get('active_deliverable_type', '')}\n"
                 f"- open_questions: {memory_open_questions}\n"
                 f"- latest_draft: {project_memory.get('latest_draft', '')}\n"
                 f"- latest_approved_output: {project_memory.get('latest_approved_output', '')}\n\n"
-                f"Task:\n{user_task}"
+                "Current evidence:\n"
+                f"- files_read: {state.get('files_read', [])}\n"
+                f"- approved_facts_count: {len(state.get('approved_facts', [])) if isinstance(state.get('approved_facts'), list) else 0}\n"
+                f"- explicit memory lookup requested: {memory_lookup_requested}"
             ),
         )
         data = self._normalize_output(
             self._safe_parse(raw),
             inferred_jt_requested=inferred_jt_requested,
             prior_memory=project_memory,
+            user_task=user_task,
         )
         work_order = data["work_order"]
         updated_project_memory = {
@@ -69,6 +78,7 @@ class ChiefOfStaffAgent:
             "route": data["route"],
             "jt_requested": work_order["jt_requested"],
             "jt_mode": state.get("jt_mode"),
+            "memory_lookup_requested": memory_lookup_requested,
             "current_run": {
                 "objective": work_order["objective"],
                 "deliverable_type": work_order["deliverable_type"],
@@ -169,7 +179,12 @@ class ChiefOfStaffAgent:
             return {"route": "research", "rationale": "fallback due to parse error"}
 
     @staticmethod
-    def _normalize_output(data: dict, inferred_jt_requested: bool, prior_memory: dict) -> dict:
+    def _normalize_output(
+        data: dict,
+        inferred_jt_requested: bool,
+        prior_memory: dict,
+        user_task: str,
+    ) -> dict:
         work_order = ChiefOfStaffAgent._normalize_work_order(
             data.get("work_order"),
             inferred_jt_requested,
@@ -177,8 +192,10 @@ class ChiefOfStaffAgent:
         )
 
         route = data.get("route")
-        if route not in {"research", "write_direct"}:
+        if route not in {"research", "write_direct", "memory_lookup"}:
             route = "research" if work_order["research_needed"] else "write_direct"
+        if ChiefOfStaffAgent._is_memory_lookup_request(user_task):
+            route = "memory_lookup"
 
         return {
             **data,
@@ -307,6 +324,30 @@ class ChiefOfStaffAgent:
         if match:
             return match.group(0)
         return None
+
+    @staticmethod
+    def _is_memory_lookup_request(task: str) -> bool:
+        if not isinstance(task, str):
+            return False
+        normalized = " ".join(task.lower().split())
+        mentions_memory = any(
+            phrase in normalized
+            for phrase in (
+                "session memory",
+                "project memory",
+                "stored memory",
+                "memory currently stored",
+            )
+        )
+        asks_latest_approved = any(
+            phrase in normalized
+            for phrase in (
+                "latest approved output",
+                "latest_approved_output",
+                "approved output currently stored",
+            )
+        )
+        return mentions_memory and asks_latest_approved
 
     @staticmethod
     def _format_reviewer_findings_block(reviewer_findings: Any, state: SharedState) -> str:
