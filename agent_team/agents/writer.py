@@ -15,13 +15,15 @@ class WriterAgent:
 
     def run(self, state: SharedState) -> SharedState:
         if state.get("memory_lookup_requested", False):
-            memory = normalize_project_memory(state.get("project_memory"))
-            latest_approved_output = memory.get("latest_approved_output", "")
-            memory_lookup_result = (
-                latest_approved_output
-                if isinstance(latest_approved_output, str) and latest_approved_output.strip()
-                else "No latest approved output is currently stored in session project memory."
-            )
+            memory_lookup_result = state.get("memory_lookup_result", "")
+            if not isinstance(memory_lookup_result, str) or not memory_lookup_result.strip():
+                memory = normalize_project_memory(state.get("project_memory"))
+                latest_approved_output = memory.get("latest_approved_output", "")
+                memory_lookup_result = (
+                    latest_approved_output
+                    if isinstance(latest_approved_output, str) and latest_approved_output.strip()
+                    else "No latest approved output is currently stored in session project memory."
+                )
             prior_writer_history = state.get("model_metadata", {}).get("writer_outputs", [])
             writer_history = [*prior_writer_history, memory_lookup_result]
             return {
