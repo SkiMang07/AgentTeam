@@ -581,23 +581,41 @@ class ReviewerAgent:
         quoted = ReviewerAgent._extract_quoted_phrase(item)
         if quoted:
             quoted_normalized = ReviewerAgent._normalize_text(quoted)
-            if quoted_normalized and ReviewerAgent._appears_in_text(quoted_normalized, source_normalized):
+            if quoted_normalized and quoted_normalized in source_normalized:
                 return True
 
-        source_numbers = set(re.findall(r"\d+(?:\.\d+)?", source_text))
-        item_numbers = set(re.findall(r"\d+(?:\.\d+)?", item))
-        if item_numbers and item_numbers.issubset(source_numbers):
-            return True
+        ignored_tokens = {
+            "unsupported",
+            "claim",
+            "draft",
+            "rewrite",
+            "source",
+            "provided",
+            "grounded",
+            "grounding",
+        }
 
-        content_tokens = [
+        item_tokens = [
             token
             for token in normalized_item.split()
-            if len(token) > 3 and token not in {"unsupported", "claim", "draft", "rewrite", "source", "provided"}
+            if len(token) > 2 and token.isalpha() and token not in ignored_tokens
         ]
-        if not content_tokens:
+        source_tokens = [token for token in source_normalized.split() if token.isalpha()]
+        if not item_tokens or not source_tokens:
             return False
-        token_overlap = sum(1 for token in content_tokens if token in source_normalized.split())
-        return token_overlap >= max(2, len(content_tokens) // 2)
+
+        source_token_set = set(source_tokens)
+        token_overlap = [token for token in item_tokens if token in source_token_set]
+        if len(token_overlap) < 3:
+            return False
+
+        overlap_ratio = len(token_overlap) / len(item_tokens)
+        if overlap_ratio < 0.7:
+            return False
+
+        source_bigrams = {f"{left} {right}" for left, right in zip(source_tokens, source_tokens[1:])}
+        item_bigrams = {f"{left} {right}" for left, right in zip(item_tokens, item_tokens[1:])}
+        return bool(item_bigrams & source_bigrams)
 
     @staticmethod
     def _references_any_blocked_claim(item: str, blocked_claims: list[str]) -> bool:
