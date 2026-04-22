@@ -49,6 +49,22 @@ class EvidenceItem(TypedDict):
     evidence_points: list[str]
 
 
+class ProjectMemory(TypedDict):
+    current_objective: str
+    active_deliverable_type: str
+    open_questions: list[str]
+    latest_draft: str
+    latest_approved_output: str
+
+
+class CurrentRunState(TypedDict):
+    objective: str
+    deliverable_type: str
+    open_questions: list[str]
+    latest_draft: str
+    latest_approved_output: str
+
+
 class SharedState(TypedDict):
     user_task: str
     dry_run: NotRequired[bool]
@@ -72,6 +88,8 @@ class SharedState(TypedDict):
     skip_reasons: NotRequired[dict[str, str]]
     evidence_bundle: NotRequired[list[EvidenceItem]]
     file_read_summary: NotRequired[str]
+    current_run: NotRequired[CurrentRunState]
+    project_memory: NotRequired[ProjectMemory]
     draft: NotRequired[str]
     reviewer_findings: NotRequired[ReviewerFindings]
     review_feedback: NotRequired[list[str]]
@@ -102,3 +120,38 @@ def get_canonical_jt_requested(state: Mapping[str, Any]) -> bool:
         if isinstance(value, bool):
             return value
     return bool(state.get("jt_requested", False))
+
+
+def empty_project_memory() -> ProjectMemory:
+    return {
+        "current_objective": "",
+        "active_deliverable_type": "",
+        "open_questions": [],
+        "latest_draft": "",
+        "latest_approved_output": "",
+    }
+
+
+def normalize_project_memory(raw: object) -> ProjectMemory:
+    if not isinstance(raw, Mapping):
+        return empty_project_memory()
+
+    current_objective = raw.get("current_objective", "")
+    active_deliverable_type = raw.get("active_deliverable_type", "")
+    open_questions = raw.get("open_questions", [])
+    latest_draft = raw.get("latest_draft", "")
+    latest_approved_output = raw.get("latest_approved_output", "")
+
+    return {
+        "current_objective": current_objective.strip() if isinstance(current_objective, str) else "",
+        "active_deliverable_type": (
+            active_deliverable_type.strip() if isinstance(active_deliverable_type, str) else ""
+        ),
+        "open_questions": (
+            [item.strip() for item in open_questions if isinstance(item, str) and item.strip()]
+            if isinstance(open_questions, list)
+            else []
+        ),
+        "latest_draft": latest_draft if isinstance(latest_draft, str) else "",
+        "latest_approved_output": latest_approved_output if isinstance(latest_approved_output, str) else "",
+    }

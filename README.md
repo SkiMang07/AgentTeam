@@ -117,6 +117,31 @@ The final Chief of Staff pass stores a short structured alignment/completeness v
 human review pauses the flow as the final approval gate
 final output is approved or sent back for revision
 
+Project memory (session-local, explicit, narrow):
+
+- Shared state now separates **current run state** (`current_run`) from **carried project memory** (`project_memory`).
+- `project_memory` contract fields:
+  - `current_objective`
+  - `active_deliverable_type`
+  - `open_questions`
+  - `latest_draft`
+  - `latest_approved_output`
+- Memory is carried only within the same local CLI process and printed in the terminal for inspection.
+- Chief of Staff may use memory as continuity context for planning, but memory is not treated as grounded evidence/fact by default.
+
+What project memory does in v1:
+
+- Carries objective/deliverable/open questions forward into the next run in the same local session.
+- Carries latest draft and latest approved output across runs in the same local session.
+- Keeps the memory contract explicit and typed in shared state.
+
+What project memory does not do in v1:
+
+- No database storage.
+- No vector store or embeddings.
+- No cross-process persistence after CLI exit.
+- No hidden autonomous retrieval or background memory updates.
+
 Chief of Staff structured work order (canonical shared contract):
 
 - `objective` (string)
@@ -194,6 +219,8 @@ Running the app
 Run the local CLI:
 
 python -m app.main
+
+When you run without a quoted task argument, the CLI supports multi-run local sessions and will ask whether to continue after each run. This is how session-local `project_memory` is carried to later runs in v1.
 
 Optional JT challenge stage:
 

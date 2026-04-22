@@ -116,13 +116,13 @@ This project is succeeding in the near term if it can:
 
 **Objective:** Add simple project level memory so the system can hold onto current work across a session.
 
-- [ ] Define a minimal project memory schema
-- [ ] Save current objective
-- [ ] Save active deliverable type
-- [ ] Save open questions
-- [ ] Save latest draft
-- [ ] Save latest approved output
-- [ ] Keep memory narrow and inspectable
+- [x] Define a minimal project memory schema
+- [x] Save current objective
+- [x] Save active deliverable type
+- [x] Save open questions
+- [x] Save latest draft
+- [x] Save latest approved output
+- [x] Keep memory narrow and inspectable
 
 ### 6. Artifact quality
 
@@ -140,8 +140,8 @@ This project is succeeding in the near term if it can:
 ### Immediate next issues
 
 1. Make human review behavior explicit and easy to follow
-2. Add minimal project memory fields
-3. Add first artifact templates
+2. Add first artifact templates
+3. Tighten Chief of Staff routing logic
 
 ### After those
 
@@ -150,12 +150,12 @@ This project is succeeding in the near term if it can:
 
 ## Current next task
 
-**Issue 6:** Add minimal project memory fields
+**Issue 7:** Add first artifact templates
 
 ### Done when
 
-- Shared state includes a minimal explicit project memory contract
-- Current objective and latest approved artifact can be carried across a local session
+- One initial artifact template is available end-to-end in the existing workflow
+- Output structure is reusable for repeated runs
 - README and PROJECT_PLAN remain aligned with actual behavior
 
 ## Risks to avoid
@@ -210,3 +210,4 @@ This project is succeeding in the near term if it can:
 - Completed Issue 4 cleanup: added a shared canonical JT resolver, aligned graph + human-redraft JT routing to `work_order.jt_requested`, and preserved explicit JT requests during Chief-of-Staff work-order normalization
 - Completed Issue 5: added bounded local file evidence workflow (`--files-path`) with strict extension allowlist, max-depth/max-file limits, explicit read/skip tracking (`files_requested`, `files_read`, `files_skipped`, `skip_reasons`), structured evidence extraction, and writer/reviewer grounding on actual read scope
 - Tightened file-grounded output quality for Issue 5: evidence extraction now captures headings, bullets, and short snippets; Researcher now receives structured file evidence in prompt assembly; and approved-facts bundling now deduplicates richer file evidence before writing
+- Completed Issue 6: added a minimal typed `project_memory` contract (`current_objective`, `active_deliverable_type`, `open_questions`, `latest_draft`, `latest_approved_output`) plus explicit `current_run` fields; memory now carries forward across later runs in the same local CLI session and remains terminal-inspectable

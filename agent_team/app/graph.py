@@ -9,7 +9,7 @@ from agents.jt import JTAgent
 from agents.researcher import ResearcherAgent
 from agents.reviewer import ReviewerAgent
 from agents.writer import WriterAgent
-from app.state import SharedState, get_canonical_jt_requested
+from app.state import SharedState, get_canonical_jt_requested, normalize_project_memory
 from tools.local_file_reader import build_evidence_bundle
 
 
@@ -99,7 +99,24 @@ def build_graph(
         return deduped
 
     def writer_node(state: SharedState) -> SharedState:
-        return writer.run(state)
+        written_state = writer.run(state)
+        project_memory = normalize_project_memory(written_state.get("project_memory"))
+        draft = written_state.get("draft", "")
+        updated_project_memory = {
+            **project_memory,
+            "latest_draft": draft if isinstance(draft, str) else "",
+        }
+        current_run = written_state.get("current_run", {})
+        if not isinstance(current_run, dict):
+            current_run = {}
+        return {
+            **written_state,
+            "project_memory": updated_project_memory,
+            "current_run": {
+                **current_run,
+                "latest_draft": draft if isinstance(draft, str) else "",
+            },
+        }
 
     def jt_node(state: SharedState) -> SharedState:
         jt_state = jt.run(state)
@@ -149,11 +166,25 @@ def build_graph(
         }
 
     def human_review_node(state: SharedState) -> SharedState:
+        project_memory = normalize_project_memory(state.get("project_memory"))
+        current_run = state.get("current_run", {})
+        if not isinstance(current_run, dict):
+            current_run = {}
+
         if state.get("dry_run"):
             print("\nDry-run mode: auto-approving at human review step.\n")
+            approved_output = state.get("draft", "")
             return {
                 **state,
-                "final_output": state.get("draft", ""),
+                "final_output": approved_output,
+                "project_memory": {
+                    **project_memory,
+                    "latest_approved_output": approved_output if isinstance(approved_output, str) else "",
+                },
+                "current_run": {
+                    **current_run,
+                    "latest_approved_output": approved_output if isinstance(approved_output, str) else "",
+                },
                 "status": "finalized",
             }
 
@@ -221,6 +252,14 @@ def build_graph(
         return {
             **state,
             "final_output": draft,
+            "project_memory": {
+                **project_memory,
+                "latest_approved_output": draft if isinstance(draft, str) else "",
+            },
+            "current_run": {
+                **current_run,
+                "latest_approved_output": draft if isinstance(draft, str) else "",
+            },
             "status": "finalized",
         }
 
