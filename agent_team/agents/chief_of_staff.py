@@ -8,6 +8,7 @@ from typing import Any
 from app.state import (
     ChiefWorkOrder,
     SharedState,
+    get_memory_lookup_fields,
     get_canonical_jt_requested,
     normalize_project_memory,
 )
@@ -339,15 +340,20 @@ class ChiefOfStaffAgent:
                 "memory currently stored",
             )
         )
-        asks_latest_approved = any(
+        asks_transformational_rewrite = any(
             phrase in normalized
             for phrase in (
-                "latest approved output",
-                "latest_approved_output",
-                "approved output currently stored",
+                "rewrite",
+                "revise",
+                "transform",
+                "reformat",
+                "turn it into",
+                "convert",
+                "improve",
             )
         )
-        return mentions_memory and asks_latest_approved
+        requested_fields = get_memory_lookup_fields(task)
+        return mentions_memory and bool(requested_fields) and not asks_transformational_rewrite
 
     @staticmethod
     def _format_reviewer_findings_block(reviewer_findings: Any, state: SharedState) -> str:

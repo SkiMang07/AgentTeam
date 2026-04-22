@@ -80,6 +80,7 @@ class SharedState(TypedDict):
     jt_review_count: NotRequired[int]
     route: NotRequired[Literal["research", "write_direct", "memory_lookup"]]
     memory_lookup_requested: NotRequired[bool]
+    memory_lookup_fields: NotRequired[list[Literal["latest_approved_output", "current_objective", "active_deliverable_type"]]]
     memory_lookup_result: NotRequired[str]
     research_facts: NotRequired[list[str]]
     research_gaps: NotRequired[list[str]]
@@ -157,3 +158,49 @@ def normalize_project_memory(raw: object) -> ProjectMemory:
         "latest_draft": latest_draft if isinstance(latest_draft, str) else "",
         "latest_approved_output": latest_approved_output if isinstance(latest_approved_output, str) else "",
     }
+
+
+def get_memory_lookup_fields(
+    task: str,
+) -> list[Literal["latest_approved_output", "current_objective", "active_deliverable_type"]]:
+    if not isinstance(task, str):
+        return []
+    normalized = " ".join(task.lower().split())
+
+    wants_latest_approved = any(
+        phrase in normalized
+        for phrase in (
+            "latest approved output",
+            "latest_approved_output",
+            "approved output currently stored",
+        )
+    )
+    wants_objective = any(
+        phrase in normalized
+        for phrase in (
+            "current objective",
+            "objective currently stored",
+            "objective in project memory",
+            "objective in session memory",
+            "what objective",
+        )
+    )
+    wants_deliverable_type = any(
+        phrase in normalized
+        for phrase in (
+            "deliverable type",
+            "active deliverable type",
+            "deliverable currently stored",
+            "deliverable in project memory",
+            "deliverable in session memory",
+        )
+    )
+
+    fields: list[Literal["latest_approved_output", "current_objective", "active_deliverable_type"]] = []
+    if wants_latest_approved:
+        fields.append("latest_approved_output")
+    if wants_objective:
+        fields.append("current_objective")
+    if wants_deliverable_type:
+        fields.append("active_deliverable_type")
+    return fields

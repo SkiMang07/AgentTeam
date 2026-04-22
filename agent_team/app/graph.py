@@ -9,7 +9,12 @@ from agents.jt import JTAgent
 from agents.researcher import ResearcherAgent
 from agents.reviewer import ReviewerAgent
 from agents.writer import WriterAgent
-from app.state import SharedState, get_canonical_jt_requested, normalize_project_memory
+from app.state import (
+    SharedState,
+    get_canonical_jt_requested,
+    get_memory_lookup_fields,
+    normalize_project_memory,
+)
 from tools.local_file_reader import build_evidence_bundle
 
 
@@ -120,17 +125,56 @@ def build_graph(
 
     def memory_lookup_prep_node(state: SharedState) -> SharedState:
         project_memory = normalize_project_memory(state.get("project_memory"))
-        latest_approved_output = project_memory.get("latest_approved_output", "")
-        lookup_result = (
-            latest_approved_output
-            if isinstance(latest_approved_output, str) and latest_approved_output.strip()
-            else "No latest approved output is currently stored in session project memory."
-        )
+        lookup_fields = get_memory_lookup_fields(state.get("user_task", ""))
+        if not lookup_fields:
+            lookup_fields = ["latest_approved_output"]
+
+        lines: list[str] = []
+        approved_fact_lines: list[str] = []
+        if "current_objective" in lookup_fields:
+            current_objective = project_memory.get("current_objective", "")
+            value = (
+                current_objective
+                if isinstance(current_objective, str) and current_objective.strip()
+                else "(not set)"
+            )
+            lines.append(f"current_objective: {value}")
+            approved_fact_lines.append(f"Session memory current_objective: {value}")
+        if "active_deliverable_type" in lookup_fields:
+            active_deliverable_type = project_memory.get("active_deliverable_type", "")
+            value = (
+                active_deliverable_type
+                if isinstance(active_deliverable_type, str) and active_deliverable_type.strip()
+                else "(not set)"
+            )
+            lines.append(f"active_deliverable_type: {value}")
+            approved_fact_lines.append(f"Session memory active_deliverable_type: {value}")
+        if "latest_approved_output" in lookup_fields:
+            latest_approved_output = project_memory.get("latest_approved_output", "")
+            value = (
+                latest_approved_output
+                if isinstance(latest_approved_output, str) and latest_approved_output.strip()
+                else "No latest approved output is currently stored in session project memory."
+            )
+            lines.append(f"latest_approved_output: {value}")
+            approved_fact_lines.append(f"Session memory latest_approved_output: {value}")
+        lookup_result = "\n".join(lines)
         return {
             **state,
             "memory_lookup_requested": True,
+            "memory_lookup_fields": lookup_fields,
             "memory_lookup_result": lookup_result,
-            "approved_facts": [f"Session memory latest_approved_output: {lookup_result}"],
+            "approved_facts": approved_fact_lines,
+            "review_feedback": [],
+            "review_approved": False,
+            "reviewer_findings": {
+                "overall_assessment": "",
+                "missing_content": [],
+                "unsupported_claims": [],
+                "contradictions_or_logic_problems": [],
+                "format_or_structure_issues": [],
+                "recommended_next_action": "approve",
+            },
             "status": "memory_lookup_prepared",
         }
 
@@ -216,7 +260,10 @@ def build_graph(
             print(f"Execution path: {' -> '.join(execution_path)}")
         print(f"jt_requested: {get_canonical_jt_requested(state)}")
         print(f"jt_mode: {state.get('jt_mode')}")
-        print(f"Reviewer verdict: {'approved' if review_approved else 'needs_revision'}")
+        if state.get("memory_lookup_requested", False):
+            print("Reviewer verdict: not_run (memory lookup path)")
+        else:
+            print(f"Reviewer verdict: {'approved' if review_approved else 'needs_revision'}")
         if state.get("file_read_summary"):
             print(f"File read summary: {state.get('file_read_summary')}")
         if review_feedback:
