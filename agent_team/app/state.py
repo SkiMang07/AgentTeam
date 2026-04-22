@@ -44,6 +44,11 @@ class JTInput(TypedDict):
     jt_mode: str | None
 
 
+class EvidenceItem(TypedDict):
+    file_path: str
+    evidence_points: list[str]
+
+
 class SharedState(TypedDict):
     user_task: str
     dry_run: NotRequired[bool]
@@ -61,6 +66,12 @@ class SharedState(TypedDict):
     research_facts: NotRequired[list[str]]
     research_gaps: NotRequired[list[str]]
     approved_facts: NotRequired[list[str]]
+    files_requested: NotRequired[list[str]]
+    files_read: NotRequired[list[str]]
+    files_skipped: NotRequired[list[str]]
+    skip_reasons: NotRequired[dict[str, str]]
+    evidence_bundle: NotRequired[list[EvidenceItem]]
+    file_read_summary: NotRequired[str]
     draft: NotRequired[str]
     reviewer_findings: NotRequired[ReviewerFindings]
     review_feedback: NotRequired[list[str]]

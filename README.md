@@ -207,6 +207,15 @@ Optional debug mode:
 
 python -m app.main --debug --jt-mode advisory "your task here"
 
+
+Optional bounded local file evidence input:
+
+python -m app.main --files-path ../README.md "Summarize the local project setup"
+
+Multiple explicit evidence paths:
+
+python -m app.main --files-path ../PROJECT_PLAN.md --files-path ../README.md "Draft a concise project status update"
+
 To run explicit JT challenge routing:
 
 python -m app.main --jt-mode full_challenge "your task here"
@@ -222,6 +231,26 @@ Example prompts:
 Prepare a one page brief for tomorrow’s leadership meeting
 Summarize the key risks and gaps in this project approach
 Turn these notes into a clear executive update
+
+Local file evidence workflow (v1)
+
+You can pass explicit local file or folder paths through `--files-path`.
+
+Bounded behavior in this first version:
+- Allowed file types: `.md`, `.txt`, `.py`, `.json`, `.yaml`, `.yml`, `.csv`
+- Folder traversal depth: max depth `1`
+- Max files read per run: `8`
+- Read scope is explicit only: the system reads only the paths you provide and files that pass these bounds.
+
+State fields captured each run:
+- `files_requested`
+- `files_read`
+- `files_skipped`
+- `skip_reasons`
+
+The graph builds a structured evidence bundle from files actually read, passes that into Writer, and asks Reviewer to validate both content grounding and file-scope honesty.
+The system should not claim it read files that were skipped or unsupported.
+
 Expected behavior
 
 Depending on the request, the system may:
@@ -258,7 +287,6 @@ After the scaffold is running, the most sensible next steps are:
 
 add structured output validation
 improve routing behavior in Chief of Staff
-add local file retrieval from project docs
 add simple persistence or checkpoint visibility
 introduce one real integration only after the local flow is stable
 Development notes

@@ -103,14 +103,14 @@ This project is succeeding in the near term if it can:
 
 **Objective:** Add bounded local file support so the system can work from real project materials.
 
-- [ ] Define the first allowed local file workflow
-- [ ] Decide where user provided files will come from
-- [ ] Add a simple local file reader
-- [ ] Add bounded file selection rules
-- [ ] Add evidence extraction step
-- [ ] Pass evidence into Writer
-- [ ] Make Reviewer check whether draft reflects evidence
-- [ ] Avoid claiming the system read files it did not actually read
+- [x] Define the first allowed local file workflow
+- [x] Decide where user provided files will come from
+- [x] Add a simple local file reader
+- [x] Add bounded file selection rules
+- [x] Add evidence extraction step
+- [x] Pass evidence into Writer
+- [x] Make Reviewer check whether draft reflects evidence
+- [x] Avoid claiming the system read files it did not actually read
 
 ### 5. Project memory
 
@@ -139,25 +139,23 @@ This project is succeeding in the near term if it can:
 
 ### Immediate next issues
 
-1. Define Chief of Staff work order format
-2. Add first local file context workflow
-3. Add evidence extraction from local files
+1. Make human review behavior explicit and easy to follow
+2. Add minimal project memory fields
+3. Add first artifact templates
 
 ### After those
 
-6. Add evidence extraction from local files
-7. Add project memory fields
-8. Add first artifact templates
-9. Tighten README and docs to match implementation
+4. Tighten Chief of Staff routing logic
+5. Tighten README and docs to match implementation as behavior evolves
 
 ## Current next task
 
-**Issue 5:** Make human review behavior explicit and easy to follow
+**Issue 6:** Add minimal project memory fields
 
 ### Done when
 
-- Chief of Staff work order includes objective, deliverable type, and success criteria
-- Work order includes open questions and routing context for downstream agents
+- Shared state includes a minimal explicit project memory contract
+- Current objective and latest approved artifact can be carried across a local session
 - README and PROJECT_PLAN remain aligned with actual behavior
 
 ## Risks to avoid
@@ -210,3 +208,5 @@ This project is succeeding in the near term if it can:
 - Kept `approved_facts` evidence-only; reviewer/chief/human revision instructions now flow through explicit writer guidance note fields
 - Reduced `jt_requested` drift risk by preferring `work_order.jt_requested` when selecting reviewer artifact and formatting Chief-final JT context
 - Completed Issue 4 cleanup: added a shared canonical JT resolver, aligned graph + human-redraft JT routing to `work_order.jt_requested`, and preserved explicit JT requests during Chief-of-Staff work-order normalization
+- Completed Issue 5: added bounded local file evidence workflow (`--files-path`) with strict extension allowlist, max-depth/max-file limits, explicit read/skip tracking (`files_requested`, `files_read`, `files_skipped`, `skip_reasons`), structured evidence extraction, and writer/reviewer grounding on actual read scope
+
