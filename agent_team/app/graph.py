@@ -107,10 +107,15 @@ def build_graph(
         written_state = writer.run(state)
         project_memory = normalize_project_memory(written_state.get("project_memory"))
         draft = written_state.get("draft", "")
-        updated_project_memory = {
-            **project_memory,
-            "latest_draft": draft if isinstance(draft, str) else "",
-        }
+        is_memory_inspection_turn = written_state.get("memory_turn_type") == "memory_inspection"
+        updated_project_memory = (
+            project_memory
+            if is_memory_inspection_turn
+            else {
+                **project_memory,
+                "latest_draft": draft if isinstance(draft, str) else "",
+            }
+        )
         current_run = written_state.get("current_run", {})
         if not isinstance(current_run, dict):
             current_run = {}
@@ -161,6 +166,7 @@ def build_graph(
         lookup_result = "\n".join(lines)
         return {
             **state,
+            "memory_turn_type": "memory_inspection",
             "memory_lookup_requested": True,
             "memory_lookup_fields": lookup_fields,
             "memory_lookup_result": lookup_result,
@@ -235,13 +241,18 @@ def build_graph(
         if state.get("dry_run"):
             print("\nDry-run mode: auto-approving at human review step.\n")
             approved_output = state.get("draft", "")
+            is_memory_inspection_turn = state.get("memory_turn_type") == "memory_inspection"
             return {
                 **state,
                 "final_output": approved_output,
-                "project_memory": {
-                    **project_memory,
-                    "latest_approved_output": approved_output if isinstance(approved_output, str) else "",
-                },
+                "project_memory": (
+                    project_memory
+                    if is_memory_inspection_turn
+                    else {
+                        **project_memory,
+                        "latest_approved_output": approved_output if isinstance(approved_output, str) else "",
+                    }
+                ),
                 "current_run": {
                     **current_run,
                     "latest_approved_output": approved_output if isinstance(approved_output, str) else "",
@@ -313,13 +324,18 @@ def build_graph(
                 "status": "stopped_by_human",
             }
 
+        is_memory_inspection_turn = state.get("memory_turn_type") == "memory_inspection"
         return {
             **state,
             "final_output": draft,
-            "project_memory": {
-                **project_memory,
-                "latest_approved_output": draft if isinstance(draft, str) else "",
-            },
+            "project_memory": (
+                project_memory
+                if is_memory_inspection_turn
+                else {
+                    **project_memory,
+                    "latest_approved_output": draft if isinstance(draft, str) else "",
+                }
+            ),
             "current_run": {
                 **current_run,
                 "latest_approved_output": draft if isinstance(draft, str) else "",

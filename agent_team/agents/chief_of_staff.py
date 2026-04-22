@@ -28,6 +28,7 @@ class ChiefOfStaffAgent:
         project_memory = normalize_project_memory(state.get("project_memory"))
         memory_open_questions = project_memory.get("open_questions", [])
         memory_lookup_requested = self._is_memory_lookup_request(user_task)
+        memory_turn_type = self._get_memory_turn_type(user_task)
 
         raw = self._client.ask(
             system_prompt=self._prompt,
@@ -66,12 +67,16 @@ class ChiefOfStaffAgent:
             user_task=user_task,
         )
         work_order = data["work_order"]
-        updated_project_memory = {
-            **project_memory,
-            "current_objective": work_order["objective"],
-            "active_deliverable_type": work_order["deliverable_type"],
-            "open_questions": work_order["open_questions"],
-        }
+        updated_project_memory = (
+            project_memory
+            if memory_turn_type == "memory_inspection"
+            else {
+                **project_memory,
+                "current_objective": work_order["objective"],
+                "active_deliverable_type": work_order["deliverable_type"],
+                "open_questions": work_order["open_questions"],
+            }
+        )
 
         return {
             **state,
@@ -79,6 +84,7 @@ class ChiefOfStaffAgent:
             "route": data["route"],
             "jt_requested": work_order["jt_requested"],
             "jt_mode": state.get("jt_mode"),
+            "memory_turn_type": memory_turn_type,
             "memory_lookup_requested": memory_lookup_requested,
             "current_run": {
                 "objective": work_order["objective"],
@@ -354,6 +360,39 @@ class ChiefOfStaffAgent:
         )
         requested_fields = get_memory_lookup_fields(task)
         return mentions_memory and bool(requested_fields) and not asks_transformational_rewrite
+
+    @staticmethod
+    def _get_memory_turn_type(task: str) -> str:
+        if ChiefOfStaffAgent._is_memory_lookup_request(task):
+            return "memory_inspection"
+        if not isinstance(task, str):
+            return "project_work"
+        normalized = " ".join(task.lower().split())
+        mentions_memory = any(
+            phrase in normalized
+            for phrase in (
+                "session memory",
+                "project memory",
+                "stored memory",
+                "latest approved output",
+                "latest_approved_output",
+            )
+        )
+        asks_transformational_rewrite = any(
+            phrase in normalized
+            for phrase in (
+                "rewrite",
+                "revise",
+                "transform",
+                "reformat",
+                "turn it into",
+                "convert",
+                "improve",
+            )
+        )
+        if mentions_memory and asks_transformational_rewrite:
+            return "memory_transform"
+        return "project_work"
 
     @staticmethod
     def _format_reviewer_findings_block(reviewer_findings: Any, state: SharedState) -> str:

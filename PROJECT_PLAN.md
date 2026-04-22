@@ -215,3 +215,4 @@ This project is succeeding in the near term if it can:
 - Completed Issue 67 follow-up: transformational rewrite requests that reference stored output continue through normal drafting flow instead of lookup-only routing
 - Completed Issue 67 UI-path fix: memory-lookup human review now avoids misleading inherited reviewer verdict display and clears stale reviewer artifacts on the lookup-prep path
 - Clarified prompt assembly boundaries across Chief of Staff, Researcher, and Writer so current task, current evidence, and continuity memory are separated explicitly
+- Completed Issue 67 memory-writeback fix: memory inspection turns are now read-only and no longer overwrite canonical `project_memory` artifact/context fields after approval; memory-based transform requests continue through normal drafting flow
