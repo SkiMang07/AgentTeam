@@ -3,23 +3,32 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.state import (
     ChiefWorkOrder,
     SharedState,
-    get_memory_lookup_fields,
     get_canonical_jt_requested,
+    get_memory_lookup_fields,
     normalize_project_memory,
 )
+from tools.obsidian_context import ObsidianContextTool
 from tools.openai_client import ResponsesClient
+
+if TYPE_CHECKING:
+    pass
 
 PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "chief_of_staff.md"
 
 
 class ChiefOfStaffAgent:
-    def __init__(self, client: ResponsesClient) -> None:
+    def __init__(
+        self,
+        client: ResponsesClient,
+        obsidian_tool: ObsidianContextTool | None = None,
+    ) -> None:
         self._client = client
+        self._obsidian_tool = obsidian_tool
         self._prompt = PROMPT_PATH.read_text(encoding="utf-8")
 
     def run(self, state: SharedState) -> SharedState:
@@ -29,6 +38,9 @@ class ChiefOfStaffAgent:
         memory_open_questions = project_memory.get("open_questions", [])
         memory_lookup_requested = self._is_memory_lookup_request(user_task)
         memory_turn_type = self._get_memory_turn_type(user_task)
+
+        # Load Obsidian vault context for this task
+        obsidian_block = self._load_obsidian_context(user_task)
 
         raw = self._client.ask(
             system_prompt=self._prompt,
@@ -44,10 +56,14 @@ class ChiefOfStaffAgent:
                 "Set work_order.jt_requested from explicit task text only; do not infer hidden intent. "
                 "If project memory is provided, use it only as continuity context for planning; "
                 "do not treat memory as evidence or claimed facts unless they are present in current task inputs. "
+                "Use vault context to better understand Andrew's active projects, priorities, and knowledge landscape "
+                "when forming the work order — but do not treat vault context as approved facts. "
                 "Do not include extra keys.\n\n"
                 f"CLI JT requested flag: {inferred_jt_requested}\n\n"
                 "Current task:\n"
                 f"{user_task}\n\n"
+                "Obsidian vault context (use for routing and work order framing only):\n"
+                f"{obsidian_block}\n\n"
                 "Session project memory (continuity only):\n"
                 f"- current_objective: {project_memory.get('current_objective', '')}\n"
                 f"- active_deliverable_type: {project_memory.get('active_deliverable_type', '')}\n"
@@ -171,6 +187,17 @@ class ChiefOfStaffAgent:
                 "chief_final_critical_reviewer_findings": has_critical_reviewer_findings,
             },
         }
+
+    def _load_obsidian_context(self, task: str) -> str:
+        """Load vault context for the given task; return a prompt-ready block."""
+        if self._obsidian_tool is None or not self._obsidian_tool.available:
+            return "(Obsidian vault not configured)"
+        try:
+            context = self._obsidian_tool.load(task)
+            from tools.obsidian_context import ObsidianContextTool as _OCT
+            return _OCT.render_for_prompt(context)
+        except Exception as exc:  # noqa: BLE001
+            return f"(Obsidian context unavailable: {exc})"
 
     @staticmethod
     def _safe_parse(raw: str) -> dict:

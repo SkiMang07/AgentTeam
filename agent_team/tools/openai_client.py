@@ -22,13 +22,51 @@ class ResponsesClient:
         )
         return response.output_text.strip()
 
+    def ask_with_tools(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        tools: list[dict] | None = None,
+    ) -> str:
+        """
+        Like ask(), but passes a tools list to the Responses API.
+
+        For web search pass: tools=[{"type": "web_search_preview"}]
+        The model will call the tool automatically and output_text contains
+        the final synthesised answer — no extra parsing needed.
+        """
+        kwargs: dict = {
+            "model": self._model,
+            "input": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        }
+        if tools:
+            kwargs["tools"] = tools
+        response = self._client.responses.create(**kwargs)
+        return response.output_text.strip()
+
 
 class DryRunResponsesClient:
     def __init__(self) -> None:
         self._reviewer_calls = 0
         self._chief_final_calls = 0
 
+    def ask_with_tools(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        tools: list[dict] | None = None,  # noqa: ARG002
+    ) -> str:
+        """Dry-run variant of ask_with_tools — delegates to ask()."""
+        return self.ask(system_prompt, user_prompt)
+
     def ask(self, system_prompt: str, user_prompt: str) -> str:  # noqa: ARG002
+        # Obsidian vault navigator folder selection
+        if "You are a knowledge navigator for an Obsidian vault." in system_prompt:
+            return json.dumps({"relevant_paths": []})
+
         if "Create and route the Chief of Staff work order." in user_prompt:
             task = user_prompt.split("Task:\n", maxsplit=1)[-1].lower()
             route = "write_direct" if "write_direct" in task else "research"

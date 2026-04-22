@@ -14,7 +14,9 @@ from app.graph import build_graph
 from app.jt_request import detect_jt_request
 from app.state import SharedState, empty_project_memory, normalize_project_memory
 from tools.local_file_reader import load_local_files
+from tools.obsidian_context import ObsidianContextTool
 from tools.openai_client import DryRunResponsesClient, ResponsesClient
+from tools.voice_loader import VoiceLoader
 
 
 def parse_args() -> argparse.Namespace:
@@ -57,6 +59,8 @@ def main() -> None:
     if args.dry_run:
         print("\nMode: DRY RUN (no OpenAI calls)\n")
         client = DryRunResponsesClient()
+        obsidian_tool: ObsidianContextTool | None = None
+        voice_loader = VoiceLoader("")
     else:
         try:
             settings = get_settings()
@@ -65,11 +69,27 @@ def main() -> None:
             return
         client = ResponsesClient(settings)
 
-    chief_of_staff = ChiefOfStaffAgent(client)
+        if settings.obsidian_vault_path:
+            obsidian_tool = ObsidianContextTool(settings.obsidian_vault_path, client)
+            if obsidian_tool.available:
+                print(f"[tools] Obsidian vault loaded: {settings.obsidian_vault_path}")
+            else:
+                print(f"[tools] Warning: OBSIDIAN_VAULT_PATH set but path not found: {settings.obsidian_vault_path}")
+                obsidian_tool = None
+        else:
+            obsidian_tool = None
+
+        voice_loader = VoiceLoader(settings.voice_file_path)
+        if voice_loader.available:
+            print(f"[tools] Voice/style guide loaded: {settings.voice_file_path}")
+        elif settings.voice_file_path:
+            print(f"[tools] Warning: VOICE_FILE_PATH set but file not found: {settings.voice_file_path}")
+
+    chief_of_staff = ChiefOfStaffAgent(client, obsidian_tool=obsidian_tool)
     jt = JTAgent(client)
-    researcher = ResearcherAgent(client)
+    researcher = ResearcherAgent(client, obsidian_tool=obsidian_tool)
     reviewer = ReviewerAgent(client)
-    writer = WriterAgent(client)
+    writer = WriterAgent(client, voice_loader=voice_loader)
 
     graph = build_graph(chief_of_staff, jt, researcher, reviewer, writer)
     session_project_memory = empty_project_memory()

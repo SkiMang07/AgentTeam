@@ -4,14 +4,27 @@ from pathlib import Path
 
 from app.state import SharedState, normalize_project_memory
 from tools.openai_client import ResponsesClient
+from tools.voice_loader import VoiceLoader
 
 PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "writer.md"
 
 
 class WriterAgent:
-    def __init__(self, client: ResponsesClient) -> None:
+    def __init__(
+        self,
+        client: ResponsesClient,
+        voice_loader: VoiceLoader | None = None,
+    ) -> None:
         self._client = client
-        self._prompt = PROMPT_PATH.read_text(encoding="utf-8")
+        base_prompt = PROMPT_PATH.read_text(encoding="utf-8")
+
+        # Append voice/style guide to the system prompt at init time so it is
+        # baked into every model call without any runtime overhead.
+        if voice_loader and voice_loader.available:
+            voice_block = voice_loader.load_for_prompt()
+            self._prompt = f"{base_prompt}\n\n{voice_block}" if voice_block else base_prompt
+        else:
+            self._prompt = base_prompt
 
     def run(self, state: SharedState) -> SharedState:
         if state.get("memory_lookup_requested", False):
