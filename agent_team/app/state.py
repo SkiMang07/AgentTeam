@@ -79,6 +79,7 @@ class SharedState(TypedDict):
     jt_findings: NotRequired[str | None]
     jt_review_count: NotRequired[int]
     route: NotRequired[Literal["research", "write_direct", "memory_lookup"]]
+    memory_turn_type: NotRequired[Literal["project_work", "memory_inspection", "memory_transform"]]
     memory_lookup_requested: NotRequired[bool]
     memory_lookup_fields: NotRequired[list[Literal["latest_approved_output", "current_objective", "active_deliverable_type"]]]
     memory_lookup_result: NotRequired[str]

@@ -11,6 +11,15 @@ class _NoopModelClient:
         return ""
 
 
+class _ChiefModelClient:
+    def ask(self, system_prompt: str, user_prompt: str) -> str:
+        return (
+            '{"work_order":{"objective":"Inspect memory","deliverable_type":"memory_lookup",'
+            '"success_criteria":["Return requested stored fields"],"research_needed":false,'
+            '"open_questions":[],"jt_requested":false},"route":"memory_lookup","rationale":"lookup"}'
+        )
+
+
 class _ChiefMemoryLookupStub:
     def run(self, state):
         return {
@@ -110,6 +119,52 @@ class MemoryLookupIntentTests(unittest.TestCase):
 
         final_output = result.get("final_output", "")
         self.assertIn("latest_approved_output: approved artifact text", final_output)
+
+    def test_memory_lookup_approval_does_not_overwrite_project_memory(self) -> None:
+        graph = build_graph(
+            _ChiefMemoryLookupStub(),
+            _NoopAgent(),
+            _NoopAgent(),
+            _NoopAgent(),
+            WriterAgent(_NoopModelClient()),
+        )
+        original_memory = {
+            "current_objective": "Ship onboarding brief",
+            "active_deliverable_type": "status_update",
+            "open_questions": ["Need launch date"],
+            "latest_draft": "draft text",
+            "latest_approved_output": "approved artifact text",
+        }
+
+        result = graph.invoke(
+            {
+                "user_task": "What is the latest approved output currently stored in session memory?",
+                "dry_run": True,
+                "project_memory": original_memory,
+                "model_metadata": {},
+            }
+        )
+
+        self.assertEqual(result.get("project_memory"), original_memory)
+
+    def test_chief_run_keeps_project_context_for_memory_inspection_turns(self) -> None:
+        agent = ChiefOfStaffAgent(_ChiefModelClient())
+        original_memory = {
+            "current_objective": "Ship onboarding brief",
+            "active_deliverable_type": "status_update",
+            "open_questions": ["Need launch date"],
+            "latest_draft": "draft text",
+            "latest_approved_output": "approved artifact text",
+        }
+        state = {
+            "user_task": "What objective and deliverable type are currently stored in project memory?",
+            "project_memory": original_memory,
+            "model_metadata": {},
+        }
+
+        result = agent.run(state)
+        self.assertEqual(result.get("memory_turn_type"), "memory_inspection")
+        self.assertEqual(result.get("project_memory"), original_memory)
 
 
 if __name__ == "__main__":
