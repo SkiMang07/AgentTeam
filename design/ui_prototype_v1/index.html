@@ -159,13 +159,16 @@
               </div>
               <label for="sequencePreview" style="margin-top:8px;">Design sequence preview</label>
               <input id="sequencePreview" value="Plan" readonly />
-              <div class="preview-note">Runtime: single branch per run. Multi-branch sequence is a design-direction preview.</div>
+              <div class="preview-note" id="sequenceNote">Single branch mode.</div>
             </div>
 
             <div class="section mode-block active" data-mode="plan">
               <p class="section-title">Plan controls</p>
-              <label for="planRequest">Request</label>
-              <textarea id="planRequest">Draft a decision memo for the next release cadence and include explicit human-approval points.</textarea>
+              <div class="request-field-wrap">
+                <label for="planRequest">Request</label>
+                <textarea id="planRequest">Draft a decision memo for the next release cadence and include explicit human-approval points.</textarea>
+              </div>
+              <div class="handoff-note" style="display:none;padding:8px;border:1px dashed #2b3d52;border-radius:8px;font-size:11px;color:#8ea2ba;margin-bottom:4px;">Task: auto-populated from the previous branch's approved output.</div>
               <div class="row" style="margin-top:8px;">
                 <div>
                   <label for="planArtifact">Output format</label>
@@ -208,8 +211,11 @@
 
             <div class="section mode-block" data-mode="build">
               <p class="section-title">Build controls (future-facing static contract)</p>
-              <label for="buildRequest">Request</label>
-              <textarea id="buildRequest">Implement CLI support for branch selection and keep human review as an explicit gate.</textarea>
+              <div class="request-field-wrap">
+                <label for="buildRequest">Request</label>
+                <textarea id="buildRequest">Implement CLI support for branch selection and keep human review as an explicit gate.</textarea>
+              </div>
+              <div class="handoff-note" style="display:none;padding:8px;border:1px dashed #2b3d52;border-radius:8px;font-size:11px;color:#8ea2ba;margin-bottom:4px;">Task: auto-populated from the previous branch's approved output.</div>
               <div class="row" style="margin-top:8px;">
                 <div>
                   <label for="buildSurface">Build surface</label>
@@ -228,8 +234,11 @@
 
             <div class="section mode-block" data-mode="brainstorm">
               <p class="section-title">Brainstorm controls</p>
-              <label for="brainQuestion">Question / decision</label>
-              <textarea id="brainQuestion">What operating model should AgentTeam use for the next three milestones?</textarea>
+              <div class="request-field-wrap">
+                <label for="brainQuestion">Question / decision</label>
+                <textarea id="brainQuestion">What operating model should AgentTeam use for the next three milestones?</textarea>
+              </div>
+              <div class="handoff-note" style="display:none;padding:8px;border:1px dashed #2b3d52;border-radius:8px;font-size:11px;color:#8ea2ba;margin-bottom:4px;">Task: auto-populated from the previous branch's approved output.</div>
               <label for="brainOutput" style="margin-top:8px;">Output format</label>
               <select id="brainOutput">
                 <option selected>Chat</option>
@@ -301,7 +310,7 @@
     </main>
 
     <script>
-      // ── Branch configs (unchanged from design) ────────────────────────────
+      // ── Branch configs ────────────────────────────────────────────────────
       const order = ['brainstorm', 'plan', 'build'];
       const branchConfigs = {
         plan: {
@@ -432,12 +441,13 @@
       const rejectBtn       = document.getElementById('rejectBtn');
 
       // ── State ─────────────────────────────────────────────────────────────
-      let selectedModes     = new Set(['plan']);
-      let currentSessionId  = null;
-      let currentEvtSource  = null;
-      let lastActiveCardId  = null;
-      // A stable memory-session key shared across runs in this browser tab
-      const memSessionKey   = crypto.randomUUID();
+      let selectedModes        = new Set(['plan']);
+      let currentSessionId     = null;
+      let currentEvtSource     = null;
+      let lastActiveCardId     = null;
+      let currentRunningBranch = null; // which branch is executing right now
+      let onBranchComplete     = null; // promise resolver called by handleSseEvent on final/error
+      const memSessionKey      = crypto.randomUUID();
 
       // ── Helpers ───────────────────────────────────────────────────────────
       function esc(str) {
@@ -486,6 +496,31 @@
       function setViewContent(viewId, html) {
         const v = workspaceBody.querySelector(`[data-view="${viewId}"]`);
         if (v) v.innerHTML = html;
+      }
+
+      // ── Sequence mode UI ─────────────────────────────────────────────────
+      // Shows/hides the request-field-wrap and handoff-note in each mode-block
+      // depending on whether that branch is the entry point or a downstream recipient.
+      function updateSequenceMode() {
+        const selected   = selectedInOrder();
+        const isSeq      = selected.length > 1;
+        const firstBranch = selected[0];
+
+        document.querySelectorAll('.mode-block').forEach(block => {
+          const mode    = block.dataset.mode;
+          const isFirst = !isSeq || mode === firstBranch;
+          const wrap    = block.querySelector('.request-field-wrap');
+          const note    = block.querySelector('.handoff-note');
+          if (wrap) wrap.style.display  = isFirst ? '' : 'none';
+          if (note) note.style.display  = isFirst ? 'none' : '';
+        });
+
+        const prevNote = document.getElementById('sequenceNote');
+        if (prevNote) {
+          prevNote.textContent = isSeq
+            ? `Sequential: ${selected.map(m => branchConfigs[m].label).join(' → ')}. Each branch's output feeds the next automatically.`
+            : 'Single branch mode.';
+        }
       }
 
       // ── Render pipeline rail ──────────────────────────────────────────────
@@ -570,6 +605,7 @@
 
         focusPill.textContent = steps[0]?.name || 'Chief of Staff';
         focusList.innerHTML   = `<li>${steps[0]?.summary || 'Select a branch.'}</li><li>Sequence: ${sequence}.</li>`;
+        updateSequenceMode();
         renderWorkspace();
         bindRailInteractions();
       }
@@ -596,7 +632,8 @@
 
       // ── SSE event handler ─────────────────────────────────────────────────
       function handleSseEvent(event) {
-        const branch = activeBranch();
+        const branch = currentRunningBranch || activeBranch();
+        const isSeq  = selectedInOrder().length > 1;
 
         switch (event.type) {
 
@@ -638,16 +675,18 @@
           }
 
           case 'human_review': {
-            runState.textContent    = 'Awaiting Approval';
+            runState.textContent     = 'Awaiting Approval';
             promptStatus.textContent = 'Draft ready — your review is required.';
 
-            // ── Show draft in Draft/Approval tab ──────────────────────────
             const draftHtml = `<div class="doc"><div class="sec"><pre style="white-space:pre-wrap;word-break:break-word;color:#d6dfec;font-family:inherit;margin:0;">${esc(event.draft)}</pre></div></div>`;
 
-            if (branch === 'plan') {
+            if (isSeq) {
+              // Sequence mode: always use the Sequence Output tab
+              setViewContent('seq_output', draftHtml);
+              activateTab('seq_output');
+            } else if (branch === 'plan') {
               setViewContent('draft', draftHtml);
               activateTab('draft');
-
               if (event.reviewer_findings && Object.keys(event.reviewer_findings).length) {
                 const f = event.reviewer_findings;
                 setViewContent('findings', `<div class="doc">
@@ -666,46 +705,51 @@
               activateTab('synthesis');
             }
 
-            // ── Show approval UI ──────────────────────────────────────────
-            approvalNotes.value    = '';
+            approvalNotes.value      = '';
             approvalUi.style.display = 'block';
             approvalUi.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             break;
           }
 
           case 'final': {
-            runState.textContent    = event.status === 'finalized' ? 'Complete' : 'Stopped';
-            promptStatus.textContent = `Done — status: ${event.status}`;
             approvalUi.style.display = 'none';
+            setCardState(cardById(`${branch}_human_review`), 'complete');
+            lastActiveCardId = null;
+            memoryIndicator.textContent = 'Memory: updated this run';
+            if (currentEvtSource) { currentEvtSource.close(); currentEvtSource = null; }
 
             const finalHtml = `<div class="doc"><div class="sec"><pre style="white-space:pre-wrap;word-break:break-word;color:#d6dfec;font-family:inherit;margin:0;">${esc(event.output)}</pre></div></div>`;
 
-            if (branch === 'plan') {
-              setViewContent('approval', finalHtml);
-              activateTab('approval');
-            } else if (branch === 'build') {
-              setViewContent('approval', finalHtml);
-              activateTab('approval');
-            } else if (branch === 'brainstorm') {
+            if (isSeq) {
+              // Park output in seq_output; the sequence runner activates
+              // the tab and updates status after the last branch resolves.
+              setViewContent('seq_output', finalHtml);
+            } else {
+              runState.textContent     = event.status === 'finalized' ? 'Complete' : 'Stopped';
+              promptStatus.textContent = `Done — status: ${event.status}`;
               setViewContent('approval', finalHtml);
               activateTab('approval');
             }
 
-            // Mark human_review card as complete
-            setCardState(cardById(`${branch}_human_review`), 'complete');
-            lastActiveCardId = null;
-
-            // Update memory indicator
-            memoryIndicator.textContent = 'Memory: updated this run';
-            if (currentEvtSource) { currentEvtSource.close(); currentEvtSource = null; }
+            // Signal the sequence runner's await (only set in multi-branch mode)
+            if (onBranchComplete) {
+              const cb = onBranchComplete;
+              onBranchComplete = null;
+              cb({ output: event.output, status: event.status });
+            }
             break;
           }
 
           case 'error': {
-            runState.textContent    = 'Error';
+            runState.textContent     = 'Error';
             promptStatus.textContent = `Error: ${event.message}`;
             approvalUi.style.display = 'none';
             if (currentEvtSource) { currentEvtSource.close(); currentEvtSource = null; }
+            if (onBranchComplete) {
+              const cb = onBranchComplete;
+              onBranchComplete = null;
+              cb(null);
+            }
             break;
           }
 
@@ -717,59 +761,114 @@
         }
       }
 
-      // ── Run button ────────────────────────────────────────────────────────
-      document.getElementById('runBtn').addEventListener('click', () => {
-        if (currentEvtSource) { currentEvtSource.close(); currentEvtSource = null; }
+      // ── Branch run helpers ────────────────────────────────────────────────
+      function getBranchParams(branch, taskOverride) {
+        const task = taskOverride !== undefined ? taskOverride : getTaskText(branch);
+        return {
+          task, branch,
+          jt_enabled:    branch === 'plan' && document.getElementById('planJt')?.value === 'Enabled',
+          files_path:    branch === 'plan' ? (document.getElementById('planFiles')?.value || '') : '',
+          web_search:    branch === 'plan' && document.getElementById('planWeb')?.value === 'Requested',
+          output_format: branch === 'plan'       ? (document.getElementById('planArtifact')?.value || 'Chat')
+                       : branch === 'brainstorm' ? (document.getElementById('brainOutput')?.value  || 'Chat')
+                       : 'Chat',
+          mem_session: memSessionKey,
+        };
+      }
 
-        const branch = activeBranch();
-        const task   = getTaskText(branch);
-        if (!task) {
+      function startEvtSource(params) {
+        const es = new EventSource(`/run?${new URLSearchParams(params)}`);
+        es.addEventListener('message', e => {
+          try { handleSseEvent(JSON.parse(e.data)); } catch {}
+        });
+        es.addEventListener('error', () => {
+          if (es.readyState === EventSource.CLOSED) return;
+          runState.textContent     = 'Connection error';
+          promptStatus.textContent = 'Lost connection to server. Is it running?';
+          if (onBranchComplete) { const cb = onBranchComplete; onBranchComplete = null; cb(null); }
+        });
+        return es;
+      }
+
+      // Runs one branch and returns a Promise<{output, status}|null>.
+      // handleSseEvent resolves the promise via onBranchComplete when 'final' fires.
+      function runBranchAsync(branch, taskOverride) {
+        return new Promise(resolve => {
+          onBranchComplete     = resolve;
+          currentRunningBranch = branch;
+          currentEvtSource     = startEvtSource(getBranchParams(branch, taskOverride));
+        });
+      }
+
+      function resetRailAndWorkspace() {
+        lastActiveCardId = null;
+        agentList.querySelectorAll('.agent-card').forEach(c => setCardState(c, 'waiting'));
+        approvalUi.style.display = 'none';
+        // Reset single-branch workspace placeholders (seq workspace is static)
+        if (selectedInOrder().length === 1) {
+          const b = activeBranch();
+          workspaceBody.querySelectorAll('.output-view').forEach(v => {
+            const config = branchConfigs[b];
+            if (config?.views[v.dataset.view]) v.innerHTML = config.views[v.dataset.view];
+          });
+        }
+      }
+
+      // ── Run button ────────────────────────────────────────────────────────
+      document.getElementById('runBtn').addEventListener('click', async () => {
+        if (currentEvtSource) { currentEvtSource.close(); currentEvtSource = null; }
+        onBranchComplete = null;
+
+        const branches  = selectedInOrder();
+        const firstTask = getTaskText(branches[0]);
+        if (!firstTask) {
           promptStatus.textContent = 'Please enter a task before running.';
           return;
         }
 
-        const jtEnabled   = branch === 'plan' && document.getElementById('planJt')?.value === 'Enabled';
-        const filesPath   = branch === 'plan' ? (document.getElementById('planFiles')?.value || '') : '';
-        const webSearch   = branch === 'plan' && document.getElementById('planWeb')?.value === 'Requested';
-        const outputFmt   = branch === 'plan' ? (document.getElementById('planArtifact')?.value || 'Chat')
-                          : branch === 'brainstorm' ? (document.getElementById('brainOutput')?.value || 'Chat')
-                          : 'Chat';
+        resetRailAndWorkspace();
+        runState.textContent = 'Running';
 
-        // Reset rail
-        lastActiveCardId = null;
-        agentList.querySelectorAll('.agent-card').forEach(c => setCardState(c, 'waiting'));
-        approvalUi.style.display = 'none';
+        if (branches.length === 1) {
+          // ── Single branch ──────────────────────────────────────────────
+          currentRunningBranch     = branches[0];
+          promptStatus.textContent = 'Connecting to agent team…';
+          currentEvtSource         = startEvtSource(getBranchParams(branches[0]));
 
-        // Reset workspace views to placeholder
-        workspaceBody.querySelectorAll('.output-view').forEach(v => {
-          const branch0 = activeBranch();
-          const config  = branchConfigs[branch0];
-          if (config && config.views[v.dataset.view]) {
-            v.innerHTML = config.views[v.dataset.view];
+        } else {
+          // ── Sequential execution ───────────────────────────────────────
+          let currentTask = firstTask;
+
+          for (let i = 0; i < branches.length; i++) {
+            const branch = branches[i];
+            const total  = branches.length;
+            runState.textContent     = `Step ${i + 1}/${total}`;
+            promptStatus.textContent = `Starting ${branchConfigs[branch].label} (step ${i + 1} of ${total})…`;
+
+            const result = await runBranchAsync(branch, currentTask);
+
+            if (!result || result.status !== 'finalized') {
+              promptStatus.textContent = `Sequence stopped at ${branchConfigs[branch].label}.`;
+              runState.textContent     = 'Stopped';
+              currentRunningBranch     = null;
+              return;
+            }
+
+            if (i < branches.length - 1) {
+              // Handoff: feed this branch's output as the next branch's task
+              currentTask              = result.output;
+              const nextLabel          = branchConfigs[branches[i + 1]].label;
+              promptStatus.textContent = `${branchConfigs[branch].label} complete → handing off to ${nextLabel}…`;
+              runState.textContent     = 'Handing off';
+              await new Promise(r => setTimeout(r, 1200)); // brief pause for UX
+            }
           }
-        });
 
-        runState.textContent    = 'Running';
-        promptStatus.textContent = 'Connecting to agent team…';
-
-        const params = new URLSearchParams({
-          task, branch,
-          jt_enabled:    jtEnabled,
-          files_path:    filesPath,
-          web_search:    webSearch,
-          output_format: outputFmt,
-          mem_session:   memSessionKey,
-        });
-
-        currentEvtSource = new EventSource(`/run?${params}`);
-        currentEvtSource.addEventListener('message', e => {
-          try { handleSseEvent(JSON.parse(e.data)); } catch {}
-        });
-        currentEvtSource.addEventListener('error', () => {
-          if (currentEvtSource.readyState === EventSource.CLOSED) return;
-          runState.textContent    = 'Connection error';
-          promptStatus.textContent = 'Lost connection to server. Is it running?';
-        });
+          runState.textContent     = 'Sequence complete';
+          promptStatus.textContent = `All ${branches.length} branches completed.`;
+          activateTab('seq_output'); // surface the final output
+          currentRunningBranch     = null;
+        }
       });
 
       // ── Approval UI ───────────────────────────────────────────────────────
