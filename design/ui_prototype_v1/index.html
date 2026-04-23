@@ -3,26 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Agent Team UI Prototype v1 · Branch Aware</title>
+    <title>Agent Team UI Prototype v1 · Workstream Aware</title>
     <style>
       :root {
         --bg: #06080b;
         --bg-mid: #0b1016;
-        --panel: #0f141c;
-        --panel-elevated: #151c26;
         --border: #232c39;
         --border-soft: #1b232e;
         --text: #e7edf5;
         --muted: #94a0b0;
-        --accent: #5f82ab;
         --accent-soft: rgba(95, 130, 171, 0.18);
         --ok: #64906c;
-        --warn: #bd995d;
         --radius: 14px;
       }
-
       * { box-sizing: border-box; }
-
       body {
         margin: 0;
         font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -33,15 +27,7 @@
         color: var(--text);
         min-height: 100vh;
       }
-
-      .shell {
-        padding: 18px;
-        min-height: 100vh;
-        display: grid;
-        grid-template-rows: auto 1fr;
-        gap: 12px;
-      }
-
+      .shell { padding: 18px; min-height: 100vh; display: grid; grid-template-rows: auto 1fr; gap: 12px; }
       .topbar {
         background: rgba(13, 18, 24, 0.75);
         border: 1px solid var(--border);
@@ -52,16 +38,8 @@
         align-items: center;
         gap: 14px;
       }
-
-      .title {
-        font-size: 12px;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        color: #b5c2d4;
-      }
-
+      .title { font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #b5c2d4; }
       .top-meta { display: flex; align-items: center; gap: 8px; }
-
       .badge {
         border: 1px solid #304157;
         padding: 6px 10px;
@@ -70,20 +48,8 @@
         color: #d1dded;
         background: var(--accent-soft);
       }
-
-      .badge.ghost {
-        border-color: var(--border);
-        color: var(--muted);
-        background: rgba(11, 15, 20, 0.75);
-      }
-
-      .grid {
-        display: grid;
-        grid-template-columns: 1.2fr 1fr 1.3fr;
-        gap: 12px;
-        min-height: 0;
-      }
-
+      .badge.ghost { border-color: var(--border); color: var(--muted); background: rgba(11, 15, 20, 0.75); }
+      .grid { display: grid; grid-template-columns: 1.2fr 1fr 1.3fr; gap: 12px; min-height: 0; }
       .panel {
         border: 1px solid var(--border);
         border-radius: var(--radius);
@@ -94,53 +60,15 @@
         min-height: 0;
         box-shadow: 0 16px 30px rgba(2, 5, 9, 0.24);
       }
-
-      .panel h2 {
-        margin: 0 0 12px;
-        font-size: 12px;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        color: #c6d1df;
-      }
-
+      .panel h2 { margin: 0 0 12px; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #c6d1df; }
       .stack { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
-
-      .section {
-        border: 1px solid var(--border-soft);
-        background: rgba(8, 12, 17, 0.76);
-        border-radius: 11px;
-        padding: 10px;
-      }
-
-      .section-title {
-        margin: 0 0 8px;
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: #9eaab9;
-      }
-
-      label {
-        display: block;
-        font-size: 11px;
-        color: var(--muted);
-        margin-bottom: 5px;
-      }
-
-      textarea, select, input {
-        width: 100%;
-        border: 1px solid #1f2a37;
-        border-radius: 9px;
-        background: #0a1017;
-        color: var(--text);
-        padding: 9px 10px;
-      }
-
-      textarea { min-height: 95px; resize: vertical; }
-
+      .section { border: 1px solid var(--border-soft); background: rgba(8, 12, 17, 0.76); border-radius: 11px; padding: 10px; }
+      .section-title { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #9eaab9; }
+      label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+      textarea, select, input { width: 100%; border: 1px solid #1f2a37; border-radius: 9px; background: #0a1017; color: var(--text); padding: 9px 10px; }
+      textarea { min-height: 90px; resize: vertical; }
       .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
       .status-inline { font-size: 12px; color: #afbccd; }
-
       .mode-picker { display: flex; gap: 8px; flex-wrap: wrap; }
       .mode-btn {
         border: 1px solid #2b3646;
@@ -152,7 +80,7 @@
         cursor: pointer;
       }
       .mode-btn.active { border-color: #52719a; background: rgba(95, 130, 171, 0.24); }
-
+      .preview-note { margin-top: 8px; font-size: 11px; color: #8ea2ba; }
       .run-btn {
         margin-top: auto;
         border: 1px solid #51709b;
@@ -163,79 +91,19 @@
         padding: 11px;
         cursor: pointer;
       }
-
       .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
-      .metric {
-        border: 1px solid var(--border-soft);
-        background: rgba(9, 14, 20, 0.72);
-        border-radius: 10px;
-        padding: 9px;
-      }
+      .metric { border: 1px solid var(--border-soft); background: rgba(9, 14, 20, 0.72); border-radius: 10px; padding: 9px; }
       .metric small { color: var(--muted); display: block; font-size: 11px; }
       .metric strong { color: #d3deed; font-size: 13px; }
-
-      .detail-card {
-        border: 1px solid var(--border-soft);
-        border-radius: 11px;
-        padding: 10px;
-        background: rgba(10, 15, 21, 0.78);
-        margin-bottom: 10px;
-      }
-
-      .detail-title {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 7px;
-      }
-
-      .pill {
-        border: 1px solid #2f3e52;
-        border-radius: 999px;
-        padding: 3px 8px;
-        font-size: 10px;
-        color: #c8d6e7;
-      }
-
-      .detail-card ul {
-        margin: 0;
-        padding-left: 15px;
-        font-size: 11px;
-        color: #b5c0cf;
-        line-height: 1.45;
-      }
-
+      .detail-card { border: 1px solid var(--border-soft); border-radius: 11px; padding: 10px; background: rgba(10, 15, 21, 0.78); margin-bottom: 10px; }
+      .detail-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; }
+      .pill { border: 1px solid #2f3e52; border-radius: 999px; padding: 3px 8px; font-size: 10px; color: #c8d6e7; }
+      .detail-card ul { margin: 0; padding-left: 15px; font-size: 11px; color: #b5c0cf; line-height: 1.45; }
       .rail-wrap { overflow-y: auto; padding-right: 3px; }
       .agent-list { position: relative; margin-left: 10px; padding-left: 16px; }
-      .agent-list::before {
-        content: "";
-        position: absolute;
-        left: 4px;
-        top: 4px;
-        bottom: 4px;
-        width: 2px;
-        background: linear-gradient(180deg, #425162, #2b3440);
-      }
-
-      .agent-card {
-        position: relative;
-        border: 1px solid #263140;
-        background: #0d141d;
-        border-radius: 10px;
-        padding: 9px;
-        margin-bottom: 8px;
-      }
-      .agent-card::before {
-        content: "";
-        position: absolute;
-        width: 9px;
-        height: 9px;
-        border-radius: 999px;
-        left: -17px;
-        top: 12px;
-        border: 2px solid #415063;
-        background: #0d141d;
-      }
+      .agent-list::before { content: ""; position: absolute; left: 4px; top: 4px; bottom: 4px; width: 2px; background: linear-gradient(180deg, #425162, #2b3440); }
+      .agent-card { position: relative; border: 1px solid #263140; background: #0d141d; border-radius: 10px; padding: 9px; margin-bottom: 8px; }
+      .agent-card::before { content: ""; position: absolute; width: 9px; height: 9px; border-radius: 999px; left: -17px; top: 12px; border: 2px solid #415063; background: #0d141d; }
       .agent-card.active { border-color: #4f6b8f; }
       .agent-card.complete { border-color: #365340; }
       .agent-card.waiting { opacity: 0.9; }
@@ -245,75 +113,27 @@
       .agent-card.complete::before { border-color: var(--ok); background: var(--ok); }
       .agent-card.waiting::before { border-color: #5f6d80; }
       .agent-card.skipped::before { border-color: #6f7786; background: transparent; }
-
       .agent-head { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 5px; }
       .agent-name { font-size: 13px; margin-bottom: 4px; }
       .agent-summary { font-size: 11px; color: #b7c2d0; line-height: 1.42; }
-
-      .tabs, .subtabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-      .tab, .subtab {
-        border: 1px solid #2b3646;
-        background: #0d131b;
-        color: #c1cddd;
-        border-radius: 999px;
-        padding: 6px 10px;
-        font-size: 11px;
-        cursor: pointer;
-      }
-      .tab.active, .subtab.active { border-color: #52719a; background: rgba(95, 130, 171, 0.22); }
-
-      .output-wrap {
-        border: 1px solid #1f2a37;
-        border-radius: 12px;
-        background: #0a1017;
-        min-height: 275px;
-        overflow: auto;
-        padding: 12px;
-        font-size: 12px;
-      }
-
-      .output-view.hidden,
-      .artifact-view.hidden { display: none; }
-
-      .doc h3 {
-        margin: 0 0 10px;
-        font-size: 12px;
-        color: #d3ddeb;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-      }
-
+      .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+      .tab { border: 1px solid #2b3646; background: #0d131b; color: #c1cddd; border-radius: 999px; padding: 6px 10px; font-size: 11px; cursor: pointer; }
+      .tab.active { border-color: #52719a; background: rgba(95, 130, 171, 0.22); }
+      .output-wrap { border: 1px solid #1f2a37; border-radius: 12px; background: #0a1017; min-height: 230px; overflow: auto; padding: 12px; font-size: 12px; }
+      .output-view.hidden { display: none; }
+      .doc h3 { margin: 0 0 10px; font-size: 12px; color: #d3ddeb; text-transform: uppercase; letter-spacing: 0.06em; }
       .doc .sec { margin-bottom: 10px; border-top: 1px solid #1d2733; padding-top: 9px; }
       .doc .sec:first-child { border-top: none; padding-top: 0; }
       .doc .sec-title { color: #aac0da; font-size: 11px; margin-bottom: 6px; }
       .doc p { margin: 0; color: #d6dfec; line-height: 1.5; }
       .doc ul { margin: 0; padding-left: 15px; color: #d6dfec; line-height: 1.45; }
-
-      .approval-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-      .btn {
-        border: 1px solid #2e3d50;
-        border-radius: 9px;
-        background: #101724;
-        color: #d4dfee;
-        font-size: 11px;
-        padding: 7px 11px;
-        cursor: pointer;
-      }
-      .btn.primary { border-color: #4d6990; background: #1a2536; }
-      .btn.warn { border-color: #8f774d; background: #2b2418; color: #e3d2b6; }
-
+      .follow-up { margin-top: 10px; border: 1px solid var(--border-soft); border-radius: 11px; background: rgba(10, 15, 21, 0.84); padding: 10px; }
+      .follow-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+      .btn { border: 1px solid #2e3d50; border-radius: 9px; background: #101724; color: #d4dfee; font-size: 11px; padding: 7px 11px; cursor: pointer; }
+      .footnote { margin-top: 8px; font-size: 11px; color: #93a5bc; }
       .mode-block { display: none; }
       .mode-block.active { display: block; }
-
-      .footnote {
-        margin-top: 8px;
-        font-size: 11px;
-        color: #93a5bc;
-      }
-
-      @media (max-width: 1200px) {
-        .grid { grid-template-columns: 1fr; }
-      }
+      @media (max-width: 1200px) { .grid { grid-template-columns: 1fr; } }
     </style>
   </head>
   <body>
@@ -321,7 +141,7 @@
       <div class="topbar">
         <div class="title">Agent Team · Static UI Prototype · Design Only</div>
         <div class="top-meta">
-          <div class="badge ghost" id="memoryIndicator">Memory continuity: active_deliverable_type + latest_approved_output</div>
+          <div class="badge ghost" id="memoryIndicator">Memory continuity status: active_deliverable_type + latest_approved_output</div>
           <div class="badge" id="runState">Idle</div>
         </div>
       </div>
@@ -331,12 +151,15 @@
           <h2>Request Setup</h2>
           <div class="stack">
             <div class="section">
-              <p class="section-title">Primary mode</p>
+              <p class="section-title">Requested branches</p>
               <div class="mode-picker">
                 <button class="mode-btn" data-mode="brainstorm">Brainstorm</button>
                 <button class="mode-btn active" data-mode="plan">Plan</button>
                 <button class="mode-btn" data-mode="build">Build</button>
               </div>
+              <label for="sequencePreview" style="margin-top:8px;">Design sequence preview</label>
+              <input id="sequencePreview" value="Plan" readonly />
+              <div class="preview-note">Design direction only: compound branch orchestration preview is not wired to runtime logic yet.</div>
             </div>
 
             <div class="section mode-block active" data-mode="plan">
@@ -363,7 +186,7 @@
                   </select>
                 </div>
               </div>
-              <label for="planFiles" style="margin-top:8px;">Local files (evidence scope)</label>
+              <label for="planFiles" style="margin-top:8px;">Local files (Plan only)</label>
               <input id="planFiles" value="README.md, PROJECT_PLAN.md, prompts/artifacts/decision_memo.md" />
               <div class="row" style="margin-top:8px;">
                 <div>
@@ -374,17 +197,17 @@
                   </select>
                 </div>
                 <div>
-                  <label for="planMemory">Memory status</label>
+                  <label for="planMemory">Memory continuity status</label>
                   <select id="planMemory">
                     <option selected>Continuity available</option>
-                    <option>No memory for this session</option>
+                    <option>No continuity in this session</option>
                   </select>
                 </div>
               </div>
             </div>
 
             <div class="section mode-block" data-mode="build">
-              <p class="section-title">Build controls</p>
+              <p class="section-title">Build controls (future-facing static contract)</p>
               <label for="buildRequest">Request</label>
               <textarea id="buildRequest">Implement CLI support for branch selection and keep human review as an explicit gate.</textarea>
               <div class="row" style="margin-top:8px;">
@@ -394,11 +217,7 @@
                 </div>
                 <div>
                   <label for="buildOutputType">Output type</label>
-                  <select id="buildOutputType">
-                    <option selected>Implementation notes + patch summary</option>
-                    <option>Code change plan</option>
-                    <option>Validation-focused update</option>
-                  </select>
+                  <input id="buildOutputType" value="Implementation notes + patch summary" />
                 </div>
               </div>
               <label for="buildConstraints" style="margin-top:8px;">Constraints</label>
@@ -411,24 +230,14 @@
               <p class="section-title">Brainstorm controls</p>
               <label for="brainQuestion">Question / decision</label>
               <textarea id="brainQuestion">What operating model should AgentTeam use for the next three milestones?</textarea>
-              <label for="brainContext" style="margin-top:8px;">Context</label>
-              <textarea id="brainContext">Current architecture includes Chief of Staff routing into plan, build pod, or advisor pod with mandatory human review.</textarea>
-              <div class="row" style="margin-top:8px;">
-                <div>
-                  <label for="brainOutput">Output format</label>
-                  <select id="brainOutput">
-                    <option selected>Chat</option>
-                    <option>Let CoS decide</option>
-                    <option>Determine during planning</option>
-                  </select>
-                </div>
-                <div>
-                  <label for="brainConstraints">Constraints</label>
-                  <input id="brainConstraints" value="No new integrations, no web UI, keep state explicit" />
-                </div>
-              </div>
-              <label for="brainFraming" style="margin-top:8px;">Advisor team framing</label>
-              <input id="brainFraming" value="5 cluster perspectives + synthesis for decision support" />
+              <label for="brainOutput" style="margin-top:8px;">Output format</label>
+              <select id="brainOutput">
+                <option selected>Chat</option>
+                <option>Let CoS decide</option>
+                <option>Determine during planning</option>
+              </select>
+              <label for="brainFraming" style="margin-top:8px;">Advisor framing</label>
+              <input id="brainFraming" value="5 advisor clusters produce notes for advisor synthesis" />
             </div>
 
             <div class="status-inline" id="promptStatus">Design-only controls shown. This prototype does not execute backend code.</div>
@@ -439,50 +248,61 @@
         <article class="panel">
           <h2>Run Orchestration</h2>
           <div class="summary-grid">
-            <div class="metric"><small>Branch</small><strong id="branchLabel">Plan</strong></div>
+            <div class="metric"><small>Requested branches</small><strong id="branchLabel">Plan</strong></div>
+            <div class="metric"><small>Proposed sequence</small><strong id="sequenceLabel">Plan</strong></div>
             <div class="metric"><small>Current state</small><strong id="stateLabel">chief_of_staff</strong></div>
-            <div class="metric"><small>JT position</small><strong id="jtLabel">After Writer (Plan only)</strong></div>
-            <div class="metric"><small>Human review</small><strong id="humanLabel">Pending</strong></div>
+            <div class="metric"><small>Runtime wiring</small><strong id="humanLabel">Design-only preview</strong></div>
           </div>
 
-          <div class="detail-card" id="focusCard">
+          <div class="detail-card">
             <div class="detail-title">
               <strong>Focused orchestration state</strong>
               <span class="pill" id="focusPill">Chief of Staff</span>
             </div>
             <ul id="focusList">
-              <li>Classifies request and routes to Plan, Build, or Brainstorm branch.</li>
-              <li>Work order carries objective, deliverable type, and branch flags.</li>
-              <li>UI rail below is branch-aware and reflects the chosen mode.</li>
+              <li>Chief of Staff classifies the request and activates branch flags in the work order.</li>
+              <li>Single-branch behavior is current runtime; multi-branch rail is a design-direction preview.</li>
+              <li>Human Review remains a real explicit gate.</li>
             </ul>
           </div>
 
           <div class="rail-wrap">
             <div class="agent-list" id="agentList"></div>
           </div>
-          <div class="footnote">Helper nodes (for example QA revision loop) are styled as system states rather than human agents.</div>
+          <div class="footnote">Helper states (for example QA revision loop and sequence handoff) are shown as system states, not people.</div>
         </article>
 
         <article class="panel">
           <h2>Workspace</h2>
           <div class="tabs" id="workspaceTabs"></div>
           <div class="output-wrap" id="workspaceBody"></div>
-          <div class="footnote">Prototype copy is illustrative and intentionally non-downloadable in order to stay honest about current runtime capabilities.</div>
+          <div class="follow-up">
+            <label for="followInput">Follow-on interaction (session-level design)</label>
+            <div class="follow-actions">
+              <button class="btn">Ask a follow up</button>
+              <button class="btn">Refine this</button>
+              <button class="btn">Rerun from this output</button>
+              <button class="btn">Continue from this result</button>
+            </div>
+            <input id="followInput" value="Use this result as input for the next selected branch in sequence." />
+          </div>
+          <div class="footnote">Workspace iteration is designed for in-session progression. Persistence and compound runtime execution are not implemented.</div>
         </article>
       </section>
     </main>
 
     <script>
-      const modes = {
+      const order = ['brainstorm', 'plan', 'build'];
+      const branchConfigs = {
         plan: {
-          branchLabel: 'Plan',
+          label: 'Plan',
           steps: [
             { id: 'chief_of_staff', name: 'Chief of Staff', type: 'agent', summary: 'Routes request and sets plan work order.' },
-            { id: 'researcher', name: 'Researcher / Evidence', type: 'agent', summary: 'Researcher plus evidence extraction state for grounded facts.' },
-            { id: 'writer', name: 'Writer', type: 'agent', summary: 'Drafts the selected output format.' },
-            { id: 'jt', name: 'JT (when enabled)', type: 'agent', summary: 'Modifier stage after writer and before reviewer.' },
+            { id: 'researcher', name: 'Researcher / Evidence', type: 'agent', summary: 'Research plus evidence extraction for grounded facts.' },
+            { id: 'writer', name: 'Writer', type: 'agent', summary: 'Drafts selected output format.' },
+            { id: 'jt', name: 'JT (if enabled)', type: 'agent', summary: 'Optional challenge stage after Writer and before Reviewer.' },
             { id: 'reviewer', name: 'Reviewer', type: 'agent', summary: 'Structured QC findings and next action.' },
-            { id: 'chief_final', name: 'Chief of Staff Final Check', type: 'agent', summary: 'Final validation and next-step decision.' },
+            { id: 'chief_final', name: 'Chief of Staff Final Check', type: 'agent', summary: 'Final validation before handoff.' },
             { id: 'human_review', name: 'Human Review', type: 'agent', summary: 'Explicit approve/revise gate.' }
           ],
           tabs: [
@@ -492,24 +312,21 @@
             { id: 'approval', label: 'Approval' }
           ],
           views: {
-            draft: `<strong>Plan draft state</strong><p style="margin:8px 0 0; color:#cdd8e7;">Draft text appears here after Writer. JT can modify this draft only when explicitly enabled.</p>`,
-            artifact: `<div class="subtabs"><button class="subtab active" data-artifact="executive">Executive Brief</button><button class="subtab" data-artifact="decision">Decision Memo</button><button class="subtab" data-artifact="project">Project Plan</button></div>
-              <div class="artifact-view" id="artifactExecutive"><div class="doc"><h3>Executive Brief (template preview)</h3><div class="sec"><div class="sec-title"><strong>Problem</strong></div><p>Describe the decision or issue clearly.</p></div><div class="sec"><div class="sec-title"><strong>Recommendation</strong></div><p>Provide the recommended direction.</p></div><div class="sec"><div class="sec-title"><strong>Rationale</strong></div><p>Back recommendation with approved evidence.</p></div><div class="sec"><div class="sec-title"><strong>Risks</strong></div><p>List risks tied to the recommendation.</p></div><div class="sec"><div class="sec-title"><strong>Next Steps</strong></div><p>State immediate actions and owners.</p></div></div></div>
-              <div class="artifact-view hidden" id="artifactDecision"><div class="doc"><h3>Decision Memo (template preview)</h3><div class="sec"><div class="sec-title"><strong>Context</strong></div><p>Summarize decision context.</p></div><div class="sec"><div class="sec-title"><strong>Decision</strong></div><p>State what is being decided.</p></div><div class="sec"><div class="sec-title"><strong>Options Considered</strong></div><p>Compare options with trade-offs.</p></div><div class="sec"><div class="sec-title"><strong>Recommendation</strong></div><p>Recommend one path.</p></div><div class="sec"><div class="sec-title"><strong>Implications</strong></div><p>Explain expected outcomes.</p></div></div></div>
-              <div class="artifact-view hidden" id="artifactProject"><div class="doc"><h3>Project Plan (template preview)</h3><div class="sec"><div class="sec-title"><strong>Objective</strong></div><p>Define what success means.</p></div><div class="sec"><div class="sec-title"><strong>Current State</strong></div><p>Summarize baseline status.</p></div><div class="sec"><div class="sec-title"><strong>Workstreams / Milestones</strong></div><p>Break work into phases.</p></div><div class="sec"><div class="sec-title"><strong>Open Questions</strong></div><p>Track unresolved items.</p></div><div class="sec"><div class="sec-title"><strong>Risks</strong></div><p>Capture project risks.</p></div></div></div>`,
-            findings: `<div class="doc"><h3>Reviewer findings</h3><div class="sec"><div class="sec-title"><strong>Overall assessment</strong></div><p>Draft is structurally sound, one unsupported claim requires revision.</p></div><div class="sec"><div class="sec-title"><strong>Recommended next action</strong></div><p>revise</p></div></div>`,
-            approval: `<div class="doc"><h3>Human approval checkpoint</h3><div class="sec"><div class="sec-title"><strong>Status</strong></div><p>Awaiting explicit human decision.</p></div></div><div class="approval-actions"><button class="btn primary">Approve</button><button class="btn warn">Request Revision</button></div>`
+            draft: '<strong>Plan draft state</strong><p style="margin-top:8px;color:#cdd8e7;">Draft text appears after Writer. JT modifies only when explicitly enabled.</p>',
+            artifact: '<div class="doc"><h3>Output format preview</h3><div class="sec"><div class="sec-title"><strong>Current option</strong></div><p>Chat, Executive Brief, Decision Memo, Project Plan, or CoS-selected format.</p></div></div>',
+            findings: '<div class="doc"><h3>Reviewer findings</h3><div class="sec"><div class="sec-title"><strong>Recommended next action</strong></div><p>revise (sample static state)</p></div></div>',
+            approval: '<strong>Human approval checkpoint</strong><p style="margin-top:8px;color:#cdd8e7;">Awaiting explicit human decision.</p>'
           }
         },
         build: {
-          branchLabel: 'Build',
+          label: 'Build',
           steps: [
-            { id: 'pod_entry', name: 'Pod Entry', type: 'system', summary: 'State prepares pod brief and initializes pod artifacts.' },
-            { id: 'backend', name: 'Backend', type: 'agent', summary: 'Builds backend artifact output.' },
-            { id: 'frontend', name: 'Frontend', type: 'agent', summary: 'Builds frontend artifact output.' },
-            { id: 'qa', name: 'QA', type: 'agent', summary: 'Evaluates backend + frontend output quality.' },
-            { id: 'qa_loop', name: 'State: QA Revision Loop', type: 'system', summary: 'Optional loop when QA verdict is revise.' },
-            { id: 'assemble', name: 'Assemble', type: 'system', summary: 'Combines pod outputs into one assembled draft.' },
+            { id: 'pod_entry', name: 'Pod Entry', type: 'system', summary: 'System state initializes pod brief and artifact map.' },
+            { id: 'backend', name: 'Backend', type: 'agent', summary: 'Build pod backend output.' },
+            { id: 'frontend', name: 'Frontend', type: 'agent', summary: 'Build pod frontend output.' },
+            { id: 'qa', name: 'QA', type: 'agent', summary: 'Evaluate output quality and verdict.' },
+            { id: 'qa_loop', name: 'QA Revision Loop (optional)', type: 'system', summary: 'Loop state when verdict is revise.' },
+            { id: 'assemble', name: 'Assemble', type: 'system', summary: 'Combine backend/frontend/QA outputs.' },
             { id: 'human_review', name: 'Human Review', type: 'agent', summary: 'Explicit approve/revise gate.' }
           ],
           tabs: [
@@ -520,17 +337,17 @@
             { id: 'approval', label: 'Approval' }
           ],
           views: {
-            backend_out: '<strong>Backend output</strong><p style="margin-top:8px;color:#cdd8e7;">Pod backend artifact appears here.</p>',
-            frontend_out: '<strong>Frontend output</strong><p style="margin-top:8px;color:#cdd8e7;">Pod frontend artifact appears here.</p>',
-            qa_findings: '<strong>QA findings</strong><p style="margin-top:8px;color:#cdd8e7;">QA verdict can be pass or revise. Revise triggers the QA revision loop state.</p>',
-            assembled: '<strong>Assembled output</strong><p style="margin-top:8px;color:#cdd8e7;">Assemble state merges backend, frontend, and QA notes into a draft for human review.</p>',
-            approval: '<strong>Human approval</strong><p style="margin-top:8px;color:#cdd8e7;">Final gate remains human review before output is accepted.</p>'
+            backend_out: '<strong>Backend output</strong><p style="margin-top:8px;color:#cdd8e7;">Static placeholder for backend pod result.</p>',
+            frontend_out: '<strong>Frontend output</strong><p style="margin-top:8px;color:#cdd8e7;">Static placeholder for frontend pod result.</p>',
+            qa_findings: '<strong>QA findings</strong><p style="margin-top:8px;color:#cdd8e7;">QA verdict can pass or revise; revise loops before assemble.</p>',
+            assembled: '<strong>Assembled output</strong><p style="margin-top:8px;color:#cdd8e7;">Combined build output ready for human review.</p>',
+            approval: '<strong>Human approval</strong><p style="margin-top:8px;color:#cdd8e7;">Final gate remains human review.</p>'
           }
         },
         brainstorm: {
-          branchLabel: 'Brainstorm',
+          label: 'Brainstorm',
           steps: [
-            { id: 'advisor_entry', name: 'Advisor Entry', type: 'system', summary: 'State prepares advisor brief and output map.' },
+            { id: 'advisor_entry', name: 'Advisor Entry', type: 'system', summary: 'System state prepares advisor brief.' },
             { id: 'strategy_systems', name: 'Strategy and Systems', type: 'agent', summary: 'Cluster perspective 1.' },
             { id: 'leadership_culture', name: 'Leadership and Culture', type: 'agent', summary: 'Cluster perspective 2.' },
             { id: 'communication_influence', name: 'Communication and Influence', type: 'agent', summary: 'Cluster perspective 3.' },
@@ -545,9 +362,9 @@
             { id: 'approval', label: 'Approval' }
           ],
           views: {
-            synthesis: '<strong>Advisor synthesis</strong><p style="margin-top:8px;color:#cdd8e7;">Combined recommendation from all five advisor clusters appears here.</p>',
-            clusters: '<div class="doc"><h3>Expandable cluster notes (design mock)</h3><div class="sec"><div class="sec-title"><strong>Strategy and Systems</strong></div><p>Notes collapsed by default in runtime design.</p></div><div class="sec"><div class="sec-title"><strong>Leadership and Culture</strong></div><p>Notes collapsed by default in runtime design.</p></div><div class="sec"><div class="sec-title"><strong>Communication and Influence</strong></div><p>Notes collapsed by default in runtime design.</p></div><div class="sec"><div class="sec-title"><strong>Growth and Mindset</strong></div><p>Notes collapsed by default in runtime design.</p></div><div class="sec"><div class="sec-title"><strong>Entrepreneur and Execution</strong></div><p>Notes collapsed by default in runtime design.</p></div></div>',
-            approval: '<strong>Human approval</strong><p style="margin-top:8px;color:#cdd8e7;">Human review approves or requests revision on the synthesized recommendation.</p>'
+            synthesis: '<strong>Advisor synthesis</strong><p style="margin-top:8px;color:#cdd8e7;">Combined recommendation from five advisor clusters.</p>',
+            clusters: '<strong>Cluster notes</strong><p style="margin-top:8px;color:#cdd8e7;">Static placeholders for cluster perspectives in one session workspace.</p>',
+            approval: '<strong>Human approval</strong><p style="margin-top:8px;color:#cdd8e7;">Human review approves or requests revision.</p>'
           }
         }
       };
@@ -556,9 +373,10 @@
       const modeBlocks = [...document.querySelectorAll('.mode-block')];
       const runState = document.getElementById('runState');
       const promptStatus = document.getElementById('promptStatus');
+      const sequencePreview = document.getElementById('sequencePreview');
       const branchLabel = document.getElementById('branchLabel');
+      const sequenceLabel = document.getElementById('sequenceLabel');
       const stateLabel = document.getElementById('stateLabel');
-      const jtLabel = document.getElementById('jtLabel');
       const humanLabel = document.getElementById('humanLabel');
       const focusPill = document.getElementById('focusPill');
       const focusList = document.getElementById('focusList');
@@ -566,39 +384,60 @@
       const workspaceTabs = document.getElementById('workspaceTabs');
       const workspaceBody = document.getElementById('workspaceBody');
 
-      let currentMode = 'plan';
+      let selectedModes = new Set(['plan']);
 
-      function renderMode(mode) {
-        currentMode = mode;
-        modeButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.mode === mode));
-        modeBlocks.forEach(block => block.classList.toggle('active', block.dataset.mode === mode));
-
-        const config = modes[mode];
-        branchLabel.textContent = config.branchLabel;
-        stateLabel.textContent = config.steps[0].id;
-        jtLabel.textContent = mode === 'plan' ? 'After Writer (Plan only)' : 'Not used';
-        humanLabel.textContent = 'Pending';
-
-        agentList.innerHTML = config.steps.map((step, idx) => `
-          <div class="agent-card ${idx === 0 ? 'active' : 'waiting'} ${step.type === 'system' ? 'system-state' : ''}" data-step="${step.id}">
-            <div class="agent-head"><span>Step ${idx + 1}</span><span>${idx === 0 ? 'active' : 'waiting'}</span></div>
-            <div class="agent-name">${step.name}</div>
-            <div class="agent-summary">${step.summary}</div>
-          </div>
-        `).join('');
-
-        focusPill.textContent = config.steps[0].name;
-        focusList.innerHTML = `<li>${config.steps[0].summary}</li><li>Branch-aware rail reflects ${config.branchLabel} flow.</li><li>Human Review remains the final explicit gate.</li>`;
-
-        workspaceTabs.innerHTML = config.tabs.map((tab, idx) => `<button class="tab ${idx === 0 ? 'active' : ''}" data-tab="${tab.id}">${tab.label}</button>`).join('');
-        workspaceBody.innerHTML = Object.entries(config.views).map(([id, html], idx) => `<div class="output-view ${idx === 0 ? '' : 'hidden'}" data-view="${id}">${html}</div>`).join('');
-
-        bindWorkspaceInteractions();
-        bindRailInteractions();
-        promptStatus.textContent = `${config.branchLabel} setup loaded. Design-only controls shown.`;
+      function selectedInOrder() {
+        return order.filter(mode => selectedModes.has(mode));
       }
 
-      function bindWorkspaceInteractions() {
+      function buildSequenceLabel() {
+        return selectedInOrder().map(mode => branchConfigs[mode].label).join(' → ') || 'Plan';
+      }
+
+      function buildCombinedSteps() {
+        const selected = selectedInOrder();
+        const many = selected.length > 1;
+        const steps = [];
+        selected.forEach((mode, index) => {
+          const scoped = branchConfigs[mode].steps.map(step => ({
+            ...step,
+            id: `${mode}_${step.id}`,
+            branch: branchConfigs[mode].label,
+            name: many ? `${branchConfigs[mode].label} · ${step.name}` : step.name
+          }));
+          steps.push(...scoped);
+          if (many && index < selected.length - 1) {
+            steps.push({
+              id: `handoff_${mode}_${selected[index + 1]}`,
+              branch: 'Composite',
+              name: 'Sequence Handoff',
+              type: 'system',
+              summary: `Design preview: carry workspace output from ${branchConfigs[mode].label} into ${branchConfigs[selected[index + 1]].label}.`
+            });
+          }
+        });
+        return steps;
+      }
+
+      function renderWorkspace() {
+        const selected = selectedInOrder();
+        if (selected.length === 1) {
+          const config = branchConfigs[selected[0]];
+          workspaceTabs.innerHTML = config.tabs.map((tab, idx) => `<button class="tab ${idx === 0 ? 'active' : ''}" data-tab="${tab.id}">${tab.label}</button>`).join('');
+          workspaceBody.innerHTML = Object.entries(config.views).map(([id, html], idx) => `<div class="output-view ${idx === 0 ? '' : 'hidden'}" data-view="${id}">${html}</div>`).join('');
+        } else {
+          const sequence = buildSequenceLabel();
+          workspaceTabs.innerHTML = [
+            { id: 'seq_output', label: 'Sequence Output' },
+            { id: 'handoff', label: 'Handoff Notes' },
+            { id: 'approval', label: 'Human Review' }
+          ].map((tab, idx) => `<button class="tab ${idx === 0 ? 'active' : ''}" data-tab="${tab.id}">${tab.label}</button>`).join('');
+          workspaceBody.innerHTML = `
+            <div class="output-view" data-view="seq_output"><div class="doc"><h3>Composite workspace (design preview)</h3><div class="sec"><div class="sec-title"><strong>Proposed sequence</strong></div><p>${sequence}</p></div><div class="sec"><div class="sec-title"><strong>Session progression</strong></div><p>Output from each selected branch can seed the next branch in this sequence. Runtime orchestration for this is not implemented.</p></div></div></div>
+            <div class="output-view hidden" data-view="handoff"><div class="doc"><h3>Branch handoff notes</h3><div class="sec"><ul><li>Capture what should persist into the next selected branch.</li><li>Mark reviewer or QA findings before handoff.</li><li>Keep approval checkpoints explicit between branches.</li></ul></div></div></div>
+            <div class="output-view hidden" data-view="approval"><strong>Human approval</strong><p style="margin-top:8px;color:#cdd8e7;">Human review remains the final decision gate for sequence output.</p></div>`;
+        }
+
         const tabs = [...workspaceTabs.querySelectorAll('.tab')];
         const views = [...workspaceBody.querySelectorAll('.output-view')];
         tabs.forEach(tab => {
@@ -610,19 +449,34 @@
             if (target) target.classList.remove('hidden');
           });
         });
+      }
 
-        const artifactTabs = [...workspaceBody.querySelectorAll('.subtab')];
-        const artifactViews = [...workspaceBody.querySelectorAll('.artifact-view')];
-        artifactTabs.forEach(tab => {
-          tab.addEventListener('click', () => {
-            artifactTabs.forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            artifactViews.forEach(v => v.classList.add('hidden'));
-            const map = { executive: 'artifactExecutive', decision: 'artifactDecision', project: 'artifactProject' };
-            const view = document.getElementById(map[tab.dataset.artifact]);
-            if (view) view.classList.remove('hidden');
-          });
-        });
+      function render() {
+        const selected = selectedInOrder();
+        const sequence = buildSequenceLabel();
+        modeButtons.forEach(btn => btn.classList.toggle('active', selectedModes.has(btn.dataset.mode)));
+        modeBlocks.forEach(block => block.classList.toggle('active', selectedModes.has(block.dataset.mode)));
+
+        sequencePreview.value = sequence;
+        branchLabel.textContent = selected.map(mode => branchConfigs[mode].label).join(', ');
+        sequenceLabel.textContent = sequence;
+        humanLabel.textContent = selected.length > 1 ? 'Design-only sequence preview' : 'Single branch preview';
+
+        const steps = buildCombinedSteps();
+        stateLabel.textContent = steps[0]?.id || 'chief_of_staff';
+        agentList.innerHTML = steps.map((step, idx) => `
+          <div class="agent-card ${idx === 0 ? 'active' : 'waiting'} ${step.type === 'system' ? 'system-state' : ''}" data-step="${step.id}">
+            <div class="agent-head"><span>Step ${idx + 1}</span><span>${idx === 0 ? 'active' : 'waiting'}</span></div>
+            <div class="agent-name">${step.name}</div>
+            <div class="agent-summary">${step.summary}</div>
+          </div>`).join('');
+
+        focusPill.textContent = steps[0]?.name || 'Chief of Staff';
+        focusList.innerHTML = `<li>${steps[0]?.summary || 'Select a branch.'}</li><li>Sequence: ${sequence}.</li><li>${selected.length > 1 ? 'Composite rail is a design direction, not runtime behavior.' : 'Branch rail reflects current runtime architecture.'}</li>`;
+
+        promptStatus.textContent = `${selected.length > 1 ? 'Multi-workstream design preview loaded.' : `${branchConfigs[selected[0]].label} setup loaded.`} This prototype does not execute backend logic.`;
+        renderWorkspace();
+        bindRailInteractions();
       }
 
       function bindRailInteractions() {
@@ -631,25 +485,27 @@
           card.addEventListener('click', () => {
             cards.forEach(c => c.classList.remove('active'));
             card.classList.add('active');
-            const name = card.querySelector('.agent-name').textContent;
-            const summary = card.querySelector('.agent-summary').textContent;
-            focusPill.textContent = name;
-            focusList.innerHTML = `<li>${summary}</li><li>Visual state shown for branch: ${modes[currentMode].branchLabel}.</li><li>This is a static representation (not wired to app state).</li>`;
+            focusPill.textContent = card.querySelector('.agent-name').textContent;
+            focusList.innerHTML = `<li>${card.querySelector('.agent-summary').textContent}</li><li>Static branch-aware visualization only.</li><li>Human review remains explicit and required.</li>`;
             stateLabel.textContent = card.dataset.step;
           });
         });
       }
 
       modeButtons.forEach(btn => {
-        btn.addEventListener('click', () => renderMode(btn.dataset.mode));
+        btn.addEventListener('click', () => {
+          const mode = btn.dataset.mode;
+          if (selectedModes.has(mode) && selectedModes.size === 1) return;
+          if (selectedModes.has(mode)) selectedModes.delete(mode);
+          else selectedModes.add(mode);
+          render();
+        });
       });
 
       document.getElementById('runBtn').addEventListener('click', async () => {
-        const config = modes[currentMode];
         const cards = [...agentList.querySelectorAll('.agent-card')];
         runState.textContent = 'Running';
-        promptStatus.textContent = `Simulating ${config.branchLabel} orchestration...`;
-        humanLabel.textContent = 'Pending';
+        promptStatus.textContent = 'Simulating design flow...';
 
         cards.forEach(c => {
           c.classList.remove('active', 'complete', 'waiting', 'skipped');
@@ -657,10 +513,9 @@
           c.querySelector('.agent-head span:last-child').textContent = 'waiting';
         });
 
-        const jtEnabled = currentMode !== 'plan' || document.getElementById('planJt').value === 'Enabled';
-
+        const jtEnabled = !selectedModes.has('plan') || document.getElementById('planJt').value === 'Enabled';
         for (const card of cards) {
-          if (card.dataset.step === 'jt' && !jtEnabled) {
+          if (card.dataset.step.includes('_jt') && !jtEnabled) {
             card.classList.remove('waiting');
             card.classList.add('skipped');
             card.querySelector('.agent-head span:last-child').textContent = 'skipped';
@@ -671,8 +526,8 @@
           card.querySelector('.agent-head span:last-child').textContent = 'active';
           stateLabel.textContent = card.dataset.step;
           focusPill.textContent = card.querySelector('.agent-name').textContent;
-          await new Promise(resolve => setTimeout(resolve, 430));
-          if (card.dataset.step !== 'human_review') {
+          await new Promise(resolve => setTimeout(resolve, 260));
+          if (!card.dataset.step.includes('human_review')) {
             card.classList.remove('active');
             card.classList.add('complete');
             card.querySelector('.agent-head span:last-child').textContent = 'complete';
@@ -680,10 +535,10 @@
         }
 
         runState.textContent = 'Awaiting Human Review';
-        promptStatus.textContent = `${config.branchLabel} simulation complete. Awaiting explicit human approval.`;
+        promptStatus.textContent = 'Simulation complete. Awaiting explicit human approval.';
       });
 
-      renderMode('plan');
+      render();
     </script>
   </body>
 </html>
