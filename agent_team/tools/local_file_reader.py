@@ -7,7 +7,7 @@ from typing import TypedDict
 
 ALLOWED_EXTENSIONS = {".md", ".txt", ".py", ".json", ".yaml", ".yml", ".csv"}
 DEFAULT_MAX_DEPTH = 1
-DEFAULT_MAX_FILES = 8
+DEFAULT_MAX_FILES = 15
 MAX_CHARS_PER_FILE = 4000
 
 
@@ -80,7 +80,7 @@ def load_local_files(
                 continue
             candidate_files.append(child)
 
-    for file_path in sorted(candidate_files):
+    for file_path in sorted(candidate_files, key=lambda p: p.stat().st_mtime, reverse=True):
         file_key = str(file_path)
         if len(files_read) >= max_files:
             files_skipped.append(file_key)
