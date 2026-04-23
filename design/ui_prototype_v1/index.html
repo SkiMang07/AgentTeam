@@ -345,12 +345,14 @@
               <textarea id="planRequest">Draft a decision memo for the next release cadence and include explicit human-approval points.</textarea>
               <div class="row" style="margin-top:8px;">
                 <div>
-                  <label for="planArtifact">Artifact type</label>
+                  <label for="planArtifact">Output format</label>
                   <select id="planArtifact">
-                    <option selected>Executive Brief</option>
+                    <option selected>Chat</option>
+                    <option>Executive Brief</option>
                     <option>Decision Memo</option>
                     <option>Project Plan</option>
-                    <option>General</option>
+                    <option>Let CoS decide</option>
+                    <option>Determine during planning</option>
                   </select>
                 </div>
                 <div>
@@ -387,20 +389,22 @@
               <textarea id="buildRequest">Implement CLI support for branch selection and keep human review as an explicit gate.</textarea>
               <div class="row" style="margin-top:8px;">
                 <div>
-                  <label for="buildTarget">Build target</label>
-                  <select id="buildTarget">
-                    <option selected>CLI workflow update</option>
-                    <option>Prompt contract update</option>
-                    <option>Graph routing behavior</option>
-                  </select>
+                  <label for="buildSurface">Build surface</label>
+                  <input id="buildSurface" value="CLI routing and branch handoff behavior" />
                 </div>
                 <div>
-                  <label for="buildStack">Stack / constraints</label>
-                  <input id="buildStack" value="Python, LangGraph, local-first, no UI runtime" />
+                  <label for="buildOutputType">Output type</label>
+                  <select id="buildOutputType">
+                    <option selected>Implementation notes + patch summary</option>
+                    <option>Code change plan</option>
+                    <option>Validation-focused update</option>
+                  </select>
                 </div>
               </div>
+              <label for="buildConstraints" style="margin-top:8px;">Constraints</label>
+              <textarea id="buildConstraints">Python + LangGraph only, no new integrations, no web runtime UI, keep human review explicit.</textarea>
               <label for="buildAcceptance" style="margin-top:8px;">Acceptance notes</label>
-              <textarea id="buildAcceptance">Backend + frontend artifacts should pass QA, loop for revision when QA verdict is revise, then assemble and send to human review.</textarea>
+              <textarea id="buildAcceptance">Backend + frontend pod outputs should pass QA, loop when verdict is revise, then assemble and route to human review.</textarea>
             </div>
 
             <div class="section mode-block" data-mode="brainstorm">
@@ -411,14 +415,20 @@
               <textarea id="brainContext">Current architecture includes Chief of Staff routing into plan, build pod, or advisor pod with mandatory human review.</textarea>
               <div class="row" style="margin-top:8px;">
                 <div>
+                  <label for="brainOutput">Output format</label>
+                  <select id="brainOutput">
+                    <option selected>Chat</option>
+                    <option>Let CoS decide</option>
+                    <option>Determine during planning</option>
+                  </select>
+                </div>
+                <div>
                   <label for="brainConstraints">Constraints</label>
                   <input id="brainConstraints" value="No new integrations, no web UI, keep state explicit" />
                 </div>
-                <div>
-                  <label for="brainFraming">Advisor team framing</label>
-                  <input id="brainFraming" value="5 cluster perspectives + synthesis for decision support" />
-                </div>
               </div>
+              <label for="brainFraming" style="margin-top:8px;">Advisor team framing</label>
+              <input id="brainFraming" value="5 cluster perspectives + synthesis for decision support" />
             </div>
 
             <div class="status-inline" id="promptStatus">Design-only controls shown. This prototype does not execute backend code.</div>
@@ -469,7 +479,7 @@
           steps: [
             { id: 'chief_of_staff', name: 'Chief of Staff', type: 'agent', summary: 'Routes request and sets plan work order.' },
             { id: 'researcher', name: 'Researcher / Evidence', type: 'agent', summary: 'Researcher plus evidence extraction state for grounded facts.' },
-            { id: 'writer', name: 'Writer', type: 'agent', summary: 'Drafts the selected artifact template.' },
+            { id: 'writer', name: 'Writer', type: 'agent', summary: 'Drafts the selected output format.' },
             { id: 'jt', name: 'JT (when enabled)', type: 'agent', summary: 'Modifier stage after writer and before reviewer.' },
             { id: 'reviewer', name: 'Reviewer', type: 'agent', summary: 'Structured QC findings and next action.' },
             { id: 'chief_final', name: 'Chief of Staff Final Check', type: 'agent', summary: 'Final validation and next-step decision.' },

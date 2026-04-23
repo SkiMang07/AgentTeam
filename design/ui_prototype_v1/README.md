@@ -7,41 +7,70 @@ This folder contains a **standalone static HTML prototype** for a premium dark, 
 1. From the repository root, open `design/ui_prototype_v1/index.html` directly in a browser.
 2. No dependencies, build tools, frameworks, or backend services are required.
 
-## What changed in this version
+## Architecture reflected in this prototype
 
-The prototype now matches the live architecture in `agent_team/app/graph.py`, `agent_team/app/state.py`, and the current agent modules:
+The prototype reflects the current three-branch model after Chief of Staff routing:
 
-- The UI is explicitly **branch-aware** after Chief of Staff.
-- Top-level mode choices are now:
-  - **Plan**
-  - **Build** (developer pod)
-  - **Brainstorm** (advisor team)
-- Layout is now aligned to the requested desktop model:
-  - **Left:** Request Setup
-  - **Middle:** Run Orchestration
-  - **Right:** Workspace
+- **Plan**
+- **Build**
+- **Brainstorm**
 
-## Branch mapping to current repo behavior
+Layout stays branch-aware and mode-specific:
 
-### Plan branch
+- **Left:** Request Setup
+- **Middle:** Run Orchestration
+- **Right:** Workspace
 
-Orchestration rail reflects the current plan path:
+## Request Setup controls (design-only)
+
+### Plan mode
+
+- Uses **Output format** (renamed from artifact language in setup controls).
+- Output format options are:
+  - Chat
+  - Executive Brief
+  - Decision Memo
+  - Project Plan
+  - Let CoS decide
+  - Determine during planning
+- JT remains a **Plan-only** modifier.
+- Local files and web search controls remain visible only in Plan mode.
+- Memory is represented as continuity/status, not as a backend feature toggle.
+
+### Build mode
+
+- Replaces older invented “build target” mock options with a more structured request shape:
+  - Request
+  - Build surface
+  - Output type
+  - Constraints
+  - Acceptance notes
+- These controls are intentionally **future-facing UI contract design**, not a claim that runtime currently accepts this typed form.
+
+### Brainstorm mode
+
+- Adds an **Output format** control with:
+  - Chat
+  - Let CoS decide
+  - Determine during planning
+- Keeps Brainstorm tied to advisor clusters + synthesis rather than introducing new artifact classes.
+- Plan and Brainstorm can explicitly return **Chat** in the prototype.
+
+## Orchestration rail and workspace (design-only)
+
+### Plan rail
 
 1. Chief of Staff
 2. Researcher / Evidence
 3. Writer
-4. JT (only when enabled)
+4. JT (when enabled)
 5. Reviewer
 6. Chief of Staff final check
 7. Human Review
 
-Notes:
-- JT is shown only in Plan and appears after Writer and before Reviewer.
-- Memory is represented as continuity status (not as a generic runtime toggle).
+JT remains positioned after Writer and before Reviewer.
 
-### Build branch
-
-Orchestration rail reflects the developer pod path:
+### Build rail
 
 1. Pod Entry (system state)
 2. Backend
@@ -51,12 +80,7 @@ Orchestration rail reflects the developer pod path:
 6. Assemble (system state)
 7. Human Review
 
-Notes:
-- Helper nodes are visually styled as **system states** rather than person-like agents.
-
-### Brainstorm branch
-
-Orchestration rail reflects the advisor pod path:
+### Brainstorm rail
 
 1. Advisor Entry (system state)
 2. Strategy and Systems
@@ -67,24 +91,15 @@ Orchestration rail reflects the advisor pod path:
 7. Advisor Synthesis
 8. Human Review
 
-## Workspace behavior (design-only)
-
-Workspace tabs are mode-specific:
+Workspace tabs remain branch-specific:
 
 - **Plan:** Draft, Artifact Preview, Reviewer Findings, Approval
 - **Build:** Backend Output, Frontend Output, QA Findings, Assembled Output, Approval
 - **Brainstorm:** Advisor Synthesis, Cluster Notes, Approval
 
-Artifact previews are aligned to currently implemented template types:
+## Scope and honesty notes
 
-- Executive Brief
-- Decision Memo
-- Project Plan
-
-This prototype **does not imply downloadable runtime artifacts** and remains explicit that it is a design mock, not a wired UI.
-
-## Scope notes
-
-- Design-only static prototype; no backend wiring.
-- Python code and runtime behavior are unchanged.
-- No frameworks or build tooling were added.
+- This remains a **design-only static prototype**.
+- It is **not wired to runtime graph/state execution**.
+- It does **not** imply downloadable artifact generation.
+- Python runtime code is unchanged.
