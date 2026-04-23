@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Any
 from app.state import (
     ChiefWorkOrder,
     SharedState,
+    get_canonical_advisor_pod_requested,
+    get_canonical_dev_pod_requested,
     get_canonical_jt_requested,
     get_memory_lookup_fields,
     normalize_project_memory,
@@ -35,6 +37,7 @@ class ChiefOfStaffAgent:
         user_task = state["user_task"]
         inferred_jt_requested = state.get("jt_requested", False)
         inferred_dev_pod_requested = state.get("dev_pod_requested", False)
+        inferred_advisor_pod_requested = state.get("advisor_pod_requested", False)
         project_memory = normalize_project_memory(state.get("project_memory"))
         memory_open_questions = project_memory.get("open_questions", [])
         memory_lookup_requested = self._is_memory_lookup_request(user_task)
@@ -50,20 +53,24 @@ class ChiefOfStaffAgent:
                 "work_order, route, rationale. "
                 "work_order must include: objective (string), deliverable_type (string), "
                 "success_criteria (array of strings), research_needed (boolean), "
-                "open_questions (array of strings), jt_requested (boolean), dev_pod_requested (boolean). "
+                "open_questions (array of strings), jt_requested (boolean), dev_pod_requested (boolean), "
+                "advisor_pod_requested (boolean). "
                 "When dev_pod_requested is true, also include pod_task_brief as a top-level key (not inside work_order). "
+                "When advisor_pod_requested is true, also include advisor_brief as a top-level key (not inside work_order). "
                 "route must be 'research', 'write_direct', or 'memory_lookup'. "
                 "Use route='memory_lookup' only when the task explicitly asks to inspect stored session/project memory "
                 "(for example asking for latest approved output currently stored). "
                 "Set work_order.jt_requested from explicit task text only; do not infer hidden intent. "
                 "Set work_order.dev_pod_requested=true only when the task is explicitly about writing or implementing code artifacts. "
+                "Set work_order.advisor_pod_requested=true only when the task explicitly asks for strategic advice, brainstorming, or advisor/council input. "
                 "If project memory is provided, use it only as continuity context for planning; "
                 "do not treat memory as evidence or claimed facts unless they are present in current task inputs. "
                 "Use vault context to extract specific facts, tool descriptions, and current state into success_criteria — "
                 "do not treat vault context as approved facts for the Researcher, but do use it to write concrete, falsifiable success_criteria items. "
                 "Do not include extra keys.\n\n"
                 f"CLI JT requested flag: {inferred_jt_requested}\n"
-                f"CLI dev pod requested flag: {inferred_dev_pod_requested}\n\n"
+                f"CLI dev pod requested flag: {inferred_dev_pod_requested}\n"
+                f"CLI advisor pod requested flag: {inferred_advisor_pod_requested}\n\n"
                 "Current task:\n"
                 f"{user_task}\n\n"
                 "Obsidian vault context (use to ground the work order — pull specific facts, tool descriptions, and current state into success_criteria):\n"
@@ -84,6 +91,7 @@ class ChiefOfStaffAgent:
             self._safe_parse(raw),
             inferred_jt_requested=inferred_jt_requested,
             inferred_dev_pod_requested=inferred_dev_pod_requested,
+            inferred_advisor_pod_requested=inferred_advisor_pod_requested,
             prior_memory=project_memory,
             user_task=user_task,
         )
@@ -119,6 +127,7 @@ class ChiefOfStaffAgent:
         )
 
         pod_task_brief = data.get("pod_task_brief") or ""
+        advisor_brief = data.get("advisor_brief") or ""
         return {
             **state,
             "work_order": work_order,
@@ -126,7 +135,9 @@ class ChiefOfStaffAgent:
             "jt_requested": work_order["jt_requested"],
             "jt_mode": state.get("jt_mode"),
             "dev_pod_requested": work_order["dev_pod_requested"],
+            "advisor_pod_requested": work_order["advisor_pod_requested"],
             "pod_task_brief": pod_task_brief,
+            "advisor_brief": advisor_brief,
             "memory_turn_type": memory_turn_type,
             "memory_lookup_requested": memory_lookup_requested,
             "current_run": {
@@ -244,13 +255,15 @@ class ChiefOfStaffAgent:
         data: dict,
         inferred_jt_requested: bool,
         inferred_dev_pod_requested: bool,
-        prior_memory: dict,
-        user_task: str,
+        inferred_advisor_pod_requested: bool = False,
+        prior_memory: dict | None = None,
+        user_task: str = "",
     ) -> dict:
         work_order = ChiefOfStaffAgent._normalize_work_order(
             data.get("work_order"),
             inferred_jt_requested,
             inferred_dev_pod_requested=inferred_dev_pod_requested,
+            inferred_advisor_pod_requested=inferred_advisor_pod_requested,
             prior_memory=prior_memory,
         )
 
@@ -279,6 +292,7 @@ class ChiefOfStaffAgent:
         raw_work_order: Any,
         inferred_jt_requested: bool,
         inferred_dev_pod_requested: bool = False,
+        inferred_advisor_pod_requested: bool = False,
         prior_memory: dict | None = None,
     ) -> ChiefWorkOrder:
         if not isinstance(raw_work_order, dict):
@@ -313,6 +327,14 @@ class ChiefOfStaffAgent:
         model_dev_pod_requested = dev_pod_requested if isinstance(dev_pod_requested, bool) else False
         dev_pod_requested = bool(inferred_dev_pod_requested) or model_dev_pod_requested
 
+        advisor_pod_requested = raw_work_order.get("advisor_pod_requested")
+        model_advisor_pod_requested = advisor_pod_requested if isinstance(advisor_pod_requested, bool) else False
+        advisor_pod_requested = bool(inferred_advisor_pod_requested) or model_advisor_pod_requested
+
+        # dev_pod and advisor_pod are mutually exclusive; CLI flags take precedence
+        if dev_pod_requested and advisor_pod_requested:
+            advisor_pod_requested = False
+
         return {
             "objective": objective.strip(),
             "deliverable_type": deliverable_type.strip(),
@@ -321,17 +343,18 @@ class ChiefOfStaffAgent:
             "open_questions": [item.strip() for item in open_questions if item.strip()],
             "jt_requested": jt_requested,
             "dev_pod_requested": dev_pod_requested,
+            "advisor_pod_requested": advisor_pod_requested,
         }
 
     @staticmethod
     def _get_work_order(state: SharedState) -> ChiefWorkOrder:
-        from app.state import get_canonical_dev_pod_requested
         existing = state.get("work_order")
         if isinstance(existing, dict):
             return ChiefOfStaffAgent._normalize_work_order(
                 existing,
                 get_canonical_jt_requested(state),
                 inferred_dev_pod_requested=get_canonical_dev_pod_requested(state),
+                inferred_advisor_pod_requested=get_canonical_advisor_pod_requested(state),
                 prior_memory=normalize_project_memory(state.get("project_memory")),
             )
         user_task = state.get("user_task", "")
@@ -346,6 +369,7 @@ class ChiefOfStaffAgent:
             "open_questions": project_memory.get("open_questions", []),
             "jt_requested": get_canonical_jt_requested(state),
             "dev_pod_requested": get_canonical_dev_pod_requested(state),
+            "advisor_pod_requested": get_canonical_advisor_pod_requested(state),
         }
 
     @staticmethod

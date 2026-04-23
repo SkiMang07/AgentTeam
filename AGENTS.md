@@ -2,13 +2,23 @@
 
 ## Project goal
 
-Build a local multi agent system using OpenAI Responses API for model calls and LangGraph for orchestration.
+Build a local multi-agent system using OpenAI Responses API for model calls and LangGraph for orchestration.
 
-This project is an early stage scaffold for an "Agent Team" system with:
-1. Chief of Staff agent
-2. Researcher agent
-3. Writer agent
-4. Human review step
+The system routes tasks through one of three branches:
+
+**Plan** — Chief of Staff → Researcher → Writer → (JT) → Reviewer → CoS Final → Human Review
+**Build** — Chief of Staff → Backend → Frontend → QA → Assemble → Human Review
+**Brainstorm** — Chief of Staff → 5 Advisor Clusters → Advisor Synthesis → Human Review
+
+Current agents:
+1. Chief of Staff — classifies, routes, and runs final validation pass
+2. Researcher — extracts facts and gaps from vault, local files, or web
+3. Writer — drafts output from approved facts
+4. Reviewer — structured QC pass (Plan branch only)
+5. JT — optional challenge/pressure-test modifier (Plan branch only)
+6. Backend, Frontend, QA — developer pod (Build branch)
+7. Advisor (synthesis) + 5 cluster sub-advisors — advisor pod (Brainstorm branch)
+8. Human review step on all branches
 
 ## Build priorities
 
@@ -23,9 +33,9 @@ This project is an early stage scaffold for an "Agent Team" system with:
 
 ## Constraints
 
-1. Do not overengineer version one
+1. Do not overengineer — keep it runnable and understandable locally
 2. Do not add Slack, HubSpot, email, calendar, or database integrations yet
-3. Do not add extra agents beyond Chief of Staff, Researcher, and Writer
+3. Do not add new agents or pods without explicit approval
 4. Do not add a web UI yet
 5. Do not use broad autonomous behavior
 6. Keep all prompts in separate files

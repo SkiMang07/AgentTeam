@@ -6,39 +6,40 @@ This project is the first practical version of an agent team system. The goal is
 
 ## What this does
 
-Version one includes:
+The system routes every task through one of three branches after Chief of Staff:
 
-1. A **Chief of Staff** agent that interprets the task and routes work
-2. A **Researcher** agent that extracts facts and gaps
-3. A **Writer** agent that drafts output using approved facts
-4. A **Reviewer** agent that runs a structured quality-control pass on the draft
-5. An optional **JT** agent stage for explicit JT requests
-6. A **human review** step before finalization
-7. A local **CLI** entry point for testing workflows
+**Plan** — the classic drafting path
+`Chief of Staff → Researcher / Evidence → Writer → (JT) → Reviewer → CoS Final Check → Human Review`
+
+**Build** — the developer pod path
+`Chief of Staff → Pod Entry → Backend → Frontend → QA (bounded revision loop) → Assemble → Human Review`
+
+**Brainstorm** — the advisor pod path
+`Chief of Staff → Advisor Entry → 5 specialist clusters → Advisor Synthesis → Human Review`
+
+The five advisor clusters are: Strategy & Systems (Dalio, Meadows, Senge, Christensen, Moore, Collins, Kahneman), Leadership & Culture (Sinek, Brown, Lencioni, Scott, Meyer, HBR), Communication & Influence (Voss, Duhigg, Duarte, Berger, Gladwell), Growth & Mindset (Clear, Manson, Lakhiani, Grant), and Entrepreneur & Execution (Horowitz, Bet-David, Lawson).
+
+JT is a modifier on the Plan path only — it runs after Writer and before Reviewer when explicitly requested. Web search is a modifier on the Plan path, applied during the Researcher step.
 
 ## Current scope
 
-This is intentionally narrow.
-
-Included in version one:
+Included:
 
 - Python project scaffold
 - OpenAI Responses API model calls
-- LangGraph state graph
+- LangGraph state graph with three routing branches (Plan, Build, Brainstorm)
 - Explicit shared state
 - Prompt files stored separately from code
-- CLI based execution
+- CLI based execution with `--jt`, `--dev-pod`, `--advisor`, `--web-search`, `--files-path` flags
+- Obsidian vault integration for task grounding
+- Session-local project memory
 
 Not included yet:
 
-- HubSpot integration
-- Slack integration
-- email or calendar actions
-- database persistence
-- web UI
-- vector search
-- complex toolchains
-- more than three agents
+- HubSpot, Slack, email, or calendar integrations
+- Database persistence beyond the current CLI session
+- Web UI
+- Vector search or embeddings
 
 ## Why this exists
 
@@ -55,67 +56,59 @@ The system should use small specialized roles, explicit state, and review gates 
 
 agent_team/
   app/
-    main.py
-    graph.py
-    state.py
+    main.py        ← CLI entry point and session loop
+    graph.py       ← LangGraph orchestration, all three branch paths
+    state.py       ← SharedState TypedDict and canonical helper functions
     config.py
   agents/
-    chief_of_staff.py
+    chief_of_staff.py       ← routes to Plan / Build / Brainstorm
     researcher.py
     writer.py
-  tools/
-    openai_client.py
+    reviewer.py
+    jt.py
+    backend.py              ← Build pod
+    frontend.py             ← Build pod
+    qa.py                   ← Build pod
+    advisor.py              ← Brainstorm pod (synthesis)
+    base_sub_advisor.py     ← Brainstorm pod (shared base)
+    strategy_systems_advisor.py
+    leadership_culture_advisor.py
+    communication_influence_advisor.py
+    growth_mindset_advisor.py
+    entrepreneur_execution_advisor.py
   prompts/
     chief_of_staff.md
     researcher.md
     writer.md
+    reviewer.md
+    jt.md
+    backend.md
+    frontend.md
+    qa.md
+    advisor.md
+    strategy_systems_advisor.md
+    leadership_culture_advisor.md
+    communication_influence_advisor.md
+    growth_mindset_advisor.md
+    entrepreneur_execution_advisor.md
+  tools/
+    openai_client.py
+    obsidian_context.py
+    local_file_reader.py
+    voice_loader.py
   requirements.txt
   .env.example
-  README.md
-  AGENTS.md
 
-Agent roles
-Chief of Staff
-
-Responsibilities:
-
-understand the user request
-determine what type of workflow is needed
-route work to the right next step
-keep the process structured
-avoid guessing when research is needed
-Researcher
-
-Responsibilities:
-
-extract factual claims
-identify known gaps
-return structured findings
-separate fact from assumption
-Writer
-
-Responsibilities:
-
-draft output from approved facts
-avoid inventing details
-produce a clean usable deliverable
-stay within the provided evidence
 Workflow shape
 
-The initial workflow is:
+**Plan branch** (default for writing and drafting tasks):
+user submits task → Chief of Staff classifies and routes → Researcher gathers facts → Writer drafts → JT challenge (if requested) → Reviewer QC pass → Chief of Staff final validation → Human Review
 
-user submits task
-Chief of Staff classifies and routes
-Researcher gathers facts if needed
-Writer drafts the response
-Reviewer runs a structured QC pass and returns normalized findings
-JT node runs only when explicitly requested (`--jt`, `--jt-mode advisory`, `--jt-mode full_challenge`, or task text)
-JT returns structured feedback plus a rewritten artifact (`jt_feedback`, `jt_rewrite`) in shared state
-Reviewer validates the JT rewrite artifact on JT paths (and writer draft on non-JT paths)
-Chief of Staff runs a final pass and can request one final redraft
-The final Chief of Staff pass stores a short structured alignment/completeness validation result in shared state
-human review pauses the flow as the final approval gate
-final output is approved or sent back for revision
+**Build branch** (`--dev-pod` flag or task explicitly requests code):
+user submits task → Chief of Staff routes → Pod Entry → Backend → Frontend → QA (bounded revision loop) → Assemble → Human Review
+
+**Brainstorm branch** (`--advisor` flag or task explicitly requests advisor input):
+user submits task → Chief of Staff routes → Advisor Entry → 5 cluster advisors in sequence → Advisor Synthesis → Human Review
 
 Project memory (session-local, explicit, narrow):
 

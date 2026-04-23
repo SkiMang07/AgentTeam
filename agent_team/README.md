@@ -1,4 +1,4 @@
-# Agent Team (v1 scaffold)
+# Agent Team
 
 A local CLI-based multi-agent scaffold using:
 - OpenAI Responses API
@@ -6,51 +6,47 @@ A local CLI-based multi-agent scaffold using:
 - python-dotenv for environment loading
 - Explicit typed shared state
 
+## Routing branches
+
+The system has three branches after Chief of Staff:
+
+**Plan** (default — drafting and writing tasks)
+Chief of Staff → Researcher / Evidence → Writer → (JT if requested) → Reviewer → CoS Final Check → Human Review
+
+**Build** (`--dev-pod` flag or explicit code request)
+Chief of Staff → Pod Entry → Backend → Frontend → QA (bounded revision loop) → Assemble → Human Review
+
+**Brainstorm** (`--advisor` flag or explicit advisor request)
+Chief of Staff → Advisor Entry → 5 specialist clusters → Advisor Synthesis → Human Review
+
 ## Included agents
-1. Chief of Staff
-2. Researcher
-3. Writer
-4. Reviewer
 
-## What v1 does
-- Accepts a user task from CLI input.
-- Chief of Staff creates a structured work order (objective, deliverable type, success criteria, research flag, open questions, JT request) and routes the task.
-- Researcher extracts structured facts and gaps using the work order.
-- Writer drafts output from approved facts and the same work order contract.
-- Reviewer validates the draft against approved facts and the same work order contract.
-- If Reviewer flags issues, the system performs one automatic redraft before human review.
-- Chief of Staff final pass validates alignment to the structured work order before human review.
-- Human review pauses before finalization.
+**Plan branch:** Chief of Staff, Researcher, Writer, Reviewer, JT (optional modifier)
 
-## Project structure
+**Build branch:** Backend, Frontend, QA
 
-```text
-agent_team/
-  app/
-    main.py
-    graph.py
-    state.py
-    config.py
-  agents/
-    chief_of_staff.py
-    researcher.py
-    reviewer.py
-    writer.py
-  tools/
-    openai_client.py
-  prompts/
-    chief_of_staff.md
-    researcher.md
-    reviewer.md
-    writer.md
-  requirements.txt
-  .env.example
-  README.md
+**Brainstorm branch:** Advisor (synthesis), StrategySystemsAdvisor, LeadershipCultureAdvisor, CommunicationInfluenceAdvisor, GrowthMindsetAdvisor, EntrepreneurExecutionAdvisor
+
+## CLI flags
+
+```bash
+python -m app.main "your task"                        # Plan branch (default)
+python -m app.main --jt "your task"                   # Plan with JT challenge stage
+python -m app.main --jt-mode advisory "your task"     # Plan with JT in advisory mode
+python -m app.main --dev-pod "your task"              # Build branch
+python -m app.main --advisor "your task"              # Brainstorm branch
+python -m app.main --web-search "your task"           # Plan with live web search
+python -m app.main --files-path ../file.md "task"     # Plan with local file evidence
+python -m app.main --debug "your task"                # Debug mode (prints node artifacts)
 ```
 
 ## Setup
 
-1. Create and activate a virtual environment.
+1. Create and activate a virtual environment:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate
+   ```
 2. Install dependencies:
    ```bash
    pip install -r requirements.txt
@@ -63,38 +59,21 @@ agent_team/
 
 ## Configuration
 
-Set these environment variables in `.env` (loaded via `python-dotenv`):
+Set these environment variables in `.env`:
 
 - `OPENAI_API_KEY` (required): your OpenAI API key.
-- `OPENAI_MODEL` (optional): model name to use. Defaults to `gpt-4.1-mini`.
-
-The default `OPENAI_MODEL` value is a starter setting for local v1 usage convenience, not a recommendation of the “best” model.
-
-## Run
-
-From `agent_team/`:
-
-```bash
-python -m app.main "Draft a short policy memo about remote work expectations"
-```
-
-Or run without arguments and enter a task interactively:
-
-```bash
-python -m app.main
-```
+- `OPENAI_MODEL` (optional): model name. Defaults to `gpt-4.1-mini`.
+- `OBSIDIAN_VAULT_PATH` (optional): path to your Obsidian vault for task grounding.
+- `VOICE_FILE_PATH` (optional): path to a voice/style guide file for the Writer.
 
 ## Human review step
 
-The graph pauses after draft generation and asks:
-- Approve final output? `[y/N]`
-- Optional revision notes when not approved
-
-If notes are provided, Writer runs one more time with the reviewer note added to approved facts.
-That human-note redraft is then reviewed again by Reviewer before returning to human approval.
+Every branch pauses at Human Review:
+- `Approve final output? [y/N]`
+- Optional revision notes if not approved — Writer re-runs with notes, then re-reviews before returning to approval.
 
 ## Notes
 
-- This is intentionally simple and local.
-- No web app, DB, or external integrations are included in v1.
-- Future iterations can add tool-using research, richer review loops, and persistent state.
+- Intentionally local and CLI-based. No web app, DB, or external integrations.
+- All prompts live in `prompts/` as separate `.md` files — keep them there.
+- SharedState is the single source of truth — all agents read from and write to it.
