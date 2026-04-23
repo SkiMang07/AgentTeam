@@ -6,16 +6,19 @@
     <title>Agent Team UI Prototype v1</title>
     <style>
       :root {
-        --bg: #07090c;
-        --panel: #10141a;
-        --panel-elevated: #151a22;
-        --border: #232a34;
-        --text: #e9edf2;
-        --muted: #9ca6b5;
-        --accent: #4f77a7;
-        --accent-soft: rgba(79, 119, 167, 0.18);
-        --ok: #5d8e65;
-        --warn: #c49d59;
+        --bg: #06080b;
+        --bg-mid: #0b1016;
+        --panel: #0f141c;
+        --panel-elevated: #151c26;
+        --border: #232c39;
+        --border-soft: #1b232e;
+        --text: #e7edf5;
+        --muted: #94a0b0;
+        --accent: #5f82ab;
+        --accent-soft: rgba(95, 130, 171, 0.18);
+        --ok: #64906c;
+        --warn: #bd995d;
+        --danger: #ba6970;
         --radius: 14px;
       }
 
@@ -24,363 +27,603 @@
       body {
         margin: 0;
         font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        background: radial-gradient(circle at top, #0e131a 0%, var(--bg) 44%);
+        background:
+          radial-gradient(circle at 12% 0%, #111824 0%, transparent 44%),
+          radial-gradient(circle at 95% 10%, #0d1520 0%, transparent 42%),
+          linear-gradient(180deg, var(--bg-mid) 0%, var(--bg) 56%);
         color: var(--text);
         min-height: 100vh;
       }
 
       .shell {
-        padding: 20px;
-        height: 100vh;
+        padding: 18px;
+        min-height: 100vh;
         display: grid;
         grid-template-rows: auto 1fr;
-        gap: 14px;
+        gap: 12px;
       }
 
       .topbar {
-        background: rgba(14, 18, 24, 0.7);
+        background: rgba(13, 18, 24, 0.75);
         border: 1px solid var(--border);
         border-radius: 12px;
-        padding: 12px 16px;
+        padding: 12px 15px;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        backdrop-filter: blur(8px);
+        backdrop-filter: blur(10px);
       }
 
       .title {
-        font-size: 14px;
-        letter-spacing: 0.08em;
+        font-size: 12px;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
-        color: var(--muted);
+        color: #b5c2d4;
+      }
+
+      .top-meta {
+        display: flex;
+        align-items: center;
+        gap: 8px;
       }
 
       .badge {
-        border: 1px solid #2c3a4b;
+        border: 1px solid #304157;
         padding: 6px 10px;
         border-radius: 999px;
         font-size: 12px;
-        color: #c8d6e8;
+        color: #d1dded;
         background: var(--accent-soft);
+      }
+
+      .badge.ghost {
+        border-color: var(--border);
+        color: var(--muted);
+        background: rgba(11, 15, 20, 0.75);
       }
 
       .grid {
         display: grid;
-        grid-template-columns: 1.25fr 1fr 1.2fr;
-        gap: 14px;
+        grid-template-columns: 1.25fr 1fr 1.26fr;
+        gap: 12px;
         min-height: 0;
       }
 
       .panel {
-        background: linear-gradient(180deg, rgba(21, 26, 34, 0.96), rgba(15, 19, 25, 0.94));
         border: 1px solid var(--border);
         border-radius: var(--radius);
-        padding: 16px;
+        background: linear-gradient(180deg, rgba(20, 27, 37, 0.97), rgba(13, 18, 24, 0.95));
+        padding: 14px;
         display: flex;
         flex-direction: column;
         min-height: 0;
+        box-shadow: 0 16px 30px rgba(2, 5, 9, 0.24);
       }
 
       .panel h2 {
-        margin: 0 0 14px;
-        font-size: 14px;
-        letter-spacing: 0.05em;
+        margin: 0 0 12px;
+        font-size: 12px;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
-        color: #cfd6df;
+        color: #c6d1df;
       }
 
-      .stack { display: flex; flex-direction: column; gap: 12px; }
+      .stack { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+
+      .section {
+        border: 1px solid var(--border-soft);
+        background: rgba(8, 12, 17, 0.76);
+        border-radius: 11px;
+        padding: 10px;
+      }
+
+      .section-title {
+        margin: 0 0 8px;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #9eaab9;
+      }
 
       label {
         display: block;
-        font-size: 12px;
+        font-size: 11px;
         color: var(--muted);
-        margin-bottom: 6px;
+        margin-bottom: 5px;
       }
 
       textarea, select, input {
         width: 100%;
-        background: #0c1015;
-        border: 1px solid #202631;
-        border-radius: 10px;
+        border: 1px solid #1f2a37;
+        border-radius: 9px;
+        background: #0a1017;
         color: var(--text);
-        padding: 10px 12px;
+        padding: 9px 10px;
       }
 
-      textarea { min-height: 160px; resize: vertical; }
+      textarea { min-height: 118px; resize: vertical; }
 
       .row {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 10px;
+        gap: 8px;
       }
 
-      .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+      .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
       .chip {
-        border: 1px solid #2a3340;
-        background: #0c1118;
-        color: #c3ccd8;
-        font-size: 12px;
-        padding: 6px 10px;
+        border: 1px solid #2a3545;
+        background: #0b111a;
         border-radius: 999px;
+        padding: 5px 9px;
+        font-size: 11px;
+        color: #bac7d8;
       }
 
-      .run-btn {
-        margin-top: auto;
-        border: 1px solid #4c6790;
-        background: linear-gradient(180deg, #4d6e98, #3f5d84);
-        color: #f1f5fb;
-        border-radius: 10px;
-        padding: 12px 14px;
-        font-weight: 600;
+      .chip.file::before { content: "📄 "; }
+
+      .toggle-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .switch {
+        position: relative;
+        width: 38px;
+        height: 22px;
+      }
+
+      .switch input { opacity: 0; width: 0; height: 0; }
+
+      .slider {
+        position: absolute;
+        inset: 0;
+        border-radius: 999px;
+        background: #253243;
+        transition: background 180ms ease;
         cursor: pointer;
-        transition: transform 160ms ease, box-shadow 180ms ease;
       }
 
-      .run-btn:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 0 0 1px #5d7ca6 inset, 0 10px 24px rgba(79, 119, 167, 0.2);
+      .slider:before {
+        content: "";
+        position: absolute;
+        height: 16px;
+        width: 16px;
+        left: 3px;
+        top: 3px;
+        border-radius: 999px;
+        background: #d8e3f1;
+        transition: transform 180ms ease;
+      }
+
+      .switch input:checked + .slider {
+        background: #496a93;
+      }
+
+      .switch input:checked + .slider:before {
+        transform: translateX(16px);
       }
 
       .status-inline {
         font-size: 12px;
+        color: #afbccd;
+      }
+
+      .run-btn {
+        margin-top: auto;
+        border: 1px solid #51709b;
+        border-radius: 10px;
+        background: linear-gradient(180deg, #53729a, #435f84);
+        color: #eef4fb;
+        font-weight: 600;
+        padding: 11px;
+        cursor: pointer;
+      }
+
+      .run-btn:hover {
+        box-shadow: 0 0 0 1px rgba(110, 145, 189, 0.44) inset, 0 12px 26px rgba(48, 73, 103, 0.34);
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .metric {
+        border: 1px solid var(--border-soft);
+        background: rgba(9, 14, 20, 0.72);
+        border-radius: 10px;
+        padding: 9px;
+      }
+
+      .metric small {
         color: var(--muted);
+        display: block;
+        font-size: 11px;
+      }
+
+      .metric strong {
+        color: #d3deed;
+        font-size: 13px;
       }
 
       .rail-wrap {
         overflow-y: auto;
-        padding-right: 4px;
+        padding-right: 3px;
       }
 
       .active-agent {
-        border: 1px solid #334157;
-        background: #121923;
+        margin-bottom: 10px;
+        border: 1px solid #2f3f53;
+        background: #121a25;
         border-radius: 10px;
-        padding: 10px 12px;
-        margin-bottom: 12px;
+        padding: 10px;
+        font-size: 13px;
       }
 
       .agent-list {
         position: relative;
         margin-left: 10px;
-        padding-left: 18px;
+        padding-left: 16px;
       }
 
       .agent-list::before {
         content: "";
         position: absolute;
-        left: 5px;
+        left: 4px;
         top: 4px;
         bottom: 4px;
         width: 2px;
-        background: linear-gradient(180deg, #3f4f63, #29313c);
+        background: linear-gradient(180deg, #425162, #2b3440);
       }
 
       .agent-card {
         position: relative;
-        border: 1px solid #27303b;
-        background: #0f141b;
+        border: 1px solid #263140;
+        background: #0d141d;
         border-radius: 10px;
-        padding: 10px;
-        margin-bottom: 10px;
+        padding: 9px;
+        margin-bottom: 8px;
         cursor: pointer;
         transition: border-color 160ms ease, background 160ms ease;
       }
 
-      .agent-card:hover { border-color: #3d4e65; background: #121924; }
       .agent-card::before {
         content: "";
         position: absolute;
-        width: 10px;
-        height: 10px;
+        width: 9px;
+        height: 9px;
         border-radius: 999px;
-        left: -19px;
-        top: 14px;
-        border: 2px solid #364151;
-        background: #0f141b;
+        left: -17px;
+        top: 12px;
+        border: 2px solid #415063;
+        background: #0d141d;
       }
 
+      .agent-card:hover { border-color: #3d4f67; background: #101a26; }
       .agent-card.active {
-        border-color: #4b6589;
-        box-shadow: 0 0 0 1px rgba(79, 119, 167, 0.4) inset;
+        border-color: #4f6b8f;
         animation: pulse 1.8s ease-in-out infinite;
       }
-      .agent-card.complete { border-color: #35503a; }
+      .agent-card.complete { border-color: #365340; }
       .agent-card.waiting { opacity: 0.9; }
-      .agent-card.active::before { border-color: #6f91bb; background: #6f91bb; }
+      .agent-card.skipped { border-color: #4f5967; opacity: 0.66; }
+
+      .agent-card.active::before { border-color: #7396c2; background: #7396c2; }
       .agent-card.complete::before { border-color: var(--ok); background: var(--ok); }
-      .agent-card.waiting::before { border-color: #687585; }
+      .agent-card.waiting::before { border-color: #5f6d80; }
+      .agent-card.skipped::before { border-color: #6f7786; background: transparent; }
 
       .agent-head {
         display: flex;
         justify-content: space-between;
-        font-size: 12px;
+        font-size: 11px;
         color: var(--muted);
+        margin-bottom: 5px;
+      }
+
+      .agent-name { font-size: 13px; margin-bottom: 4px; }
+      .agent-summary { font-size: 11px; color: #b7c2d0; line-height: 1.42; }
+
+      .detail-card {
+        border: 1px solid var(--border-soft);
+        border-radius: 11px;
+        padding: 10px;
+        background: rgba(10, 15, 21, 0.78);
+        margin-bottom: 10px;
+      }
+
+      .detail-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 7px;
+      }
+
+      .detail-title strong { font-size: 13px; }
+
+      .pill {
+        border: 1px solid #2f3e52;
+        border-radius: 999px;
+        padding: 3px 8px;
+        font-size: 10px;
+        color: #c8d6e7;
+      }
+
+      .detail-card ul {
+        margin: 0;
+        padding-left: 15px;
+        font-size: 11px;
+        color: #b5c0cf;
+        line-height: 1.45;
+      }
+
+      .tabs, .subtabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 10px;
+      }
+
+      .tab, .subtab {
+        border: 1px solid #2b3646;
+        background: #0d131b;
+        color: #c1cddd;
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 11px;
+        cursor: pointer;
+      }
+
+      .tab.active, .subtab.active {
+        border-color: #52719a;
+        background: rgba(95, 130, 171, 0.22);
+      }
+
+      .output-wrap {
+        border: 1px solid #1f2a37;
+        border-radius: 12px;
+        background: #0a1017;
+        min-height: 275px;
+        overflow: auto;
+        padding: 12px;
+        font-size: 12px;
+      }
+
+      .output-view.hidden,
+      .artifact-view.hidden,
+      .download-state.hidden,
+      .qc-state.hidden,
+      .approval-state.hidden { display: none; }
+
+      .doc h3 {
+        margin: 0 0 10px;
+        font-size: 12px;
+        color: #d3ddeb;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .doc .sec {
+        margin-bottom: 10px;
+        border-top: 1px solid #1d2733;
+        padding-top: 9px;
+      }
+
+      .doc .sec:first-child {
+        border-top: none;
+        padding-top: 0;
+      }
+
+      .doc .sec-title {
+        color: #aac0da;
+        font-size: 11px;
         margin-bottom: 6px;
       }
 
-      .agent-name { font-size: 14px; color: var(--text); margin-bottom: 4px; }
-      .agent-summary { font-size: 12px; color: #b4becb; line-height: 1.45; }
-
-      .tabs {
-        display: flex;
-        gap: 8px;
-        margin-bottom: 12px;
+      .doc p {
+        margin: 0;
+        color: #d6dfec;
+        line-height: 1.5;
       }
 
-      .tab {
-        font-size: 12px;
-        color: #bcc8d8;
-        border: 1px solid #2a3443;
-        background: #0d1219;
-        border-radius: 999px;
-        padding: 6px 10px;
-        cursor: pointer;
+      .doc ul {
+        margin: 0;
+        padding-left: 15px;
+        color: #d6dfec;
+        line-height: 1.45;
       }
-      .tab.active {
-        border-color: #4b6790;
-        background: rgba(79, 119, 167, 0.22);
-      }
-
-      .output-view {
-        border: 1px solid #222b36;
-        border-radius: 12px;
-        background: #0c1118;
-        padding: 14px;
-        min-height: 240px;
-        overflow: auto;
-        font-size: 13px;
-        line-height: 1.55;
-      }
-
-      .hidden { display: none; }
 
       .file-card {
-        border: 1px solid #2f3a4a;
+        border: 1px solid #324357;
         border-radius: 10px;
         padding: 10px;
-        background: #101723;
-        margin-top: 12px;
+        background: #101924;
       }
 
-      .controls {
-        margin-top: 12px;
+      .file-meta {
+        font-size: 11px;
+        color: #a8b7ca;
+      }
+
+      .qc-banner {
+        border: 1px solid #876f46;
+        background: rgba(189, 153, 93, 0.14);
+        color: #dbc8a7;
+        padding: 9px;
+        border-radius: 9px;
+        margin-bottom: 10px;
+      }
+
+      .approval-actions {
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
       }
 
       .btn {
-        border: 1px solid #2f3a4a;
-        background: #111824;
-        color: #d5deeb;
+        border: 1px solid #2e3d50;
         border-radius: 9px;
-        padding: 8px 12px;
-        font-size: 12px;
+        background: #101724;
+        color: #d4dfee;
+        font-size: 11px;
+        padding: 7px 11px;
         cursor: pointer;
       }
 
       .btn.primary {
-        border-color: #4a688f;
-        background: #1a2638;
+        border-color: #4d6990;
+        background: #1a2536;
+      }
+
+      .btn.warn {
+        border-color: #8f774d;
+        background: #2b2418;
+        color: #e3d2b6;
       }
 
       @keyframes pulse {
-        0%, 100% { box-shadow: 0 0 0 1px rgba(79, 119, 167, 0.38) inset; }
-        50% { box-shadow: 0 0 0 1px rgba(113, 148, 191, 0.62) inset, 0 0 22px rgba(79, 119, 167, 0.16); }
+        0%, 100% { box-shadow: 0 0 0 1px rgba(95, 130, 171, 0.34) inset; }
+        50% { box-shadow: 0 0 0 1px rgba(122, 158, 203, 0.6) inset, 0 0 20px rgba(82, 113, 154, 0.14); }
       }
 
-      @media (max-width: 1180px) {
+      @media (max-width: 1200px) {
         .grid { grid-template-columns: 1fr; }
-        .shell { height: auto; min-height: 100vh; }
       }
     </style>
   </head>
   <body>
     <main class="shell">
       <div class="topbar">
-        <div class="title">Agent Team / Local Operator Console / Prototype v1</div>
-        <div class="badge" id="runState">Idle</div>
+        <div class="title">Agent Team · Local Operator Console · Static Prototype</div>
+        <div class="top-meta">
+          <div class="badge ghost">Session memory aware</div>
+          <div class="badge" id="runState">Idle</div>
+        </div>
       </div>
 
       <section class="grid">
         <article class="panel">
           <h2>Prompt</h2>
           <div class="stack">
-            <div>
-              <label for="request">Request</label>
-              <textarea id="request">Draft a project status update for the AgentTeam repository. Include current phase, key wins from this week, unresolved risks, and what needs explicit human review before final sign-off.</textarea>
+            <div class="section">
+              <p class="section-title">Run request</p>
+              <label for="request">Request input</label>
+              <textarea id="request">Create an executive brief for the AgentTeam repository that summarizes current phase, concrete wins, open questions, and what requires explicit human approval before release.</textarea>
             </div>
-            <div class="row">
+
+            <div class="section row">
               <div>
-                <label for="deliverable">Deliverable Type</label>
+                <label for="deliverable">Deliverable type</label>
                 <select id="deliverable">
-                  <option>Executive Brief</option>
-                  <option selected>Project Status Update</option>
+                  <option selected>Executive Brief</option>
                   <option>Decision Memo</option>
-                  <option>Risk and Gaps</option>
+                  <option>Project Plan</option>
+                  <option>Plain Response</option>
                 </select>
               </div>
               <div>
                 <label for="tone">Tone</label>
                 <select id="tone">
-                  <option>Neutral / Operational</option>
                   <option selected>Concise / Leadership</option>
+                  <option>Neutral / Operational</option>
                   <option>Analytical</option>
                 </select>
               </div>
             </div>
-            <div>
-              <label for="context">Context</label>
-              <input id="context" value="Local-first workflow, explicit typed state, CLI currently primary interface, human review is final gate." />
-            </div>
-            <div>
-              <label>Attached Evidence</label>
+
+            <div class="section">
+              <p class="section-title">Context and evidence</p>
+              <label for="context">Optional context</label>
+              <input id="context" value="Local-first CLI workflow with explicit typed state, structured work order, reviewer findings, and human review gate." />
+              <div style="height:8px"></div>
+              <label>Selected local files (mocked)</label>
               <div class="chips">
-                <span class="chip">README.md</span>
-                <span class="chip">PROJECT_PLAN.md</span>
-                <span class="chip">VAULT_CLAUDE.md</span>
+                <span class="chip file">README.md</span>
+                <span class="chip file">PROJECT_PLAN.md</span>
+                <span class="chip file">agent_team/prompts/artifacts/executive_brief.md</span>
+                <span class="chip file">agent_team/prompts/artifacts/decision_memo.md</span>
               </div>
             </div>
-            <div class="status-inline" id="promptStatus">Ready to run mock execution.</div>
+
+            <div class="section">
+              <p class="section-title">Run controls</p>
+              <div class="toggle-row">
+                <span>JT stage requested</span>
+                <label class="switch"><input id="jtToggle" type="checkbox" checked /><span class="slider"></span></label>
+              </div>
+              <div class="toggle-row" style="margin-top:7px;">
+                <span>Optional web search</span>
+                <label class="switch"><input id="webToggle" type="checkbox" /><span class="slider"></span></label>
+              </div>
+              <div class="toggle-row" style="margin-top:7px;">
+                <span>Session memory continuity</span>
+                <label class="switch"><input id="memoryToggle" type="checkbox" checked /><span class="slider"></span></label>
+              </div>
+            </div>
+
+            <div class="status-inline" id="promptStatus">Ready. Configure a structured run and execute the mock pipeline.</div>
           </div>
           <button class="run-btn" id="runBtn">Run Agent Team</button>
         </article>
 
         <article class="panel">
           <h2>Agent Team</h2>
-          <div class="active-agent"><strong>Active:</strong> <span id="activeLabel">Chief of Staff</span></div>
+          <div class="active-agent"><strong>Active agent:</strong> <span id="activeLabel">Chief of Staff</span></div>
+
+          <div class="summary-grid" style="margin-bottom:10px;">
+            <div class="metric"><small>Route</small><strong id="routeLabel">Plan → Research → Draft</strong></div>
+            <div class="metric"><small>Research needed</small><strong id="researchLabel">Yes</strong></div>
+            <div class="metric"><small>JT requested</small><strong id="jtLabel">Yes</strong></div>
+            <div class="metric"><small>Human review</small><strong id="humanLabel">Pending</strong></div>
+          </div>
+
+          <div class="detail-card" id="focusCard">
+            <div class="detail-title">
+              <strong>Work order snapshot</strong>
+              <span class="pill" id="focusPill">Chief of Staff</span>
+            </div>
+            <ul id="focusList">
+              <li>Objective: deliver executive-ready summary grounded in local evidence.</li>
+              <li>Deliverable type: executive_brief.</li>
+              <li>Open question: should unresolved risks trigger revise or approve-with-notes.</li>
+            </ul>
+          </div>
+
           <div class="rail-wrap">
             <div class="agent-list" id="agentList">
               <div class="agent-card active" data-step="cos">
                 <div class="agent-head"><span>Step 1</span><span>active</span></div>
                 <div class="agent-name">Chief of Staff</div>
-                <div class="agent-summary">Normalizing request into a typed work order and deciding whether research is required.</div>
+                <div class="agent-summary">Creates structured work order, sets route, and preserves JT/web-search intent.</div>
               </div>
               <div class="agent-card waiting" data-step="researcher">
                 <div class="agent-head"><span>Step 2</span><span>waiting</span></div>
                 <div class="agent-name">Researcher</div>
-                <div class="agent-summary">Extracting approved facts from selected local files and identifying open questions.</div>
+                <div class="agent-summary">Builds approved facts from local files, Obsidian context, and optional web search.</div>
               </div>
               <div class="agent-card waiting" data-step="writer">
                 <div class="agent-head"><span>Step 3</span><span>waiting</span></div>
                 <div class="agent-name">Writer</div>
-                <div class="agent-summary">Drafting the requested artifact with evidence-backed claims only.</div>
+                <div class="agent-summary">Drafts artifact using selected template and evidence-backed claims only.</div>
               </div>
               <div class="agent-card waiting" data-step="reviewer">
                 <div class="agent-head"><span>Step 4</span><span>waiting</span></div>
                 <div class="agent-name">Reviewer</div>
-                <div class="agent-summary">Checking unsupported claims, missing content, and structural quality.</div>
+                <div class="agent-summary">Runs QC contract: missing content, unsupported claims, logic issues, next action.</div>
               </div>
               <div class="agent-card waiting" data-step="jt">
                 <div class="agent-head"><span>Optional</span><span>waiting</span></div>
-                <div class="agent-name">JT (optional)</div>
-                <div class="agent-summary">Runs only on explicit request to challenge and refine the draft.</div>
+                <div class="agent-name">JT</div>
+                <div class="agent-summary">Challenge/rewrite stage; only runs when explicitly requested.</div>
               </div>
               <div class="agent-card waiting" data-step="human">
-                <div class="agent-head"><span>Final Gate</span><span>waiting</span></div>
+                <div class="agent-head"><span>Final gate</span><span>waiting</span></div>
                 <div class="agent-name">Human Review</div>
-                <div class="agent-summary">Explicit approval step before finalization. No autonomous publish.</div>
+                <div class="agent-summary">Final explicit approval or revise decision before accepted output.</div>
               </div>
             </div>
           </div>
@@ -389,38 +632,100 @@
         <article class="panel">
           <h2>Output</h2>
           <div class="tabs">
-            <button class="tab active" data-target="textState">Response</button>
-            <button class="tab" data-target="artifactState">Artifact Preview</button>
+            <button class="tab active" data-target="textState">Plain response</button>
+            <button class="tab" data-target="artifactState">Artifact preview</button>
+            <button class="tab" data-target="downloadState">Downloadable file</button>
+            <button class="tab" data-target="qcState">Reviewer / QC</button>
+            <button class="tab" data-target="approvalState">Approval</button>
           </div>
 
-          <div class="output-view" id="textState">
-            <strong>Status Summary</strong><br />
-            Run prepared. Press <em>Run Agent Team</em> to simulate progression through Chief of Staff → Researcher → Writer → Reviewer → Human Review.
-          </div>
-
-          <div class="output-view hidden" id="artifactState">
-            <strong># Project Status Update</strong><br /><br />
-            ## Current Phase<br />
-            Phase 2 remains stable: tooling is integrated and the execution path is deterministic. The current emphasis is improving artifact quality while preserving explicit state contracts.<br /><br />
-            ## Key Wins<br />
-            - Structured handoffs are consistent across core agents.<br />
-            - Human review remains a required final gate.<br />
-            - CLI flow stays inspectable and local-first.<br /><br />
-            ## Open Risks<br />
-            - Artifact consistency for risk-and-gaps output is still pending.<br />
-            - Documentation drift risk increases as implementation evolves quickly.
-
-            <div class="file-card">
-              <strong>Downloadable File</strong><br />
-              `agent_status_update_draft.md` · 12 KB · generated locally
+          <div class="output-wrap">
+            <div class="output-view" id="textState">
+              <strong>Run summary</strong>
+              <p style="margin:8px 0 0; color:#cdd8e7; line-height:1.5;">
+                Local run initialized. Press <em>Run Agent Team</em> to simulate planning, routing, drafting, review, optional JT, and human approval.
+              </p>
             </div>
-          </div>
 
-          <div class="controls">
-            <button class="btn primary">Approve</button>
-            <button class="btn">Revise</button>
-            <button class="btn">Copy</button>
-            <button class="btn">Download</button>
+            <div class="output-view hidden" id="artifactState">
+              <div class="subtabs">
+                <button class="subtab active" data-artifact="executive">Executive Brief</button>
+                <button class="subtab" data-artifact="decision">Decision Memo</button>
+                <button class="subtab" data-artifact="plan">Project Plan</button>
+              </div>
+
+              <div class="artifact-view" id="artifactExecutive">
+                <div class="doc">
+                  <h3>Executive Brief (preview)</h3>
+                  <div class="sec"><div class="sec-title"><strong>PROBLEM</strong></div><p>The project can run end-to-end, but output quality still varies when tools are present yet underutilized in final drafting.</p></div>
+                  <div class="sec"><div class="sec-title"><strong>RECOMMENDATION</strong></div><p>Preserve the current local-first architecture and prioritize artifact-consistency hardening before adding any new integrations.</p></div>
+                  <div class="sec"><div class="sec-title"><strong>RATIONALE</strong></div><p>The current scaffold already has structured work orders, reviewer findings, optional JT routing, and human review. Tightening artifact behavior delivers immediate value without widening scope.</p></div>
+                  <div class="sec"><div class="sec-title"><strong>RISKS</strong></div><ul><li>Risk-and-gaps artifact type remains incomplete.</li><li>Prompt and plan docs can drift from implemented behavior.</li><li>Web search value may remain low for local-only tasks.</li></ul></div>
+                  <div class="sec"><div class="sec-title"><strong>NEXT STEPS</strong></div><ul><li>Complete the remaining risk-and-gaps artifact template.</li><li>Run reviewer-focused regression checks across artifact types.</li><li>Require explicit human decision on approve vs revise for each run.</li></ul></div>
+                </div>
+              </div>
+
+              <div class="artifact-view hidden" id="artifactDecision">
+                <div class="doc">
+                  <h3>Decision Memo (preview)</h3>
+                  <div class="sec"><div class="sec-title"><strong>CONTEXT</strong></div><p>The repo now includes multiple artifact templates and optional tool paths. The unresolved decision is whether to add new capabilities or consolidate quality first.</p></div>
+                  <div class="sec"><div class="sec-title"><strong>DECISION</strong></div><p>The recommendation is to focus on artifact quality and workflow clarity before expanding system scope.</p></div>
+                  <div class="sec"><div class="sec-title"><strong>OPTIONS CONSIDERED</strong></div><ul><li>Add more agents and integrations now — rejected due to scope and reliability risk.</li><li>Ship a UI-backed runtime immediately — rejected because the project remains CLI-first.</li><li>Harden current templates and routing contracts — selected.</li></ul></div>
+                  <div class="sec"><div class="sec-title"><strong>RECOMMENDATION</strong></div><p>Consolidation provides the best near-term leverage: it improves trust in outputs and keeps the system inspectable while preserving extension paths for future phases.</p></div>
+                  <div class="sec"><div class="sec-title"><strong>IMPLICATIONS</strong></div><ul><li>Near-term velocity shifts to quality work, not feature expansion.</li><li>Reviewer and human gate remain explicit control points.</li><li>If reversed later, integration work can resume from a stronger base.</li></ul></div>
+                </div>
+              </div>
+
+              <div class="artifact-view hidden" id="artifactPlan">
+                <div class="doc">
+                  <h3>Project Plan (preview)</h3>
+                  <div class="sec"><div class="sec-title"><strong>OBJECTIVE</strong></div><p>Deliver a reliable local multi-agent workflow that produces structured artifacts and keeps human approval as a hard release gate.</p></div>
+                  <div class="sec"><div class="sec-title"><strong>CURRENT STATE</strong></div><p>Core workflow is operational with Chief of Staff, Researcher, Writer, Reviewer, optional JT, and human review. Tool integrations exist but are still being tuned for stronger artifact impact.</p></div>
+                  <div class="sec"><div class="sec-title"><strong>WORKSTREAMS / MILESTONES</strong></div><ul><li><strong>Core workflow hardening</strong> — deterministic routing and reviewer contracts are largely complete; human-step clarity still in progress.</li><li><strong>Artifact quality</strong> — executive brief, decision memo, and project plan templates are complete; risk-and-gaps remains open.</li><li><strong>Tool effectiveness</strong> — routing and voice fixes landed; quality verification loop is active.</li></ul></div>
+                  <div class="sec"><div class="sec-title"><strong>OPEN QUESTIONS</strong></div><ul><li>How should revise-vs-approve thresholds be standardized across reviewers?</li><li>What minimum evidence standard should be required for web-grounded claims?</li></ul></div>
+                  <div class="sec"><div class="sec-title"><strong>RISKS</strong></div><ul><li>Documentation drift may confuse routing expectations and artifact behavior.</li><li>Adding scope too early could reduce reliability and review quality.</li><li>Overweighting optional tools might degrade local-first simplicity.</li></ul></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="output-view hidden download-state" id="downloadState">
+              <div class="file-card">
+                <strong>agent_team_executive_brief.md</strong>
+                <div class="file-meta" style="margin-top:6px;">Artifact: executive_brief · Source: local run #184 · Size: 18 KB</div>
+                <div class="file-meta" style="margin-top:5px;">Includes reviewer findings appendix and structured work-order metadata.</div>
+                <div class="approval-actions" style="margin-top:10px;">
+                  <button class="btn">Download .md</button>
+                  <button class="btn">Copy path</button>
+                  <button class="btn">Open folder</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="output-view hidden qc-state" id="qcState">
+              <div class="qc-banner" id="reviewerBanner">Reviewer result: revise recommended — unsupported claim check failed for one line.</div>
+              <div class="doc">
+                <div class="sec"><div class="sec-title"><strong>Overall assessment</strong></div><p>Strong structure and tone alignment, but one claim about schedule certainty lacks explicit evidence linkage.</p></div>
+                <div class="sec"><div class="sec-title"><strong>Missing content</strong></div><ul><li>Explicit statement of what requires human sign-off.</li></ul></div>
+                <div class="sec"><div class="sec-title"><strong>Unsupported claims</strong></div><ul><li>"Tooling is fully verified" should be softened to "tooling is integrated and under active verification."</li></ul></div>
+                <div class="sec"><div class="sec-title"><strong>Recommended next action</strong></div><p id="reviewAction">revise</p></div>
+              </div>
+              <div class="approval-actions" style="margin-top:10px;">
+                <button class="btn warn" id="setRevise">Set Revise</button>
+                <button class="btn primary" id="setApprove">Set Approve</button>
+              </div>
+            </div>
+
+            <div class="output-view hidden approval-state" id="approvalState">
+              <div class="doc">
+                <div class="sec"><div class="sec-title"><strong>Human review checkpoint</strong></div><p>This run is paused for explicit approval. Select <em>Approve</em> to finalize local artifact or <em>Revise</em> to route back for another draft cycle.</p></div>
+                <div class="sec"><div class="sec-title"><strong>Decision log</strong></div><p id="approvalLog">No decision recorded yet.</p></div>
+              </div>
+              <div class="approval-actions" style="margin-top:10px;">
+                <button class="btn primary" id="approveBtn">Approve run</button>
+                <button class="btn warn" id="reviseBtn">Send to revise</button>
+                <button class="btn">Copy reviewer notes</button>
+              </div>
+            </div>
           </div>
         </article>
       </section>
@@ -431,36 +736,60 @@
       const runState = document.getElementById('runState');
       const promptStatus = document.getElementById('promptStatus');
       const activeLabel = document.getElementById('activeLabel');
+      const routeLabel = document.getElementById('routeLabel');
+      const researchLabel = document.getElementById('researchLabel');
+      const jtLabel = document.getElementById('jtLabel');
+      const humanLabel = document.getElementById('humanLabel');
+      const focusPill = document.getElementById('focusPill');
+      const focusList = document.getElementById('focusList');
       const cards = [...document.querySelectorAll('.agent-card')];
       const tabs = [...document.querySelectorAll('.tab')];
       const views = [...document.querySelectorAll('.output-view')];
+      const artifactTabs = [...document.querySelectorAll('.subtab')];
+      const artifactViews = [...document.querySelectorAll('.artifact-view')];
 
-      const orderedSteps = ['cos', 'researcher', 'writer', 'reviewer', 'human'];
+      const jtToggle = document.getElementById('jtToggle');
+      const webToggle = document.getElementById('webToggle');
+
+      const stepDetails = {
+        cos: ['Objective normalized into structured work order.', 'Deliverable mapped to selected artifact template.', 'Route resolved using research_needed + jt_requested.'],
+        researcher: ['Approved facts extracted from local file evidence.', 'Obsidian context applied for project continuity.', 'Optional web search used only when toggled.'],
+        writer: ['Draft assembled against artifact format rules.', 'Claims constrained to approved facts and explicit assumptions.', 'Tone aligned with selected request controls.'],
+        reviewer: ['QC contract completed: missing content, unsupported claims, logic checks.', 'recommended_next_action set from structured findings.', 'Human gate required before finalization.'],
+        jt: ['JT challenge stage executed from explicit request.', 'Feedback + rewrite attached as optional structured artifacts.', 'Reviewer re-validates JT output before handoff.'],
+        human: ['Human reviewer selects approve or revise.', 'Approved output written as local artifact.', 'Session memory fields updated after approval only.']
+      };
+
       const labels = {
         cos: 'Chief of Staff',
         researcher: 'Researcher',
         writer: 'Writer',
         reviewer: 'Reviewer',
-        jt: 'JT (optional)',
+        jt: 'JT',
         human: 'Human Review'
       };
 
       function setCardState(step, state) {
         const card = cards.find(c => c.dataset.step === step);
         if (!card) return;
-        card.classList.remove('active', 'complete', 'waiting');
+        card.classList.remove('active', 'complete', 'waiting', 'skipped');
         card.classList.add(state);
         card.querySelector('.agent-head span:last-child').textContent = state;
+      }
+
+      function setFocus(step) {
+        activeLabel.textContent = labels[step];
+        focusPill.textContent = labels[step];
+        const lines = stepDetails[step] || [];
+        focusList.innerHTML = lines.map(line => `<li>${line}</li>`).join('');
       }
 
       cards.forEach(card => {
         card.addEventListener('click', () => {
           const step = card.dataset.step;
-          activeLabel.textContent = labels[step];
+          setFocus(step);
           if (step === 'reviewer' || step === 'human') {
-            tabs.find(t => t.dataset.target === 'artifactState').click();
-          } else {
-            tabs.find(t => t.dataset.target === 'textState').click();
+            tabs.find(t => t.dataset.target === 'qcState').click();
           }
         });
       });
@@ -474,23 +803,69 @@
         });
       });
 
+      artifactTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+          artifactTabs.forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          artifactViews.forEach(v => v.classList.add('hidden'));
+          document.getElementById(`artifact${tab.dataset.artifact.charAt(0).toUpperCase()}${tab.dataset.artifact.slice(1)}`).classList.remove('hidden');
+        });
+      });
+
+      document.getElementById('setApprove').addEventListener('click', () => {
+        document.getElementById('reviewerBanner').textContent = 'Reviewer result: approve recommended — draft meets structured QC requirements.';
+        document.getElementById('reviewAction').textContent = 'approve';
+      });
+
+      document.getElementById('setRevise').addEventListener('click', () => {
+        document.getElementById('reviewerBanner').textContent = 'Reviewer result: revise recommended — unsupported claim check failed for one line.';
+        document.getElementById('reviewAction').textContent = 'revise';
+      });
+
+      document.getElementById('approveBtn').addEventListener('click', () => {
+        runState.textContent = 'Approved';
+        humanLabel.textContent = 'Approved';
+        document.getElementById('approvalLog').textContent = 'Approved by Human Review at 14:18 UTC. Final artifact eligible for export.';
+      });
+
+      document.getElementById('reviseBtn').addEventListener('click', () => {
+        runState.textContent = 'Revision Requested';
+        humanLabel.textContent = 'Revise requested';
+        document.getElementById('approvalLog').textContent = 'Revision requested by Human Review: tighten unsupported claims and resubmit.';
+      });
+
       runBtn.addEventListener('click', async () => {
+        const jtEnabled = jtToggle.checked;
+        const webEnabled = webToggle.checked;
+        const orderedSteps = jtEnabled
+          ? ['cos', 'researcher', 'writer', 'jt', 'reviewer', 'human']
+          : ['cos', 'researcher', 'writer', 'reviewer', 'human'];
+
         runState.textContent = 'Running';
         promptStatus.textContent = 'Mock execution in progress...';
+        routeLabel.textContent = jtEnabled ? 'Plan → Research → Draft → JT → QC' : 'Plan → Research → Draft → QC';
+        researchLabel.textContent = 'Yes';
+        jtLabel.textContent = jtEnabled ? 'Yes' : 'No';
+        humanLabel.textContent = 'Pending';
 
-        cards.forEach(c => setCardState(c.dataset.step, c.dataset.step === 'jt' ? 'waiting' : 'waiting'));
-        setCardState('jt', 'waiting');
+        cards.forEach(c => setCardState(c.dataset.step, 'waiting'));
+        if (!jtEnabled) {
+          setCardState('jt', 'skipped');
+        }
 
-        for (let i = 0; i < orderedSteps.length; i += 1) {
-          const step = orderedSteps[i];
+        for (const step of orderedSteps) {
           setCardState(step, 'active');
-          activeLabel.textContent = labels[step];
-          await new Promise(r => setTimeout(r, 700));
-          setCardState(step, 'complete');
+          setFocus(step);
+          await new Promise(resolve => setTimeout(resolve, 580));
+          if (step !== 'human') {
+            setCardState(step, 'complete');
+          }
         }
 
         runState.textContent = 'Awaiting Human Approval';
-        promptStatus.textContent = 'Run complete. Human Review is the required final gate.';
+        promptStatus.textContent = webEnabled
+          ? 'Run complete. Research included optional web search. Human review required.'
+          : 'Run complete. Human review is required before finalization.';
         tabs.find(t => t.dataset.target === 'artifactState').click();
       });
     </script>
