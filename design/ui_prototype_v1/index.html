@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Agent Team UI Prototype v1</title>
+    <title>Agent Team UI Prototype v1 · Branch Aware</title>
     <style>
       :root {
         --bg: #06080b;
@@ -18,7 +18,6 @@
         --accent-soft: rgba(95, 130, 171, 0.18);
         --ok: #64906c;
         --warn: #bd995d;
-        --danger: #ba6970;
         --radius: 14px;
       }
 
@@ -51,7 +50,7 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        backdrop-filter: blur(10px);
+        gap: 14px;
       }
 
       .title {
@@ -61,17 +60,13 @@
         color: #b5c2d4;
       }
 
-      .top-meta {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
+      .top-meta { display: flex; align-items: center; gap: 8px; }
 
       .badge {
         border: 1px solid #304157;
         padding: 6px 10px;
         border-radius: 999px;
-        font-size: 12px;
+        font-size: 11px;
         color: #d1dded;
         background: var(--accent-soft);
       }
@@ -84,7 +79,7 @@
 
       .grid {
         display: grid;
-        grid-template-columns: 1.25fr 1fr 1.26fr;
+        grid-template-columns: 1.2fr 1fr 1.3fr;
         gap: 12px;
         min-height: 0;
       }
@@ -141,75 +136,22 @@
         padding: 9px 10px;
       }
 
-      textarea { min-height: 118px; resize: vertical; }
+      textarea { min-height: 95px; resize: vertical; }
 
-      .row {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-      }
+      .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .status-inline { font-size: 12px; color: #afbccd; }
 
-      .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-
-      .chip {
-        border: 1px solid #2a3545;
-        background: #0b111a;
+      .mode-picker { display: flex; gap: 8px; flex-wrap: wrap; }
+      .mode-btn {
+        border: 1px solid #2b3646;
+        background: #0d131b;
+        color: #c1cddd;
         border-radius: 999px;
-        padding: 5px 9px;
+        padding: 7px 11px;
         font-size: 11px;
-        color: #bac7d8;
-      }
-
-      .chip.file::before { content: "📄 "; }
-
-      .toggle-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .switch {
-        position: relative;
-        width: 38px;
-        height: 22px;
-      }
-
-      .switch input { opacity: 0; width: 0; height: 0; }
-
-      .slider {
-        position: absolute;
-        inset: 0;
-        border-radius: 999px;
-        background: #253243;
-        transition: background 180ms ease;
         cursor: pointer;
       }
-
-      .slider:before {
-        content: "";
-        position: absolute;
-        height: 16px;
-        width: 16px;
-        left: 3px;
-        top: 3px;
-        border-radius: 999px;
-        background: #d8e3f1;
-        transition: transform 180ms ease;
-      }
-
-      .switch input:checked + .slider {
-        background: #496a93;
-      }
-
-      .switch input:checked + .slider:before {
-        transform: translateX(16px);
-      }
-
-      .status-inline {
-        font-size: 12px;
-        color: #afbccd;
-      }
+      .mode-btn.active { border-color: #52719a; background: rgba(95, 130, 171, 0.24); }
 
       .run-btn {
         margin-top: auto;
@@ -222,111 +164,15 @@
         cursor: pointer;
       }
 
-      .run-btn:hover {
-        box-shadow: 0 0 0 1px rgba(110, 145, 189, 0.44) inset, 0 12px 26px rgba(48, 73, 103, 0.34);
-      }
-
-      .summary-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-      }
-
+      .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
       .metric {
         border: 1px solid var(--border-soft);
         background: rgba(9, 14, 20, 0.72);
         border-radius: 10px;
         padding: 9px;
       }
-
-      .metric small {
-        color: var(--muted);
-        display: block;
-        font-size: 11px;
-      }
-
-      .metric strong {
-        color: #d3deed;
-        font-size: 13px;
-      }
-
-      .rail-wrap {
-        overflow-y: auto;
-        padding-right: 3px;
-      }
-
-      .active-agent {
-        margin-bottom: 10px;
-        border: 1px solid #2f3f53;
-        background: #121a25;
-        border-radius: 10px;
-        padding: 10px;
-        font-size: 13px;
-      }
-
-      .agent-list {
-        position: relative;
-        margin-left: 10px;
-        padding-left: 16px;
-      }
-
-      .agent-list::before {
-        content: "";
-        position: absolute;
-        left: 4px;
-        top: 4px;
-        bottom: 4px;
-        width: 2px;
-        background: linear-gradient(180deg, #425162, #2b3440);
-      }
-
-      .agent-card {
-        position: relative;
-        border: 1px solid #263140;
-        background: #0d141d;
-        border-radius: 10px;
-        padding: 9px;
-        margin-bottom: 8px;
-        cursor: pointer;
-        transition: border-color 160ms ease, background 160ms ease;
-      }
-
-      .agent-card::before {
-        content: "";
-        position: absolute;
-        width: 9px;
-        height: 9px;
-        border-radius: 999px;
-        left: -17px;
-        top: 12px;
-        border: 2px solid #415063;
-        background: #0d141d;
-      }
-
-      .agent-card:hover { border-color: #3d4f67; background: #101a26; }
-      .agent-card.active {
-        border-color: #4f6b8f;
-        animation: pulse 1.8s ease-in-out infinite;
-      }
-      .agent-card.complete { border-color: #365340; }
-      .agent-card.waiting { opacity: 0.9; }
-      .agent-card.skipped { border-color: #4f5967; opacity: 0.66; }
-
-      .agent-card.active::before { border-color: #7396c2; background: #7396c2; }
-      .agent-card.complete::before { border-color: var(--ok); background: var(--ok); }
-      .agent-card.waiting::before { border-color: #5f6d80; }
-      .agent-card.skipped::before { border-color: #6f7786; background: transparent; }
-
-      .agent-head {
-        display: flex;
-        justify-content: space-between;
-        font-size: 11px;
-        color: var(--muted);
-        margin-bottom: 5px;
-      }
-
-      .agent-name { font-size: 13px; margin-bottom: 4px; }
-      .agent-summary { font-size: 11px; color: #b7c2d0; line-height: 1.42; }
+      .metric small { color: var(--muted); display: block; font-size: 11px; }
+      .metric strong { color: #d3deed; font-size: 13px; }
 
       .detail-card {
         border: 1px solid var(--border-soft);
@@ -342,8 +188,6 @@
         align-items: center;
         margin-bottom: 7px;
       }
-
-      .detail-title strong { font-size: 13px; }
 
       .pill {
         border: 1px solid #2f3e52;
@@ -361,13 +205,52 @@
         line-height: 1.45;
       }
 
-      .tabs, .subtabs {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-        margin-bottom: 10px;
+      .rail-wrap { overflow-y: auto; padding-right: 3px; }
+      .agent-list { position: relative; margin-left: 10px; padding-left: 16px; }
+      .agent-list::before {
+        content: "";
+        position: absolute;
+        left: 4px;
+        top: 4px;
+        bottom: 4px;
+        width: 2px;
+        background: linear-gradient(180deg, #425162, #2b3440);
       }
 
+      .agent-card {
+        position: relative;
+        border: 1px solid #263140;
+        background: #0d141d;
+        border-radius: 10px;
+        padding: 9px;
+        margin-bottom: 8px;
+      }
+      .agent-card::before {
+        content: "";
+        position: absolute;
+        width: 9px;
+        height: 9px;
+        border-radius: 999px;
+        left: -17px;
+        top: 12px;
+        border: 2px solid #415063;
+        background: #0d141d;
+      }
+      .agent-card.active { border-color: #4f6b8f; }
+      .agent-card.complete { border-color: #365340; }
+      .agent-card.waiting { opacity: 0.9; }
+      .agent-card.skipped { border-color: #4f5967; opacity: 0.66; }
+      .agent-card.system-state { border-style: dashed; }
+      .agent-card.active::before { border-color: #7396c2; background: #7396c2; }
+      .agent-card.complete::before { border-color: var(--ok); background: var(--ok); }
+      .agent-card.waiting::before { border-color: #5f6d80; }
+      .agent-card.skipped::before { border-color: #6f7786; background: transparent; }
+
+      .agent-head { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+      .agent-name { font-size: 13px; margin-bottom: 4px; }
+      .agent-summary { font-size: 11px; color: #b7c2d0; line-height: 1.42; }
+
+      .tabs, .subtabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
       .tab, .subtab {
         border: 1px solid #2b3646;
         background: #0d131b;
@@ -377,11 +260,7 @@
         font-size: 11px;
         cursor: pointer;
       }
-
-      .tab.active, .subtab.active {
-        border-color: #52719a;
-        background: rgba(95, 130, 171, 0.22);
-      }
+      .tab.active, .subtab.active { border-color: #52719a; background: rgba(95, 130, 171, 0.22); }
 
       .output-wrap {
         border: 1px solid #1f2a37;
@@ -394,10 +273,7 @@
       }
 
       .output-view.hidden,
-      .artifact-view.hidden,
-      .download-state.hidden,
-      .qc-state.hidden,
-      .approval-state.hidden { display: none; }
+      .artifact-view.hidden { display: none; }
 
       .doc h3 {
         margin: 0 0 10px;
@@ -407,63 +283,13 @@
         letter-spacing: 0.06em;
       }
 
-      .doc .sec {
-        margin-bottom: 10px;
-        border-top: 1px solid #1d2733;
-        padding-top: 9px;
-      }
+      .doc .sec { margin-bottom: 10px; border-top: 1px solid #1d2733; padding-top: 9px; }
+      .doc .sec:first-child { border-top: none; padding-top: 0; }
+      .doc .sec-title { color: #aac0da; font-size: 11px; margin-bottom: 6px; }
+      .doc p { margin: 0; color: #d6dfec; line-height: 1.5; }
+      .doc ul { margin: 0; padding-left: 15px; color: #d6dfec; line-height: 1.45; }
 
-      .doc .sec:first-child {
-        border-top: none;
-        padding-top: 0;
-      }
-
-      .doc .sec-title {
-        color: #aac0da;
-        font-size: 11px;
-        margin-bottom: 6px;
-      }
-
-      .doc p {
-        margin: 0;
-        color: #d6dfec;
-        line-height: 1.5;
-      }
-
-      .doc ul {
-        margin: 0;
-        padding-left: 15px;
-        color: #d6dfec;
-        line-height: 1.45;
-      }
-
-      .file-card {
-        border: 1px solid #324357;
-        border-radius: 10px;
-        padding: 10px;
-        background: #101924;
-      }
-
-      .file-meta {
-        font-size: 11px;
-        color: #a8b7ca;
-      }
-
-      .qc-banner {
-        border: 1px solid #876f46;
-        background: rgba(189, 153, 93, 0.14);
-        color: #dbc8a7;
-        padding: 9px;
-        border-radius: 9px;
-        margin-bottom: 10px;
-      }
-
-      .approval-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-
+      .approval-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
       .btn {
         border: 1px solid #2e3d50;
         border-radius: 9px;
@@ -473,21 +299,16 @@
         padding: 7px 11px;
         cursor: pointer;
       }
+      .btn.primary { border-color: #4d6990; background: #1a2536; }
+      .btn.warn { border-color: #8f774d; background: #2b2418; color: #e3d2b6; }
 
-      .btn.primary {
-        border-color: #4d6990;
-        background: #1a2536;
-      }
+      .mode-block { display: none; }
+      .mode-block.active { display: block; }
 
-      .btn.warn {
-        border-color: #8f774d;
-        background: #2b2418;
-        color: #e3d2b6;
-      }
-
-      @keyframes pulse {
-        0%, 100% { box-shadow: 0 0 0 1px rgba(95, 130, 171, 0.34) inset; }
-        50% { box-shadow: 0 0 0 1px rgba(122, 158, 203, 0.6) inset, 0 0 20px rgba(82, 113, 154, 0.14); }
+      .footnote {
+        margin-top: 8px;
+        font-size: 11px;
+        color: #93a5bc;
       }
 
       @media (max-width: 1200px) {
@@ -498,376 +319,361 @@
   <body>
     <main class="shell">
       <div class="topbar">
-        <div class="title">Agent Team · Local Operator Console · Static Prototype</div>
+        <div class="title">Agent Team · Static UI Prototype · Design Only</div>
         <div class="top-meta">
-          <div class="badge ghost">Session memory aware</div>
+          <div class="badge ghost" id="memoryIndicator">Memory continuity: active_deliverable_type + latest_approved_output</div>
           <div class="badge" id="runState">Idle</div>
         </div>
       </div>
 
       <section class="grid">
         <article class="panel">
-          <h2>Prompt</h2>
+          <h2>Request Setup</h2>
           <div class="stack">
             <div class="section">
-              <p class="section-title">Run request</p>
-              <label for="request">Request input</label>
-              <textarea id="request">Create an executive brief for the AgentTeam repository that summarizes current phase, concrete wins, open questions, and what requires explicit human approval before release.</textarea>
-            </div>
-
-            <div class="section row">
-              <div>
-                <label for="deliverable">Deliverable type</label>
-                <select id="deliverable">
-                  <option selected>Executive Brief</option>
-                  <option>Decision Memo</option>
-                  <option>Project Plan</option>
-                  <option>Plain Response</option>
-                </select>
-              </div>
-              <div>
-                <label for="tone">Tone</label>
-                <select id="tone">
-                  <option selected>Concise / Leadership</option>
-                  <option>Neutral / Operational</option>
-                  <option>Analytical</option>
-                </select>
+              <p class="section-title">Primary mode</p>
+              <div class="mode-picker">
+                <button class="mode-btn" data-mode="brainstorm">Brainstorm</button>
+                <button class="mode-btn active" data-mode="plan">Plan</button>
+                <button class="mode-btn" data-mode="build">Build</button>
               </div>
             </div>
 
-            <div class="section">
-              <p class="section-title">Context and evidence</p>
-              <label for="context">Optional context</label>
-              <input id="context" value="Local-first CLI workflow with explicit typed state, structured work order, reviewer findings, and human review gate." />
-              <div style="height:8px"></div>
-              <label>Selected local files (mocked)</label>
-              <div class="chips">
-                <span class="chip file">README.md</span>
-                <span class="chip file">PROJECT_PLAN.md</span>
-                <span class="chip file">agent_team/prompts/artifacts/executive_brief.md</span>
-                <span class="chip file">agent_team/prompts/artifacts/decision_memo.md</span>
+            <div class="section mode-block active" data-mode="plan">
+              <p class="section-title">Plan controls</p>
+              <label for="planRequest">Request</label>
+              <textarea id="planRequest">Draft a decision memo for the next release cadence and include explicit human-approval points.</textarea>
+              <div class="row" style="margin-top:8px;">
+                <div>
+                  <label for="planArtifact">Artifact type</label>
+                  <select id="planArtifact">
+                    <option selected>Executive Brief</option>
+                    <option>Decision Memo</option>
+                    <option>Project Plan</option>
+                    <option>General</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="planJt">JT modifier</label>
+                  <select id="planJt">
+                    <option selected>Enabled</option>
+                    <option>Disabled</option>
+                  </select>
+                </div>
+              </div>
+              <label for="planFiles" style="margin-top:8px;">Local files (evidence scope)</label>
+              <input id="planFiles" value="README.md, PROJECT_PLAN.md, prompts/artifacts/decision_memo.md" />
+              <div class="row" style="margin-top:8px;">
+                <div>
+                  <label for="planWeb">Web search intent</label>
+                  <select id="planWeb">
+                    <option selected>Off unless task requires it</option>
+                    <option>Requested</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="planMemory">Memory status</label>
+                  <select id="planMemory">
+                    <option selected>Continuity available</option>
+                    <option>No memory for this session</option>
+                  </select>
+                </div>
               </div>
             </div>
 
-            <div class="section">
-              <p class="section-title">Run controls</p>
-              <div class="toggle-row">
-                <span>JT stage requested</span>
-                <label class="switch"><input id="jtToggle" type="checkbox" checked /><span class="slider"></span></label>
+            <div class="section mode-block" data-mode="build">
+              <p class="section-title">Build controls</p>
+              <label for="buildRequest">Request</label>
+              <textarea id="buildRequest">Implement CLI support for branch selection and keep human review as an explicit gate.</textarea>
+              <div class="row" style="margin-top:8px;">
+                <div>
+                  <label for="buildTarget">Build target</label>
+                  <select id="buildTarget">
+                    <option selected>CLI workflow update</option>
+                    <option>Prompt contract update</option>
+                    <option>Graph routing behavior</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="buildStack">Stack / constraints</label>
+                  <input id="buildStack" value="Python, LangGraph, local-first, no UI runtime" />
+                </div>
               </div>
-              <div class="toggle-row" style="margin-top:7px;">
-                <span>Optional web search</span>
-                <label class="switch"><input id="webToggle" type="checkbox" /><span class="slider"></span></label>
-              </div>
-              <div class="toggle-row" style="margin-top:7px;">
-                <span>Session memory continuity</span>
-                <label class="switch"><input id="memoryToggle" type="checkbox" checked /><span class="slider"></span></label>
+              <label for="buildAcceptance" style="margin-top:8px;">Acceptance notes</label>
+              <textarea id="buildAcceptance">Backend + frontend artifacts should pass QA, loop for revision when QA verdict is revise, then assemble and send to human review.</textarea>
+            </div>
+
+            <div class="section mode-block" data-mode="brainstorm">
+              <p class="section-title">Brainstorm controls</p>
+              <label for="brainQuestion">Question / decision</label>
+              <textarea id="brainQuestion">What operating model should AgentTeam use for the next three milestones?</textarea>
+              <label for="brainContext" style="margin-top:8px;">Context</label>
+              <textarea id="brainContext">Current architecture includes Chief of Staff routing into plan, build pod, or advisor pod with mandatory human review.</textarea>
+              <div class="row" style="margin-top:8px;">
+                <div>
+                  <label for="brainConstraints">Constraints</label>
+                  <input id="brainConstraints" value="No new integrations, no web UI, keep state explicit" />
+                </div>
+                <div>
+                  <label for="brainFraming">Advisor team framing</label>
+                  <input id="brainFraming" value="5 cluster perspectives + synthesis for decision support" />
+                </div>
               </div>
             </div>
 
-            <div class="status-inline" id="promptStatus">Ready. Configure a structured run and execute the mock pipeline.</div>
+            <div class="status-inline" id="promptStatus">Design-only controls shown. This prototype does not execute backend code.</div>
           </div>
-          <button class="run-btn" id="runBtn">Run Agent Team</button>
+          <button class="run-btn" id="runBtn">Simulate Orchestration</button>
         </article>
 
         <article class="panel">
-          <h2>Agent Team</h2>
-          <div class="active-agent"><strong>Active agent:</strong> <span id="activeLabel">Chief of Staff</span></div>
-
-          <div class="summary-grid" style="margin-bottom:10px;">
-            <div class="metric"><small>Route</small><strong id="routeLabel">Plan → Research → Draft</strong></div>
-            <div class="metric"><small>Research needed</small><strong id="researchLabel">Yes</strong></div>
-            <div class="metric"><small>JT requested</small><strong id="jtLabel">Yes</strong></div>
+          <h2>Run Orchestration</h2>
+          <div class="summary-grid">
+            <div class="metric"><small>Branch</small><strong id="branchLabel">Plan</strong></div>
+            <div class="metric"><small>Current state</small><strong id="stateLabel">chief_of_staff</strong></div>
+            <div class="metric"><small>JT position</small><strong id="jtLabel">After Writer (Plan only)</strong></div>
             <div class="metric"><small>Human review</small><strong id="humanLabel">Pending</strong></div>
           </div>
 
           <div class="detail-card" id="focusCard">
             <div class="detail-title">
-              <strong>Work order snapshot</strong>
+              <strong>Focused orchestration state</strong>
               <span class="pill" id="focusPill">Chief of Staff</span>
             </div>
             <ul id="focusList">
-              <li>Objective: deliver executive-ready summary grounded in local evidence.</li>
-              <li>Deliverable type: executive_brief.</li>
-              <li>Open question: should unresolved risks trigger revise or approve-with-notes.</li>
+              <li>Classifies request and routes to Plan, Build, or Brainstorm branch.</li>
+              <li>Work order carries objective, deliverable type, and branch flags.</li>
+              <li>UI rail below is branch-aware and reflects the chosen mode.</li>
             </ul>
           </div>
 
           <div class="rail-wrap">
-            <div class="agent-list" id="agentList">
-              <div class="agent-card active" data-step="cos">
-                <div class="agent-head"><span>Step 1</span><span>active</span></div>
-                <div class="agent-name">Chief of Staff</div>
-                <div class="agent-summary">Creates structured work order, sets route, and preserves JT/web-search intent.</div>
-              </div>
-              <div class="agent-card waiting" data-step="researcher">
-                <div class="agent-head"><span>Step 2</span><span>waiting</span></div>
-                <div class="agent-name">Researcher</div>
-                <div class="agent-summary">Builds approved facts from local files, Obsidian context, and optional web search.</div>
-              </div>
-              <div class="agent-card waiting" data-step="writer">
-                <div class="agent-head"><span>Step 3</span><span>waiting</span></div>
-                <div class="agent-name">Writer</div>
-                <div class="agent-summary">Drafts artifact using selected template and evidence-backed claims only.</div>
-              </div>
-              <div class="agent-card waiting" data-step="reviewer">
-                <div class="agent-head"><span>Step 4</span><span>waiting</span></div>
-                <div class="agent-name">Reviewer</div>
-                <div class="agent-summary">Runs QC contract: missing content, unsupported claims, logic issues, next action.</div>
-              </div>
-              <div class="agent-card waiting" data-step="jt">
-                <div class="agent-head"><span>Optional</span><span>waiting</span></div>
-                <div class="agent-name">JT</div>
-                <div class="agent-summary">Challenge/rewrite stage; only runs when explicitly requested.</div>
-              </div>
-              <div class="agent-card waiting" data-step="human">
-                <div class="agent-head"><span>Final gate</span><span>waiting</span></div>
-                <div class="agent-name">Human Review</div>
-                <div class="agent-summary">Final explicit approval or revise decision before accepted output.</div>
-              </div>
-            </div>
+            <div class="agent-list" id="agentList"></div>
           </div>
+          <div class="footnote">Helper nodes (for example QA revision loop) are styled as system states rather than human agents.</div>
         </article>
 
         <article class="panel">
-          <h2>Output</h2>
-          <div class="tabs">
-            <button class="tab active" data-target="textState">Plain response</button>
-            <button class="tab" data-target="artifactState">Artifact preview</button>
-            <button class="tab" data-target="downloadState">Downloadable file</button>
-            <button class="tab" data-target="qcState">Reviewer / QC</button>
-            <button class="tab" data-target="approvalState">Approval</button>
-          </div>
-
-          <div class="output-wrap">
-            <div class="output-view" id="textState">
-              <strong>Run summary</strong>
-              <p style="margin:8px 0 0; color:#cdd8e7; line-height:1.5;">
-                Local run initialized. Press <em>Run Agent Team</em> to simulate planning, routing, drafting, review, optional JT, and human approval.
-              </p>
-            </div>
-
-            <div class="output-view hidden" id="artifactState">
-              <div class="subtabs">
-                <button class="subtab active" data-artifact="executive">Executive Brief</button>
-                <button class="subtab" data-artifact="decision">Decision Memo</button>
-                <button class="subtab" data-artifact="plan">Project Plan</button>
-              </div>
-
-              <div class="artifact-view" id="artifactExecutive">
-                <div class="doc">
-                  <h3>Executive Brief (preview)</h3>
-                  <div class="sec"><div class="sec-title"><strong>PROBLEM</strong></div><p>The project can run end-to-end, but output quality still varies when tools are present yet underutilized in final drafting.</p></div>
-                  <div class="sec"><div class="sec-title"><strong>RECOMMENDATION</strong></div><p>Preserve the current local-first architecture and prioritize artifact-consistency hardening before adding any new integrations.</p></div>
-                  <div class="sec"><div class="sec-title"><strong>RATIONALE</strong></div><p>The current scaffold already has structured work orders, reviewer findings, optional JT routing, and human review. Tightening artifact behavior delivers immediate value without widening scope.</p></div>
-                  <div class="sec"><div class="sec-title"><strong>RISKS</strong></div><ul><li>Risk-and-gaps artifact type remains incomplete.</li><li>Prompt and plan docs can drift from implemented behavior.</li><li>Web search value may remain low for local-only tasks.</li></ul></div>
-                  <div class="sec"><div class="sec-title"><strong>NEXT STEPS</strong></div><ul><li>Complete the remaining risk-and-gaps artifact template.</li><li>Run reviewer-focused regression checks across artifact types.</li><li>Require explicit human decision on approve vs revise for each run.</li></ul></div>
-                </div>
-              </div>
-
-              <div class="artifact-view hidden" id="artifactDecision">
-                <div class="doc">
-                  <h3>Decision Memo (preview)</h3>
-                  <div class="sec"><div class="sec-title"><strong>CONTEXT</strong></div><p>The repo now includes multiple artifact templates and optional tool paths. The unresolved decision is whether to add new capabilities or consolidate quality first.</p></div>
-                  <div class="sec"><div class="sec-title"><strong>DECISION</strong></div><p>The recommendation is to focus on artifact quality and workflow clarity before expanding system scope.</p></div>
-                  <div class="sec"><div class="sec-title"><strong>OPTIONS CONSIDERED</strong></div><ul><li>Add more agents and integrations now — rejected due to scope and reliability risk.</li><li>Ship a UI-backed runtime immediately — rejected because the project remains CLI-first.</li><li>Harden current templates and routing contracts — selected.</li></ul></div>
-                  <div class="sec"><div class="sec-title"><strong>RECOMMENDATION</strong></div><p>Consolidation provides the best near-term leverage: it improves trust in outputs and keeps the system inspectable while preserving extension paths for future phases.</p></div>
-                  <div class="sec"><div class="sec-title"><strong>IMPLICATIONS</strong></div><ul><li>Near-term velocity shifts to quality work, not feature expansion.</li><li>Reviewer and human gate remain explicit control points.</li><li>If reversed later, integration work can resume from a stronger base.</li></ul></div>
-                </div>
-              </div>
-
-              <div class="artifact-view hidden" id="artifactPlan">
-                <div class="doc">
-                  <h3>Project Plan (preview)</h3>
-                  <div class="sec"><div class="sec-title"><strong>OBJECTIVE</strong></div><p>Deliver a reliable local multi-agent workflow that produces structured artifacts and keeps human approval as a hard release gate.</p></div>
-                  <div class="sec"><div class="sec-title"><strong>CURRENT STATE</strong></div><p>Core workflow is operational with Chief of Staff, Researcher, Writer, Reviewer, optional JT, and human review. Tool integrations exist but are still being tuned for stronger artifact impact.</p></div>
-                  <div class="sec"><div class="sec-title"><strong>WORKSTREAMS / MILESTONES</strong></div><ul><li><strong>Core workflow hardening</strong> — deterministic routing and reviewer contracts are largely complete; human-step clarity still in progress.</li><li><strong>Artifact quality</strong> — executive brief, decision memo, and project plan templates are complete; risk-and-gaps remains open.</li><li><strong>Tool effectiveness</strong> — routing and voice fixes landed; quality verification loop is active.</li></ul></div>
-                  <div class="sec"><div class="sec-title"><strong>OPEN QUESTIONS</strong></div><ul><li>How should revise-vs-approve thresholds be standardized across reviewers?</li><li>What minimum evidence standard should be required for web-grounded claims?</li></ul></div>
-                  <div class="sec"><div class="sec-title"><strong>RISKS</strong></div><ul><li>Documentation drift may confuse routing expectations and artifact behavior.</li><li>Adding scope too early could reduce reliability and review quality.</li><li>Overweighting optional tools might degrade local-first simplicity.</li></ul></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="output-view hidden download-state" id="downloadState">
-              <div class="file-card">
-                <strong>agent_team_executive_brief.md</strong>
-                <div class="file-meta" style="margin-top:6px;">Artifact: executive_brief · Source: local run #184 · Size: 18 KB</div>
-                <div class="file-meta" style="margin-top:5px;">Includes reviewer findings appendix and structured work-order metadata.</div>
-                <div class="approval-actions" style="margin-top:10px;">
-                  <button class="btn">Download .md</button>
-                  <button class="btn">Copy path</button>
-                  <button class="btn">Open folder</button>
-                </div>
-              </div>
-            </div>
-
-            <div class="output-view hidden qc-state" id="qcState">
-              <div class="qc-banner" id="reviewerBanner">Reviewer result: revise recommended — unsupported claim check failed for one line.</div>
-              <div class="doc">
-                <div class="sec"><div class="sec-title"><strong>Overall assessment</strong></div><p>Strong structure and tone alignment, but one claim about schedule certainty lacks explicit evidence linkage.</p></div>
-                <div class="sec"><div class="sec-title"><strong>Missing content</strong></div><ul><li>Explicit statement of what requires human sign-off.</li></ul></div>
-                <div class="sec"><div class="sec-title"><strong>Unsupported claims</strong></div><ul><li>"Tooling is fully verified" should be softened to "tooling is integrated and under active verification."</li></ul></div>
-                <div class="sec"><div class="sec-title"><strong>Recommended next action</strong></div><p id="reviewAction">revise</p></div>
-              </div>
-              <div class="approval-actions" style="margin-top:10px;">
-                <button class="btn warn" id="setRevise">Set Revise</button>
-                <button class="btn primary" id="setApprove">Set Approve</button>
-              </div>
-            </div>
-
-            <div class="output-view hidden approval-state" id="approvalState">
-              <div class="doc">
-                <div class="sec"><div class="sec-title"><strong>Human review checkpoint</strong></div><p>This run is paused for explicit approval. Select <em>Approve</em> to finalize local artifact or <em>Revise</em> to route back for another draft cycle.</p></div>
-                <div class="sec"><div class="sec-title"><strong>Decision log</strong></div><p id="approvalLog">No decision recorded yet.</p></div>
-              </div>
-              <div class="approval-actions" style="margin-top:10px;">
-                <button class="btn primary" id="approveBtn">Approve run</button>
-                <button class="btn warn" id="reviseBtn">Send to revise</button>
-                <button class="btn">Copy reviewer notes</button>
-              </div>
-            </div>
-          </div>
+          <h2>Workspace</h2>
+          <div class="tabs" id="workspaceTabs"></div>
+          <div class="output-wrap" id="workspaceBody"></div>
+          <div class="footnote">Prototype copy is illustrative and intentionally non-downloadable in order to stay honest about current runtime capabilities.</div>
         </article>
       </section>
     </main>
 
     <script>
-      const runBtn = document.getElementById('runBtn');
+      const modes = {
+        plan: {
+          branchLabel: 'Plan',
+          steps: [
+            { id: 'chief_of_staff', name: 'Chief of Staff', type: 'agent', summary: 'Routes request and sets plan work order.' },
+            { id: 'researcher', name: 'Researcher / Evidence', type: 'agent', summary: 'Researcher plus evidence extraction state for grounded facts.' },
+            { id: 'writer', name: 'Writer', type: 'agent', summary: 'Drafts the selected artifact template.' },
+            { id: 'jt', name: 'JT (when enabled)', type: 'agent', summary: 'Modifier stage after writer and before reviewer.' },
+            { id: 'reviewer', name: 'Reviewer', type: 'agent', summary: 'Structured QC findings and next action.' },
+            { id: 'chief_final', name: 'Chief of Staff Final Check', type: 'agent', summary: 'Final validation and next-step decision.' },
+            { id: 'human_review', name: 'Human Review', type: 'agent', summary: 'Explicit approve/revise gate.' }
+          ],
+          tabs: [
+            { id: 'draft', label: 'Draft' },
+            { id: 'artifact', label: 'Artifact Preview' },
+            { id: 'findings', label: 'Reviewer Findings' },
+            { id: 'approval', label: 'Approval' }
+          ],
+          views: {
+            draft: `<strong>Plan draft state</strong><p style="margin:8px 0 0; color:#cdd8e7;">Draft text appears here after Writer. JT can modify this draft only when explicitly enabled.</p>`,
+            artifact: `<div class="subtabs"><button class="subtab active" data-artifact="executive">Executive Brief</button><button class="subtab" data-artifact="decision">Decision Memo</button><button class="subtab" data-artifact="project">Project Plan</button></div>
+              <div class="artifact-view" id="artifactExecutive"><div class="doc"><h3>Executive Brief (template preview)</h3><div class="sec"><div class="sec-title"><strong>Problem</strong></div><p>Describe the decision or issue clearly.</p></div><div class="sec"><div class="sec-title"><strong>Recommendation</strong></div><p>Provide the recommended direction.</p></div><div class="sec"><div class="sec-title"><strong>Rationale</strong></div><p>Back recommendation with approved evidence.</p></div><div class="sec"><div class="sec-title"><strong>Risks</strong></div><p>List risks tied to the recommendation.</p></div><div class="sec"><div class="sec-title"><strong>Next Steps</strong></div><p>State immediate actions and owners.</p></div></div></div>
+              <div class="artifact-view hidden" id="artifactDecision"><div class="doc"><h3>Decision Memo (template preview)</h3><div class="sec"><div class="sec-title"><strong>Context</strong></div><p>Summarize decision context.</p></div><div class="sec"><div class="sec-title"><strong>Decision</strong></div><p>State what is being decided.</p></div><div class="sec"><div class="sec-title"><strong>Options Considered</strong></div><p>Compare options with trade-offs.</p></div><div class="sec"><div class="sec-title"><strong>Recommendation</strong></div><p>Recommend one path.</p></div><div class="sec"><div class="sec-title"><strong>Implications</strong></div><p>Explain expected outcomes.</p></div></div></div>
+              <div class="artifact-view hidden" id="artifactProject"><div class="doc"><h3>Project Plan (template preview)</h3><div class="sec"><div class="sec-title"><strong>Objective</strong></div><p>Define what success means.</p></div><div class="sec"><div class="sec-title"><strong>Current State</strong></div><p>Summarize baseline status.</p></div><div class="sec"><div class="sec-title"><strong>Workstreams / Milestones</strong></div><p>Break work into phases.</p></div><div class="sec"><div class="sec-title"><strong>Open Questions</strong></div><p>Track unresolved items.</p></div><div class="sec"><div class="sec-title"><strong>Risks</strong></div><p>Capture project risks.</p></div></div></div>`,
+            findings: `<div class="doc"><h3>Reviewer findings</h3><div class="sec"><div class="sec-title"><strong>Overall assessment</strong></div><p>Draft is structurally sound, one unsupported claim requires revision.</p></div><div class="sec"><div class="sec-title"><strong>Recommended next action</strong></div><p>revise</p></div></div>`,
+            approval: `<div class="doc"><h3>Human approval checkpoint</h3><div class="sec"><div class="sec-title"><strong>Status</strong></div><p>Awaiting explicit human decision.</p></div></div><div class="approval-actions"><button class="btn primary">Approve</button><button class="btn warn">Request Revision</button></div>`
+          }
+        },
+        build: {
+          branchLabel: 'Build',
+          steps: [
+            { id: 'pod_entry', name: 'Pod Entry', type: 'system', summary: 'State prepares pod brief and initializes pod artifacts.' },
+            { id: 'backend', name: 'Backend', type: 'agent', summary: 'Builds backend artifact output.' },
+            { id: 'frontend', name: 'Frontend', type: 'agent', summary: 'Builds frontend artifact output.' },
+            { id: 'qa', name: 'QA', type: 'agent', summary: 'Evaluates backend + frontend output quality.' },
+            { id: 'qa_loop', name: 'State: QA Revision Loop', type: 'system', summary: 'Optional loop when QA verdict is revise.' },
+            { id: 'assemble', name: 'Assemble', type: 'system', summary: 'Combines pod outputs into one assembled draft.' },
+            { id: 'human_review', name: 'Human Review', type: 'agent', summary: 'Explicit approve/revise gate.' }
+          ],
+          tabs: [
+            { id: 'backend_out', label: 'Backend Output' },
+            { id: 'frontend_out', label: 'Frontend Output' },
+            { id: 'qa_findings', label: 'QA Findings' },
+            { id: 'assembled', label: 'Assembled Output' },
+            { id: 'approval', label: 'Approval' }
+          ],
+          views: {
+            backend_out: '<strong>Backend output</strong><p style="margin-top:8px;color:#cdd8e7;">Pod backend artifact appears here.</p>',
+            frontend_out: '<strong>Frontend output</strong><p style="margin-top:8px;color:#cdd8e7;">Pod frontend artifact appears here.</p>',
+            qa_findings: '<strong>QA findings</strong><p style="margin-top:8px;color:#cdd8e7;">QA verdict can be pass or revise. Revise triggers the QA revision loop state.</p>',
+            assembled: '<strong>Assembled output</strong><p style="margin-top:8px;color:#cdd8e7;">Assemble state merges backend, frontend, and QA notes into a draft for human review.</p>',
+            approval: '<strong>Human approval</strong><p style="margin-top:8px;color:#cdd8e7;">Final gate remains human review before output is accepted.</p>'
+          }
+        },
+        brainstorm: {
+          branchLabel: 'Brainstorm',
+          steps: [
+            { id: 'advisor_entry', name: 'Advisor Entry', type: 'system', summary: 'State prepares advisor brief and output map.' },
+            { id: 'strategy_systems', name: 'Strategy and Systems', type: 'agent', summary: 'Cluster perspective 1.' },
+            { id: 'leadership_culture', name: 'Leadership and Culture', type: 'agent', summary: 'Cluster perspective 2.' },
+            { id: 'communication_influence', name: 'Communication and Influence', type: 'agent', summary: 'Cluster perspective 3.' },
+            { id: 'growth_mindset', name: 'Growth and Mindset', type: 'agent', summary: 'Cluster perspective 4.' },
+            { id: 'entrepreneur_execution', name: 'Entrepreneur and Execution', type: 'agent', summary: 'Cluster perspective 5.' },
+            { id: 'advisor_synthesis', name: 'Advisor Synthesis', type: 'agent', summary: 'Synthesis agent combines cluster outputs.' },
+            { id: 'human_review', name: 'Human Review', type: 'agent', summary: 'Explicit approve/revise gate.' }
+          ],
+          tabs: [
+            { id: 'synthesis', label: 'Advisor Synthesis' },
+            { id: 'clusters', label: 'Cluster Notes' },
+            { id: 'approval', label: 'Approval' }
+          ],
+          views: {
+            synthesis: '<strong>Advisor synthesis</strong><p style="margin-top:8px;color:#cdd8e7;">Combined recommendation from all five advisor clusters appears here.</p>',
+            clusters: '<div class="doc"><h3>Expandable cluster notes (design mock)</h3><div class="sec"><div class="sec-title"><strong>Strategy and Systems</strong></div><p>Notes collapsed by default in runtime design.</p></div><div class="sec"><div class="sec-title"><strong>Leadership and Culture</strong></div><p>Notes collapsed by default in runtime design.</p></div><div class="sec"><div class="sec-title"><strong>Communication and Influence</strong></div><p>Notes collapsed by default in runtime design.</p></div><div class="sec"><div class="sec-title"><strong>Growth and Mindset</strong></div><p>Notes collapsed by default in runtime design.</p></div><div class="sec"><div class="sec-title"><strong>Entrepreneur and Execution</strong></div><p>Notes collapsed by default in runtime design.</p></div></div>',
+            approval: '<strong>Human approval</strong><p style="margin-top:8px;color:#cdd8e7;">Human review approves or requests revision on the synthesized recommendation.</p>'
+          }
+        }
+      };
+
+      const modeButtons = [...document.querySelectorAll('.mode-btn')];
+      const modeBlocks = [...document.querySelectorAll('.mode-block')];
       const runState = document.getElementById('runState');
       const promptStatus = document.getElementById('promptStatus');
-      const activeLabel = document.getElementById('activeLabel');
-      const routeLabel = document.getElementById('routeLabel');
-      const researchLabel = document.getElementById('researchLabel');
+      const branchLabel = document.getElementById('branchLabel');
+      const stateLabel = document.getElementById('stateLabel');
       const jtLabel = document.getElementById('jtLabel');
       const humanLabel = document.getElementById('humanLabel');
       const focusPill = document.getElementById('focusPill');
       const focusList = document.getElementById('focusList');
-      const cards = [...document.querySelectorAll('.agent-card')];
-      const tabs = [...document.querySelectorAll('.tab')];
-      const views = [...document.querySelectorAll('.output-view')];
-      const artifactTabs = [...document.querySelectorAll('.subtab')];
-      const artifactViews = [...document.querySelectorAll('.artifact-view')];
+      const agentList = document.getElementById('agentList');
+      const workspaceTabs = document.getElementById('workspaceTabs');
+      const workspaceBody = document.getElementById('workspaceBody');
 
-      const jtToggle = document.getElementById('jtToggle');
-      const webToggle = document.getElementById('webToggle');
+      let currentMode = 'plan';
 
-      const stepDetails = {
-        cos: ['Objective normalized into structured work order.', 'Deliverable mapped to selected artifact template.', 'Route resolved using research_needed + jt_requested.'],
-        researcher: ['Approved facts extracted from local file evidence.', 'Obsidian context applied for project continuity.', 'Optional web search used only when toggled.'],
-        writer: ['Draft assembled against artifact format rules.', 'Claims constrained to approved facts and explicit assumptions.', 'Tone aligned with selected request controls.'],
-        reviewer: ['QC contract completed: missing content, unsupported claims, logic checks.', 'recommended_next_action set from structured findings.', 'Human gate required before finalization.'],
-        jt: ['JT challenge stage executed from explicit request.', 'Feedback + rewrite attached as optional structured artifacts.', 'Reviewer re-validates JT output before handoff.'],
-        human: ['Human reviewer selects approve or revise.', 'Approved output written as local artifact.', 'Session memory fields updated after approval only.']
-      };
+      function renderMode(mode) {
+        currentMode = mode;
+        modeButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.mode === mode));
+        modeBlocks.forEach(block => block.classList.toggle('active', block.dataset.mode === mode));
 
-      const labels = {
-        cos: 'Chief of Staff',
-        researcher: 'Researcher',
-        writer: 'Writer',
-        reviewer: 'Reviewer',
-        jt: 'JT',
-        human: 'Human Review'
-      };
-
-      function setCardState(step, state) {
-        const card = cards.find(c => c.dataset.step === step);
-        if (!card) return;
-        card.classList.remove('active', 'complete', 'waiting', 'skipped');
-        card.classList.add(state);
-        card.querySelector('.agent-head span:last-child').textContent = state;
-      }
-
-      function setFocus(step) {
-        activeLabel.textContent = labels[step];
-        focusPill.textContent = labels[step];
-        const lines = stepDetails[step] || [];
-        focusList.innerHTML = lines.map(line => `<li>${line}</li>`).join('');
-      }
-
-      cards.forEach(card => {
-        card.addEventListener('click', () => {
-          const step = card.dataset.step;
-          setFocus(step);
-          if (step === 'reviewer' || step === 'human') {
-            tabs.find(t => t.dataset.target === 'qcState').click();
-          }
-        });
-      });
-
-      tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-          tabs.forEach(t => t.classList.remove('active'));
-          tab.classList.add('active');
-          views.forEach(v => v.classList.add('hidden'));
-          document.getElementById(tab.dataset.target).classList.remove('hidden');
-        });
-      });
-
-      artifactTabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-          artifactTabs.forEach(t => t.classList.remove('active'));
-          tab.classList.add('active');
-          artifactViews.forEach(v => v.classList.add('hidden'));
-          document.getElementById(`artifact${tab.dataset.artifact.charAt(0).toUpperCase()}${tab.dataset.artifact.slice(1)}`).classList.remove('hidden');
-        });
-      });
-
-      document.getElementById('setApprove').addEventListener('click', () => {
-        document.getElementById('reviewerBanner').textContent = 'Reviewer result: approve recommended — draft meets structured QC requirements.';
-        document.getElementById('reviewAction').textContent = 'approve';
-      });
-
-      document.getElementById('setRevise').addEventListener('click', () => {
-        document.getElementById('reviewerBanner').textContent = 'Reviewer result: revise recommended — unsupported claim check failed for one line.';
-        document.getElementById('reviewAction').textContent = 'revise';
-      });
-
-      document.getElementById('approveBtn').addEventListener('click', () => {
-        runState.textContent = 'Approved';
-        humanLabel.textContent = 'Approved';
-        document.getElementById('approvalLog').textContent = 'Approved by Human Review at 14:18 UTC. Final artifact eligible for export.';
-      });
-
-      document.getElementById('reviseBtn').addEventListener('click', () => {
-        runState.textContent = 'Revision Requested';
-        humanLabel.textContent = 'Revise requested';
-        document.getElementById('approvalLog').textContent = 'Revision requested by Human Review: tighten unsupported claims and resubmit.';
-      });
-
-      runBtn.addEventListener('click', async () => {
-        const jtEnabled = jtToggle.checked;
-        const webEnabled = webToggle.checked;
-        const orderedSteps = jtEnabled
-          ? ['cos', 'researcher', 'writer', 'jt', 'reviewer', 'human']
-          : ['cos', 'researcher', 'writer', 'reviewer', 'human'];
-
-        runState.textContent = 'Running';
-        promptStatus.textContent = 'Mock execution in progress...';
-        routeLabel.textContent = jtEnabled ? 'Plan → Research → Draft → JT → QC' : 'Plan → Research → Draft → QC';
-        researchLabel.textContent = 'Yes';
-        jtLabel.textContent = jtEnabled ? 'Yes' : 'No';
+        const config = modes[mode];
+        branchLabel.textContent = config.branchLabel;
+        stateLabel.textContent = config.steps[0].id;
+        jtLabel.textContent = mode === 'plan' ? 'After Writer (Plan only)' : 'Not used';
         humanLabel.textContent = 'Pending';
 
-        cards.forEach(c => setCardState(c.dataset.step, 'waiting'));
-        if (!jtEnabled) {
-          setCardState('jt', 'skipped');
-        }
+        agentList.innerHTML = config.steps.map((step, idx) => `
+          <div class="agent-card ${idx === 0 ? 'active' : 'waiting'} ${step.type === 'system' ? 'system-state' : ''}" data-step="${step.id}">
+            <div class="agent-head"><span>Step ${idx + 1}</span><span>${idx === 0 ? 'active' : 'waiting'}</span></div>
+            <div class="agent-name">${step.name}</div>
+            <div class="agent-summary">${step.summary}</div>
+          </div>
+        `).join('');
 
-        for (const step of orderedSteps) {
-          setCardState(step, 'active');
-          setFocus(step);
-          await new Promise(resolve => setTimeout(resolve, 580));
-          if (step !== 'human') {
-            setCardState(step, 'complete');
+        focusPill.textContent = config.steps[0].name;
+        focusList.innerHTML = `<li>${config.steps[0].summary}</li><li>Branch-aware rail reflects ${config.branchLabel} flow.</li><li>Human Review remains the final explicit gate.</li>`;
+
+        workspaceTabs.innerHTML = config.tabs.map((tab, idx) => `<button class="tab ${idx === 0 ? 'active' : ''}" data-tab="${tab.id}">${tab.label}</button>`).join('');
+        workspaceBody.innerHTML = Object.entries(config.views).map(([id, html], idx) => `<div class="output-view ${idx === 0 ? '' : 'hidden'}" data-view="${id}">${html}</div>`).join('');
+
+        bindWorkspaceInteractions();
+        bindRailInteractions();
+        promptStatus.textContent = `${config.branchLabel} setup loaded. Design-only controls shown.`;
+      }
+
+      function bindWorkspaceInteractions() {
+        const tabs = [...workspaceTabs.querySelectorAll('.tab')];
+        const views = [...workspaceBody.querySelectorAll('.output-view')];
+        tabs.forEach(tab => {
+          tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            views.forEach(v => v.classList.add('hidden'));
+            const target = views.find(v => v.dataset.view === tab.dataset.tab);
+            if (target) target.classList.remove('hidden');
+          });
+        });
+
+        const artifactTabs = [...workspaceBody.querySelectorAll('.subtab')];
+        const artifactViews = [...workspaceBody.querySelectorAll('.artifact-view')];
+        artifactTabs.forEach(tab => {
+          tab.addEventListener('click', () => {
+            artifactTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            artifactViews.forEach(v => v.classList.add('hidden'));
+            const map = { executive: 'artifactExecutive', decision: 'artifactDecision', project: 'artifactProject' };
+            const view = document.getElementById(map[tab.dataset.artifact]);
+            if (view) view.classList.remove('hidden');
+          });
+        });
+      }
+
+      function bindRailInteractions() {
+        const cards = [...agentList.querySelectorAll('.agent-card')];
+        cards.forEach(card => {
+          card.addEventListener('click', () => {
+            cards.forEach(c => c.classList.remove('active'));
+            card.classList.add('active');
+            const name = card.querySelector('.agent-name').textContent;
+            const summary = card.querySelector('.agent-summary').textContent;
+            focusPill.textContent = name;
+            focusList.innerHTML = `<li>${summary}</li><li>Visual state shown for branch: ${modes[currentMode].branchLabel}.</li><li>This is a static representation (not wired to app state).</li>`;
+            stateLabel.textContent = card.dataset.step;
+          });
+        });
+      }
+
+      modeButtons.forEach(btn => {
+        btn.addEventListener('click', () => renderMode(btn.dataset.mode));
+      });
+
+      document.getElementById('runBtn').addEventListener('click', async () => {
+        const config = modes[currentMode];
+        const cards = [...agentList.querySelectorAll('.agent-card')];
+        runState.textContent = 'Running';
+        promptStatus.textContent = `Simulating ${config.branchLabel} orchestration...`;
+        humanLabel.textContent = 'Pending';
+
+        cards.forEach(c => {
+          c.classList.remove('active', 'complete', 'waiting', 'skipped');
+          c.classList.add('waiting');
+          c.querySelector('.agent-head span:last-child').textContent = 'waiting';
+        });
+
+        const jtEnabled = currentMode !== 'plan' || document.getElementById('planJt').value === 'Enabled';
+
+        for (const card of cards) {
+          if (card.dataset.step === 'jt' && !jtEnabled) {
+            card.classList.remove('waiting');
+            card.classList.add('skipped');
+            card.querySelector('.agent-head span:last-child').textContent = 'skipped';
+            continue;
+          }
+          card.classList.remove('waiting');
+          card.classList.add('active');
+          card.querySelector('.agent-head span:last-child').textContent = 'active';
+          stateLabel.textContent = card.dataset.step;
+          focusPill.textContent = card.querySelector('.agent-name').textContent;
+          await new Promise(resolve => setTimeout(resolve, 430));
+          if (card.dataset.step !== 'human_review') {
+            card.classList.remove('active');
+            card.classList.add('complete');
+            card.querySelector('.agent-head span:last-child').textContent = 'complete';
           }
         }
 
-        runState.textContent = 'Awaiting Human Approval';
-        promptStatus.textContent = webEnabled
-          ? 'Run complete. Research included optional web search. Human review required.'
-          : 'Run complete. Human review is required before finalization.';
-        tabs.find(t => t.dataset.target === 'artifactState').click();
+        runState.textContent = 'Awaiting Human Review';
+        promptStatus.textContent = `${config.branchLabel} simulation complete. Awaiting explicit human approval.`;
       });
+
+      renderMode('plan');
     </script>
   </body>
 </html>
