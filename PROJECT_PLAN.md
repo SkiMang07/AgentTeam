@@ -1,3 +1,9 @@
+# Agent Team Project Plan — ARCHIVED (Phases 1 & 2)
+
+> **Status: Complete.** This document covers Phases 1 and 2 of AgentTeam development. The active plan for Phase 3 (Developer Pod) is in `PROJECT_PLAN_DEV_POD.md`.
+
+---
+
 # Agent Team Project Plan
 
 ## Goal
@@ -330,3 +336,4 @@ Alternatively: tighten README and docs to match current implementation before ad
 - Clarified prompt assembly boundaries across Chief of Staff, Researcher, and Writer so current task, current evidence, and continuity memory are separated explicitly
 - Completed Issue 67 memory-writeback fix: memory inspection turns are now read-only and no longer overwrite canonical `project_memory` artifact/context fields after approval; memory-based transform requests continue through normal drafting flow
 - Completed Issue 16 follow-up: strengthened memory-inspection intent detection for session-stored/output-type phrasing, added object-type retrieval synonym support, and changed generic memory inspection fallback to return a key-field snapshot instead of output-only
+- **2026-04-23 — Web console + Developer Pod shipped (Phase 3 complete):** FastAPI server with SSE streaming added (`agent_team/app/server.py`); browser UI served at `http://localhost:8000`; human review gate wired to browser approval flow; three-branch routing (Plan / Build / Brainstorm) exposed in UI; sequential branch execution added (Brainstorm output auto-feeds Plan); Developer Pod (Backend, Frontend, QA agents with internal revision loop) integrated into web console. CLI paths unchanged. See `PROJECT_PLAN_DEV_POD.md` for pod detail.
