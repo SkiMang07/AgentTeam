@@ -44,12 +44,17 @@ def build_graph(
     communication_influence_advisor: CommunicationInfluenceAdvisorAgent | None = None,
     growth_mindset_advisor: GrowthMindsetAdvisorAgent | None = None,
     entrepreneur_execution_advisor: EntrepreneurExecutionAdvisorAgent | None = None,
+    on_node_enter=None,
+    on_node_exit=None,
+    human_review_fn=None,
 ):
     graph_builder = StateGraph(SharedState)
     max_auto_redrafts = 1
 
     def timed_node(node_name: str, fn):
         def _wrapped(state: SharedState) -> SharedState:
+            if on_node_enter:
+                on_node_enter(node_name, state)
             print(f"[flow] entering node: {node_name}")
             start = perf_counter()
             result_state = fn(state)
@@ -69,10 +74,13 @@ def build_graph(
             node_timings_ms.setdefault(node_name, []).append(elapsed_ms)
 
             merged_metadata["node_timings_ms"] = node_timings_ms
-            return {
+            result = {
                 **result_state,
                 "model_metadata": merged_metadata,
             }
+            if on_node_exit:
+                on_node_exit(node_name, result, elapsed_ms)
+            return result
 
         return _wrapped
 
@@ -306,23 +314,28 @@ def build_graph(
                 print(f"- {item}")
             print()
 
-        try:
-            approved = input("Approve final output? [y/N]: ").strip().lower() == "y"
-        except (EOFError, KeyboardInterrupt):
-            return {
-                **state,
-                "final_output": "Finalization interrupted before approval.",
-                "status": "stopped_by_human",
-            }
-        if not approved:
+        if human_review_fn is not None:
+            approved, notes = human_review_fn(draft, state)
+        else:
             try:
-                notes = input("Optional revision notes for Writer (or press Enter to keep as-is): ").strip()
+                approved = input("Approve final output? [y/N]: ").strip().lower() == "y"
             except (EOFError, KeyboardInterrupt):
                 return {
                     **state,
                     "final_output": "Finalization interrupted before approval.",
                     "status": "stopped_by_human",
                 }
+            notes = ""
+            if not approved:
+                try:
+                    notes = input("Optional revision notes for Writer (or press Enter to keep as-is): ").strip()
+                except (EOFError, KeyboardInterrupt):
+                    return {
+                        **state,
+                        "final_output": "Finalization interrupted before approval.",
+                        "status": "stopped_by_human",
+                    }
+        if not approved:
             if notes:
                 revised_state = {
                     **state,

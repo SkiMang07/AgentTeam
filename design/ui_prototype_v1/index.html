@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Agent Team UI Prototype v1 · Workstream Aware</title>
+    <title>Agent Team · Live Console</title>
     <style>
       :root {
         --bg: #06080b;
@@ -139,9 +139,9 @@
   <body>
     <main class="shell">
       <div class="topbar">
-        <div class="title">Agent Team · Static UI Prototype · Design Only</div>
+        <div class="title">Agent Team · Live Console</div>
         <div class="top-meta">
-          <div class="badge ghost" id="memoryIndicator">Memory continuity status: active_deliverable_type + latest_approved_output</div>
+          <div class="badge ghost" id="memoryIndicator">Memory: idle</div>
           <div class="badge" id="runState">Idle</div>
         </div>
       </div>
@@ -159,7 +159,7 @@
               </div>
               <label for="sequencePreview" style="margin-top:8px;">Design sequence preview</label>
               <input id="sequencePreview" value="Plan" readonly />
-              <div class="preview-note">Design direction only: compound branch orchestration preview is not wired to runtime logic yet.</div>
+              <div class="preview-note">Runtime: single branch per run. Multi-branch sequence is a design-direction preview.</div>
             </div>
 
             <div class="section mode-block active" data-mode="plan">
@@ -240,9 +240,9 @@
               <input id="brainFraming" value="5 advisor clusters produce notes for advisor synthesis" />
             </div>
 
-            <div class="status-inline" id="promptStatus">Design-only controls shown. This prototype does not execute backend code.</div>
+            <div class="status-inline" id="promptStatus">Ready. Controls are wired to the live server.</div>
           </div>
-          <button class="run-btn" id="runBtn">Simulate Orchestration</button>
+          <button class="run-btn" id="runBtn">Run Orchestration</button>
         </article>
 
         <article class="panel">
@@ -251,7 +251,7 @@
             <div class="metric"><small>Requested branches</small><strong id="branchLabel">Plan</strong></div>
             <div class="metric"><small>Proposed sequence</small><strong id="sequenceLabel">Plan</strong></div>
             <div class="metric"><small>Current state</small><strong id="stateLabel">chief_of_staff</strong></div>
-            <div class="metric"><small>Runtime wiring</small><strong id="humanLabel">Design-only preview</strong></div>
+            <div class="metric"><small>Runtime wiring</small><strong id="humanLabel">Live server</strong></div>
           </div>
 
           <div class="detail-card">
@@ -286,12 +286,22 @@
             </div>
             <input id="followInput" value="Use this result as input for the next selected branch in sequence." />
           </div>
-          <div class="footnote">Workspace iteration is designed for in-session progression. Persistence and compound runtime execution are not implemented.</div>
+          <div id="approvalUi" style="display:none; margin-top:10px; border:1px solid #4f6b8f; border-radius:11px; background:rgba(8,14,28,0.97); padding:12px;">
+            <div style="font-size:12px; color:#c6d1df; font-weight:600; margin-bottom:6px;">Human Review Gate</div>
+            <div style="font-size:11px; color:#8ea2ba; margin-bottom:10px;">The draft is shown in the Draft tab. Approve it or provide revision notes below.</div>
+            <textarea id="approvalNotes" placeholder="Optional revision notes (leave blank to simply decline)..." style="width:100%;min-height:56px;border:1px solid #2a3a50;border-radius:8px;background:#080e18;color:#e7edf5;padding:8px;font-size:11px;resize:vertical;margin-bottom:8px;"></textarea>
+            <div style="display:flex;gap:8px;">
+              <button id="approveBtn" style="flex:1;border:1px solid #3d7a50;border-radius:9px;background:linear-gradient(180deg,#3a7048,#2b5236);color:#eef4fb;font-weight:600;padding:10px;cursor:pointer;font-size:12px;">Approve</button>
+              <button id="rejectBtn" style="flex:1;border:1px solid #7a3d3d;border-radius:9px;background:linear-gradient(180deg,#6e3535,#4e2525);color:#eef4fb;font-weight:600;padding:10px;cursor:pointer;font-size:12px;">Revise / Decline</button>
+            </div>
+          </div>
+          <div class="footnote">Multi-branch sequences and cross-session persistence are design-direction previews.</div>
         </article>
       </section>
     </main>
 
     <script>
+      // ── Branch configs (unchanged from design) ────────────────────────────
       const order = ['brainstorm', 'plan', 'build'];
       const branchConfigs = {
         plan: {
@@ -312,10 +322,10 @@
             { id: 'approval', label: 'Approval' }
           ],
           views: {
-            draft: '<strong>Plan draft state</strong><p style="margin-top:8px;color:#cdd8e7;">Draft text appears after Writer. JT modifies only when explicitly enabled.</p>',
-            artifact: '<div class="doc"><h3>Output format preview</h3><div class="sec"><div class="sec-title"><strong>Current option</strong></div><p>Chat, Executive Brief, Decision Memo, Project Plan, or CoS-selected format.</p></div></div>',
-            findings: '<div class="doc"><h3>Reviewer findings</h3><div class="sec"><div class="sec-title"><strong>Recommended next action</strong></div><p>revise (sample static state)</p></div></div>',
-            approval: '<strong>Human approval checkpoint</strong><p style="margin-top:8px;color:#cdd8e7;">Awaiting explicit human decision.</p>'
+            draft: '<em style="color:#6a7e94">Draft will appear here after the Writer runs.</em>',
+            artifact: '<em style="color:#6a7e94">Artifact preview appears after the Writer runs.</em>',
+            findings: '<em style="color:#6a7e94">Reviewer findings appear after the Reviewer runs.</em>',
+            approval: '<em style="color:#6a7e94">Awaiting human review gate.</em>'
           }
         },
         build: {
@@ -337,11 +347,11 @@
             { id: 'approval', label: 'Approval' }
           ],
           views: {
-            backend_out: '<strong>Backend output</strong><p style="margin-top:8px;color:#cdd8e7;">Static placeholder for backend pod result.</p>',
-            frontend_out: '<strong>Frontend output</strong><p style="margin-top:8px;color:#cdd8e7;">Static placeholder for frontend pod result.</p>',
-            qa_findings: '<strong>QA findings</strong><p style="margin-top:8px;color:#cdd8e7;">QA verdict can pass or revise; revise loops before assemble.</p>',
-            assembled: '<strong>Assembled output</strong><p style="margin-top:8px;color:#cdd8e7;">Combined build output ready for human review.</p>',
-            approval: '<strong>Human approval</strong><p style="margin-top:8px;color:#cdd8e7;">Final gate remains human review.</p>'
+            backend_out: '<em style="color:#6a7e94">Backend output appears after the pod runs.</em>',
+            frontend_out: '<em style="color:#6a7e94">Frontend output appears after the pod runs.</em>',
+            qa_findings: '<em style="color:#6a7e94">QA findings appear after the QA agent runs.</em>',
+            assembled: '<em style="color:#6a7e94">Assembled output appears after the pod completes.</em>',
+            approval: '<em style="color:#6a7e94">Awaiting human review gate.</em>'
           }
         },
         brainstorm: {
@@ -362,38 +372,123 @@
             { id: 'approval', label: 'Approval' }
           ],
           views: {
-            synthesis: '<strong>Advisor synthesis</strong><p style="margin-top:8px;color:#cdd8e7;">Combined recommendation from five advisor clusters.</p>',
-            clusters: '<strong>Cluster notes</strong><p style="margin-top:8px;color:#cdd8e7;">Static placeholders for cluster perspectives in one session workspace.</p>',
-            approval: '<strong>Human approval</strong><p style="margin-top:8px;color:#cdd8e7;">Human review approves or requests revision.</p>'
+            synthesis: '<em style="color:#6a7e94">Advisor synthesis appears after all clusters run.</em>',
+            clusters: '<em style="color:#6a7e94">Cluster notes appear as each advisor runs.</em>',
+            approval: '<em style="color:#6a7e94">Awaiting human review gate.</em>'
           }
         }
       };
 
-      const modeButtons = [...document.querySelectorAll('.mode-btn')];
-      const modeBlocks = [...document.querySelectorAll('.mode-block')];
-      const runState = document.getElementById('runState');
-      const promptStatus = document.getElementById('promptStatus');
-      const sequencePreview = document.getElementById('sequencePreview');
-      const branchLabel = document.getElementById('branchLabel');
-      const sequenceLabel = document.getElementById('sequenceLabel');
-      const stateLabel = document.getElementById('stateLabel');
-      const humanLabel = document.getElementById('humanLabel');
-      const focusPill = document.getElementById('focusPill');
-      const focusList = document.getElementById('focusList');
-      const agentList = document.getElementById('agentList');
-      const workspaceTabs = document.getElementById('workspaceTabs');
-      const workspaceBody = document.getElementById('workspaceBody');
+      // ── Graph node → UI step-id mapping ──────────────────────────────────
+      // Keys are the node names emitted by the Python graph.
+      // Values are the step `id` from branchConfigs.steps (card data-step = branch_stepId).
+      const NODE_TO_STEP = {
+        chief_of_staff:              'chief_of_staff',
+        researcher:                  'researcher',
+        evidence_extract:            'researcher',    // same card
+        memory_lookup_prep:          null,            // internal, no card
+        writer:                      'writer',
+        jt:                          'jt',
+        reviewer:                    'reviewer',
+        auto_redraft_prep:           null,            // internal, no card
+        chief_final:                 'chief_final',
+        human_review:                'human_review',
+        reviewer_parse_failure:      null,
+        review_rejected_after_redraft: null,
+        pod_entry:                   'pod_entry',
+        pod_backend:                 'backend',
+        pod_frontend:                'frontend',
+        pod_qa:                      'qa',
+        pod_revise_prep:             'qa_loop',
+        pod_assemble:                'assemble',
+        advisor_entry:               'advisor_entry',
+        advisor_strategy_systems:    'strategy_systems',
+        advisor_leadership_culture:  'leadership_culture',
+        advisor_communication_influence: 'communication_influence',
+        advisor_growth_mindset:      'growth_mindset',
+        advisor_entrepreneur_execution: 'entrepreneur_execution',
+        advisor_assemble:            'advisor_synthesis',
+      };
 
-      let selectedModes = new Set(['plan']);
+      // ── DOM refs ──────────────────────────────────────────────────────────
+      const modeButtons     = [...document.querySelectorAll('.mode-btn')];
+      const modeBlocks      = [...document.querySelectorAll('.mode-block')];
+      const runState        = document.getElementById('runState');
+      const promptStatus    = document.getElementById('promptStatus');
+      const memoryIndicator = document.getElementById('memoryIndicator');
+      const sequencePreview = document.getElementById('sequencePreview');
+      const branchLabel     = document.getElementById('branchLabel');
+      const sequenceLabel   = document.getElementById('sequenceLabel');
+      const stateLabel      = document.getElementById('stateLabel');
+      const humanLabel      = document.getElementById('humanLabel');
+      const focusPill       = document.getElementById('focusPill');
+      const focusList       = document.getElementById('focusList');
+      const agentList       = document.getElementById('agentList');
+      const workspaceTabs   = document.getElementById('workspaceTabs');
+      const workspaceBody   = document.getElementById('workspaceBody');
+      const approvalUi      = document.getElementById('approvalUi');
+      const approvalNotes   = document.getElementById('approvalNotes');
+      const approveBtn      = document.getElementById('approveBtn');
+      const rejectBtn       = document.getElementById('rejectBtn');
+
+      // ── State ─────────────────────────────────────────────────────────────
+      let selectedModes     = new Set(['plan']);
+      let currentSessionId  = null;
+      let currentEvtSource  = null;
+      let lastActiveCardId  = null;
+      // A stable memory-session key shared across runs in this browser tab
+      const memSessionKey   = crypto.randomUUID();
+
+      // ── Helpers ───────────────────────────────────────────────────────────
+      function esc(str) {
+        return String(str ?? '')
+          .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+          .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      }
 
       function selectedInOrder() {
-        return order.filter(mode => selectedModes.has(mode));
+        return order.filter(m => selectedModes.has(m));
       }
 
       function buildSequenceLabel() {
-        return selectedInOrder().map(mode => branchConfigs[mode].label).join(' → ') || 'Plan';
+        return selectedInOrder().map(m => branchConfigs[m].label).join(' → ') || 'Plan';
       }
 
+      function activeBranch() {
+        return selectedInOrder()[0] || 'plan';
+      }
+
+      function getTaskText(branch) {
+        if (branch === 'plan')       return document.getElementById('planRequest')?.value.trim()   || '';
+        if (branch === 'build')      return document.getElementById('buildRequest')?.value.trim()  || '';
+        if (branch === 'brainstorm') return document.getElementById('brainQuestion')?.value.trim() || '';
+        return '';
+      }
+
+      function cardById(cardStepId) {
+        return agentList.querySelector(`[data-step="${cardStepId}"]`);
+      }
+
+      function setCardState(card, newState) {
+        if (!card) return;
+        card.classList.remove('active','complete','waiting','skipped');
+        card.classList.add(newState);
+        card.querySelector('.agent-head span:last-child').textContent = newState;
+      }
+
+      function activateTab(tabId) {
+        const tabs  = [...workspaceTabs.querySelectorAll('.tab')];
+        const views = [...workspaceBody.querySelectorAll('.output-view')];
+        tabs.forEach(t  => t.classList.toggle('active', t.dataset.tab === tabId));
+        views.forEach(v => v.classList.toggle('hidden', v.dataset.view !== tabId));
+      }
+
+      function setViewContent(viewId, html) {
+        const v = workspaceBody.querySelector(`[data-view="${viewId}"]`);
+        if (v) v.innerHTML = html;
+      }
+
+      // ── Render pipeline rail ──────────────────────────────────────────────
       function buildCombinedSteps() {
         const selected = selectedInOrder();
         const many = selected.length > 1;
@@ -412,7 +507,7 @@
               branch: 'Composite',
               name: 'Sequence Handoff',
               type: 'system',
-              summary: `Design preview: carry workspace output from ${branchConfigs[mode].label} into ${branchConfigs[selected[index + 1]].label}.`
+              summary: `Design preview: carry output from ${branchConfigs[mode].label} into ${branchConfigs[selected[index + 1]].label}.`
             });
           }
         });
@@ -423,70 +518,67 @@
         const selected = selectedInOrder();
         if (selected.length === 1) {
           const config = branchConfigs[selected[0]];
-          workspaceTabs.innerHTML = config.tabs.map((tab, idx) => `<button class="tab ${idx === 0 ? 'active' : ''}" data-tab="${tab.id}">${tab.label}</button>`).join('');
-          workspaceBody.innerHTML = Object.entries(config.views).map(([id, html], idx) => `<div class="output-view ${idx === 0 ? '' : 'hidden'}" data-view="${id}">${html}</div>`).join('');
+          workspaceTabs.innerHTML = config.tabs.map((tab, i) =>
+            `<button class="tab ${i===0?'active':''}" data-tab="${tab.id}">${tab.label}</button>`
+          ).join('');
+          workspaceBody.innerHTML = Object.entries(config.views).map(([id, html], i) =>
+            `<div class="output-view${i===0?'':' hidden'}" data-view="${id}">${html}</div>`
+          ).join('');
         } else {
           const sequence = buildSequenceLabel();
           workspaceTabs.innerHTML = [
             { id: 'seq_output', label: 'Sequence Output' },
-            { id: 'handoff', label: 'Handoff Notes' },
-            { id: 'approval', label: 'Human Review' }
-          ].map((tab, idx) => `<button class="tab ${idx === 0 ? 'active' : ''}" data-tab="${tab.id}">${tab.label}</button>`).join('');
+            { id: 'handoff',    label: 'Handoff Notes'   },
+            { id: 'approval',   label: 'Human Review'    }
+          ].map((tab, i) =>
+            `<button class="tab ${i===0?'active':''}" data-tab="${tab.id}">${tab.label}</button>`
+          ).join('');
           workspaceBody.innerHTML = `
-            <div class="output-view" data-view="seq_output"><div class="doc"><h3>Composite workspace (design preview)</h3><div class="sec"><div class="sec-title"><strong>Proposed sequence</strong></div><p>${sequence}</p></div><div class="sec"><div class="sec-title"><strong>Session progression</strong></div><p>Output from each selected branch can seed the next branch in this sequence. Runtime orchestration for this is not implemented.</p></div></div></div>
-            <div class="output-view hidden" data-view="handoff"><div class="doc"><h3>Branch handoff notes</h3><div class="sec"><ul><li>Capture what should persist into the next selected branch.</li><li>Mark reviewer or QA findings before handoff.</li><li>Keep approval checkpoints explicit between branches.</li></ul></div></div></div>
-            <div class="output-view hidden" data-view="approval"><strong>Human approval</strong><p style="margin-top:8px;color:#cdd8e7;">Human review remains the final decision gate for sequence output.</p></div>`;
+            <div class="output-view" data-view="seq_output"><div class="doc"><h3>Composite workspace</h3><div class="sec"><div class="sec-title">Proposed sequence</div><p>${sequence}</p></div><div class="sec"><div class="sec-title">Session progression</div><p>Runtime runs one branch at a time. Sequence composition is a design-direction preview.</p></div></div></div>
+            <div class="output-view hidden" data-view="handoff"><div class="doc"><h3>Branch handoff notes</h3><div class="sec"><ul><li>Capture what should persist into the next branch.</li><li>Mark reviewer findings before handoff.</li><li>Keep approval checkpoints explicit.</li></ul></div></div></div>
+            <div class="output-view hidden" data-view="approval"><em style="color:#6a7e94">Awaiting human review gate.</em></div>`;
         }
-
-        const tabs = [...workspaceTabs.querySelectorAll('.tab')];
+        const tabs  = [...workspaceTabs.querySelectorAll('.tab')];
         const views = [...workspaceBody.querySelectorAll('.output-view')];
-        tabs.forEach(tab => {
-          tab.addEventListener('click', () => {
-            tabs.forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-            views.forEach(v => v.classList.add('hidden'));
-            const target = views.find(v => v.dataset.view === tab.dataset.tab);
-            if (target) target.classList.remove('hidden');
-          });
-        });
+        tabs.forEach(tab => tab.addEventListener('click', () => {
+          tabs.forEach(t  => t.classList.remove('active'));
+          tab.classList.add('active');
+          views.forEach(v => v.classList.add('hidden'));
+          const target = views.find(v => v.dataset.view === tab.dataset.tab);
+          if (target) target.classList.remove('hidden');
+        }));
       }
 
       function render() {
         const selected = selectedInOrder();
         const sequence = buildSequenceLabel();
-        modeButtons.forEach(btn => btn.classList.toggle('active', selectedModes.has(btn.dataset.mode)));
+        modeButtons.forEach(btn =>  btn.classList.toggle('active', selectedModes.has(btn.dataset.mode)));
         modeBlocks.forEach(block => block.classList.toggle('active', selectedModes.has(block.dataset.mode)));
-
-        sequencePreview.value = sequence;
-        branchLabel.textContent = selected.map(mode => branchConfigs[mode].label).join(', ');
+        sequencePreview.value     = sequence;
+        branchLabel.textContent   = selected.map(m => branchConfigs[m].label).join(', ');
         sequenceLabel.textContent = sequence;
-        humanLabel.textContent = selected.length > 1 ? 'Design-only sequence preview' : 'Single branch preview';
+        humanLabel.textContent    = 'Live server';
 
         const steps = buildCombinedSteps();
         stateLabel.textContent = steps[0]?.id || 'chief_of_staff';
-        agentList.innerHTML = steps.map((step, idx) => `
-          <div class="agent-card ${idx === 0 ? 'active' : 'waiting'} ${step.type === 'system' ? 'system-state' : ''}" data-step="${step.id}">
-            <div class="agent-head"><span>Step ${idx + 1}</span><span>${idx === 0 ? 'active' : 'waiting'}</span></div>
+        agentList.innerHTML = steps.map((step, i) => `
+          <div class="agent-card ${i===0?'active':'waiting'} ${step.type==='system'?'system-state':''}" data-step="${step.id}">
+            <div class="agent-head"><span>Step ${i+1}</span><span>${i===0?'active':'waiting'}</span></div>
             <div class="agent-name">${step.name}</div>
             <div class="agent-summary">${step.summary}</div>
           </div>`).join('');
 
         focusPill.textContent = steps[0]?.name || 'Chief of Staff';
-        focusList.innerHTML = `<li>${steps[0]?.summary || 'Select a branch.'}</li><li>Sequence: ${sequence}.</li><li>${selected.length > 1 ? 'Composite rail is a design direction, not runtime behavior.' : 'Branch rail reflects current runtime architecture.'}</li>`;
-
-        promptStatus.textContent = `${selected.length > 1 ? 'Multi-workstream design preview loaded.' : `${branchConfigs[selected[0]].label} setup loaded.`} This prototype does not execute backend logic.`;
+        focusList.innerHTML   = `<li>${steps[0]?.summary || 'Select a branch.'}</li><li>Sequence: ${sequence}.</li>`;
         renderWorkspace();
         bindRailInteractions();
       }
 
       function bindRailInteractions() {
-        const cards = [...agentList.querySelectorAll('.agent-card')];
-        cards.forEach(card => {
+        agentList.querySelectorAll('.agent-card').forEach(card => {
           card.addEventListener('click', () => {
-            cards.forEach(c => c.classList.remove('active'));
-            card.classList.add('active');
             focusPill.textContent = card.querySelector('.agent-name').textContent;
-            focusList.innerHTML = `<li>${card.querySelector('.agent-summary').textContent}</li><li>Static branch-aware visualization only.</li><li>Human review remains explicit and required.</li>`;
+            focusList.innerHTML = `<li>${card.querySelector('.agent-summary').textContent}</li>`;
             stateLabel.textContent = card.dataset.step;
           });
         });
@@ -502,42 +594,203 @@
         });
       });
 
-      document.getElementById('runBtn').addEventListener('click', async () => {
-        const cards = [...agentList.querySelectorAll('.agent-card')];
-        runState.textContent = 'Running';
-        promptStatus.textContent = 'Simulating design flow...';
+      // ── SSE event handler ─────────────────────────────────────────────────
+      function handleSseEvent(event) {
+        const branch = activeBranch();
 
-        cards.forEach(c => {
-          c.classList.remove('active', 'complete', 'waiting', 'skipped');
-          c.classList.add('waiting');
-          c.querySelector('.agent-head span:last-child').textContent = 'waiting';
-        });
+        switch (event.type) {
 
-        const jtEnabled = !selectedModes.has('plan') || document.getElementById('planJt').value === 'Enabled';
-        for (const card of cards) {
-          if (card.dataset.step.includes('_jt') && !jtEnabled) {
-            card.classList.remove('waiting');
-            card.classList.add('skipped');
-            card.querySelector('.agent-head span:last-child').textContent = 'skipped';
-            continue;
+          case 'session':
+            currentSessionId = event.session_id;
+            break;
+
+          case 'node_start': {
+            const stepKey = NODE_TO_STEP[event.node];
+            if (!stepKey) break;
+            const cardId = `${branch}_${stepKey}`;
+
+            // Mark previous active card as complete (unless it's the same card revisited)
+            if (lastActiveCardId && lastActiveCardId !== cardId) {
+              setCardState(cardById(lastActiveCardId), 'complete');
+            }
+            // Mark the new card as active
+            const card = cardById(cardId);
+            if (card) {
+              setCardState(card, 'active');
+              stateLabel.textContent = event.node;
+              focusPill.textContent  = card.querySelector('.agent-name').textContent;
+              focusList.innerHTML    = `<li>${card.querySelector('.agent-summary').textContent}</li>`;
+            }
+            lastActiveCardId = cardId;
+            promptStatus.textContent = `Running: ${event.node.replace(/_/g,' ')}…`;
+            break;
           }
-          card.classList.remove('waiting');
-          card.classList.add('active');
-          card.querySelector('.agent-head span:last-child').textContent = 'active';
-          stateLabel.textContent = card.dataset.step;
-          focusPill.textContent = card.querySelector('.agent-name').textContent;
-          await new Promise(resolve => setTimeout(resolve, 260));
-          if (!card.dataset.step.includes('human_review')) {
-            card.classList.remove('active');
-            card.classList.add('complete');
-            card.querySelector('.agent-head span:last-child').textContent = 'complete';
+
+          case 'node_complete': {
+            // node_complete fires after the graph node fully returns.
+            // For human_review we leave the card active until final/stopped events.
+            if (event.node === 'human_review') break;
+            const stepKey = NODE_TO_STEP[event.node];
+            if (!stepKey) break;
+            const card = cardById(`${branch}_${stepKey}`);
+            setCardState(card, 'complete');
+            break;
           }
+
+          case 'human_review': {
+            runState.textContent    = 'Awaiting Approval';
+            promptStatus.textContent = 'Draft ready — your review is required.';
+
+            // ── Show draft in Draft/Approval tab ──────────────────────────
+            const draftHtml = `<div class="doc"><div class="sec"><pre style="white-space:pre-wrap;word-break:break-word;color:#d6dfec;font-family:inherit;margin:0;">${esc(event.draft)}</pre></div></div>`;
+
+            if (branch === 'plan') {
+              setViewContent('draft', draftHtml);
+              activateTab('draft');
+
+              if (event.reviewer_findings && Object.keys(event.reviewer_findings).length) {
+                const f = event.reviewer_findings;
+                setViewContent('findings', `<div class="doc">
+                  <h3>Reviewer Findings</h3>
+                  <div class="sec"><div class="sec-title">Recommended action</div><p>${esc(f.recommended_next_action)}</p></div>
+                  <div class="sec"><div class="sec-title">Overall assessment</div><p>${esc(f.overall_assessment)}</p></div>
+                  ${(f.missing_content||[]).length ? `<div class="sec"><div class="sec-title">Missing content</div><ul>${(f.missing_content||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul></div>` : ''}
+                  ${(f.unsupported_claims||[]).length ? `<div class="sec"><div class="sec-title">Unsupported claims</div><ul>${(f.unsupported_claims||[]).map(i=>`<li>${esc(i)}</li>`).join('')}</ul></div>` : ''}
+                </div>`);
+              }
+            } else if (branch === 'build') {
+              setViewContent('assembled', draftHtml);
+              activateTab('assembled');
+            } else if (branch === 'brainstorm') {
+              setViewContent('synthesis', draftHtml);
+              activateTab('synthesis');
+            }
+
+            // ── Show approval UI ──────────────────────────────────────────
+            approvalNotes.value    = '';
+            approvalUi.style.display = 'block';
+            approvalUi.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            break;
+          }
+
+          case 'final': {
+            runState.textContent    = event.status === 'finalized' ? 'Complete' : 'Stopped';
+            promptStatus.textContent = `Done — status: ${event.status}`;
+            approvalUi.style.display = 'none';
+
+            const finalHtml = `<div class="doc"><div class="sec"><pre style="white-space:pre-wrap;word-break:break-word;color:#d6dfec;font-family:inherit;margin:0;">${esc(event.output)}</pre></div></div>`;
+
+            if (branch === 'plan') {
+              setViewContent('approval', finalHtml);
+              activateTab('approval');
+            } else if (branch === 'build') {
+              setViewContent('approval', finalHtml);
+              activateTab('approval');
+            } else if (branch === 'brainstorm') {
+              setViewContent('approval', finalHtml);
+              activateTab('approval');
+            }
+
+            // Mark human_review card as complete
+            setCardState(cardById(`${branch}_human_review`), 'complete');
+            lastActiveCardId = null;
+
+            // Update memory indicator
+            memoryIndicator.textContent = 'Memory: updated this run';
+            if (currentEvtSource) { currentEvtSource.close(); currentEvtSource = null; }
+            break;
+          }
+
+          case 'error': {
+            runState.textContent    = 'Error';
+            promptStatus.textContent = `Error: ${event.message}`;
+            approvalUi.style.display = 'none';
+            if (currentEvtSource) { currentEvtSource.close(); currentEvtSource = null; }
+            break;
+          }
+
+          case 'heartbeat':
+            break; // keep-alive, no UI update needed
+
+          default:
+            break;
+        }
+      }
+
+      // ── Run button ────────────────────────────────────────────────────────
+      document.getElementById('runBtn').addEventListener('click', () => {
+        if (currentEvtSource) { currentEvtSource.close(); currentEvtSource = null; }
+
+        const branch = activeBranch();
+        const task   = getTaskText(branch);
+        if (!task) {
+          promptStatus.textContent = 'Please enter a task before running.';
+          return;
         }
 
-        runState.textContent = 'Awaiting Human Review';
-        promptStatus.textContent = 'Simulation complete. Awaiting explicit human approval.';
+        const jtEnabled   = branch === 'plan' && document.getElementById('planJt')?.value === 'Enabled';
+        const filesPath   = branch === 'plan' ? (document.getElementById('planFiles')?.value || '') : '';
+        const webSearch   = branch === 'plan' && document.getElementById('planWeb')?.value === 'Requested';
+        const outputFmt   = branch === 'plan' ? (document.getElementById('planArtifact')?.value || 'Chat')
+                          : branch === 'brainstorm' ? (document.getElementById('brainOutput')?.value || 'Chat')
+                          : 'Chat';
+
+        // Reset rail
+        lastActiveCardId = null;
+        agentList.querySelectorAll('.agent-card').forEach(c => setCardState(c, 'waiting'));
+        approvalUi.style.display = 'none';
+
+        // Reset workspace views to placeholder
+        workspaceBody.querySelectorAll('.output-view').forEach(v => {
+          const branch0 = activeBranch();
+          const config  = branchConfigs[branch0];
+          if (config && config.views[v.dataset.view]) {
+            v.innerHTML = config.views[v.dataset.view];
+          }
+        });
+
+        runState.textContent    = 'Running';
+        promptStatus.textContent = 'Connecting to agent team…';
+
+        const params = new URLSearchParams({
+          task, branch,
+          jt_enabled:    jtEnabled,
+          files_path:    filesPath,
+          web_search:    webSearch,
+          output_format: outputFmt,
+          mem_session:   memSessionKey,
+        });
+
+        currentEvtSource = new EventSource(`/run?${params}`);
+        currentEvtSource.addEventListener('message', e => {
+          try { handleSseEvent(JSON.parse(e.data)); } catch {}
+        });
+        currentEvtSource.addEventListener('error', () => {
+          if (currentEvtSource.readyState === EventSource.CLOSED) return;
+          runState.textContent    = 'Connection error';
+          promptStatus.textContent = 'Lost connection to server. Is it running?';
+        });
       });
 
+      // ── Approval UI ───────────────────────────────────────────────────────
+      async function submitApproval(approved) {
+        if (!currentSessionId) return;
+        const notes = approvalNotes.value.trim();
+        approvalUi.style.display = 'none';
+        runState.textContent    = 'Running';
+        promptStatus.textContent = approved ? 'Approved — finalising…' : notes ? 'Revision requested — re-running…' : 'Declined.';
+
+        await fetch('/approve', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ session_id: currentSessionId, approved, notes }),
+        });
+      }
+
+      approveBtn.addEventListener('click', () => submitApproval(true));
+      rejectBtn.addEventListener('click',  () => submitApproval(false));
+
+      // ── Initial render ────────────────────────────────────────────────────
       render();
     </script>
   </body>
