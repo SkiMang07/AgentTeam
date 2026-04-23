@@ -4,13 +4,17 @@ from time import perf_counter
 
 from langgraph.graph import END, START, StateGraph
 
+from agents.backend import BackendAgent
 from agents.chief_of_staff import ChiefOfStaffAgent
+from agents.frontend import FrontendAgent
 from agents.jt import JTAgent
+from agents.qa import QAAgent
 from agents.researcher import ResearcherAgent
 from agents.reviewer import ReviewerAgent
 from agents.writer import WriterAgent
 from app.state import (
     SharedState,
+    get_canonical_dev_pod_requested,
     get_canonical_jt_requested,
     get_memory_lookup_fields,
     normalize_project_memory,
@@ -24,6 +28,9 @@ def build_graph(
     researcher: ResearcherAgent,
     reviewer: ReviewerAgent,
     writer: WriterAgent,
+    backend: BackendAgent | None = None,
+    frontend: FrontendAgent | None = None,
+    qa: QAAgent | None = None,
 ):
     graph_builder = StateGraph(SharedState)
     max_auto_redrafts = 1
@@ -273,6 +280,9 @@ def build_graph(
         print(f"jt_mode: {state.get('jt_mode')}")
         if state.get("memory_lookup_requested", False):
             print("Reviewer verdict: not_run (memory lookup path)")
+        elif state.get("dev_pod_requested", False):
+            pod_verdict = state.get("pod_qa_verdict", "unknown")
+            print(f"Reviewer verdict: pod_qa_{pod_verdict}")
         else:
             print(f"Reviewer verdict: {'approved' if review_approved else 'needs_revision'}")
         if state.get("file_read_summary"):
@@ -361,7 +371,103 @@ def build_graph(
             "status": "reviewer_parse_failed",
         }
 
+    max_pod_revisions = 2
+
+    def pod_entry_node(state: SharedState) -> SharedState:
+        work_order = state.get("work_order") or {}
+        existing_brief = state.get("pod_task_brief", "")
+        if not existing_brief:
+            criteria = "\n".join(f"- {c}" for c in work_order.get("success_criteria", []))
+            pod_task_brief = (
+                f"Objective: {work_order.get('objective', '')}\n"
+                f"Deliverable: {work_order.get('deliverable_type', '')}\n"
+                f"Success criteria:\n{criteria or '- (none provided)'}"
+            )
+        else:
+            pod_task_brief = existing_brief
+        return {
+            **state,
+            "pod_task_brief": pod_task_brief,
+            "pod_artifacts": {},
+            "pod_qa_findings": [],
+            "pod_qa_verdict": None,
+            "pod_revision_count": 0,
+            "status": "pod_started",
+        }
+
+    def pod_backend_node(state: SharedState) -> SharedState:
+        if backend is None:
+            raise RuntimeError("BackendAgent not provided to build_graph")
+        return backend.run(state)
+
+    def pod_frontend_node(state: SharedState) -> SharedState:
+        if frontend is None:
+            raise RuntimeError("FrontendAgent not provided to build_graph")
+        return frontend.run(state)
+
+    def pod_qa_node(state: SharedState) -> SharedState:
+        if qa is None:
+            raise RuntimeError("QAAgent not provided to build_graph")
+        return qa.run(state)
+
+    def pod_revise_prep_node(state: SharedState) -> SharedState:
+        revision_count = state.get("pod_revision_count", 0)
+        findings = state.get("pod_qa_findings", [])
+        findings_block = "\n".join(f"- {f}" for f in findings) or "- (no specific findings)"
+        revision_note = (
+            f"\n\n[Revision {revision_count + 1}] QA findings to address:\n{findings_block}"
+        )
+        print(f"\n[pod] QA requested revision {revision_count + 1}. Re-running backend + frontend.\n")
+        return {
+            **state,
+            "pod_task_brief": f"{state.get('pod_task_brief', '')}{revision_note}",
+            "pod_artifacts": {},
+            "pod_revision_count": revision_count + 1,
+            "status": "pod_revising",
+        }
+
+    def pod_assemble_node(state: SharedState) -> SharedState:
+        artifacts = state.get("pod_artifacts") or {}
+        backend_out = artifacts.get("backend", "")
+        frontend_out = artifacts.get("frontend", "")
+        qa_findings = state.get("pod_qa_findings", [])
+        revision_count = state.get("pod_revision_count", 0)
+
+        parts: list[str] = []
+        if backend_out:
+            parts.append(f"## Backend\n\n{backend_out}")
+        if frontend_out:
+            parts.append(f"## Frontend\n\n{frontend_out}")
+        if qa_findings:
+            findings_block = "\n".join(f"- {f}" for f in qa_findings)
+            verdict = state.get("pod_qa_verdict", "")
+            label = "QA Notes (passed)" if verdict == "pass" else f"QA Notes (escalated after {revision_count} revision(s))"
+            parts.append(f"## {label}\n\n{findings_block}")
+
+        assembled = "\n\n---\n\n".join(parts) if parts else "(no pod output generated)"
+        return {
+            **state,
+            "draft": assembled,
+            "status": "pod_assembled",
+        }
+
+    timed_pod_entry_node = timed_node("pod_entry", pod_entry_node)
+    timed_pod_backend_node = timed_node("pod_backend", pod_backend_node)
+    timed_pod_frontend_node = timed_node("pod_frontend", pod_frontend_node)
+    timed_pod_qa_node = timed_node("pod_qa", pod_qa_node)
+    timed_pod_revise_prep_node = timed_node("pod_revise_prep", pod_revise_prep_node)
+    timed_pod_assemble_node = timed_node("pod_assemble", pod_assemble_node)
+
+    def route_after_pod_qa(state: SharedState) -> str:
+        verdict = state.get("pod_qa_verdict", "revise")
+        revision_count = state.get("pod_revision_count", 0)
+        if verdict == "pass" or revision_count >= max_pod_revisions:
+            return "pod_assemble"
+        return "pod_revise_prep"
+
     def route_after_chief(state: SharedState) -> str:
+        if get_canonical_dev_pod_requested(state):
+            return "pod_entry"
         work_order = state.get("work_order")
         route = state.get("route")
         if route == "memory_lookup" or state.get("memory_lookup_requested", False):
@@ -430,6 +536,12 @@ def build_graph(
         "review_rejected_after_redraft",
         timed_node("review_rejected_after_redraft", review_rejected_after_redraft_node),
     )
+    graph_builder.add_node("pod_entry", timed_pod_entry_node)
+    graph_builder.add_node("pod_backend", timed_pod_backend_node)
+    graph_builder.add_node("pod_frontend", timed_pod_frontend_node)
+    graph_builder.add_node("pod_qa", timed_pod_qa_node)
+    graph_builder.add_node("pod_revise_prep", timed_pod_revise_prep_node)
+    graph_builder.add_node("pod_assemble", timed_pod_assemble_node)
 
     graph_builder.add_edge(START, "chief_of_staff")
     graph_builder.add_conditional_edges(
@@ -439,6 +551,7 @@ def build_graph(
             "researcher": "researcher",
             "evidence_extract": "evidence_extract",
             "memory_lookup_prep": "memory_lookup_prep",
+            "pod_entry": "pod_entry",
         },
     )
     graph_builder.add_edge("memory_lookup_prep", "writer")
@@ -476,5 +589,19 @@ def build_graph(
     graph_builder.add_edge("human_review", END)
     graph_builder.add_edge("reviewer_parse_failure", END)
     graph_builder.add_edge("review_rejected_after_redraft", END)
+
+    graph_builder.add_edge("pod_entry", "pod_backend")
+    graph_builder.add_edge("pod_backend", "pod_frontend")
+    graph_builder.add_edge("pod_frontend", "pod_qa")
+    graph_builder.add_conditional_edges(
+        "pod_qa",
+        route_after_pod_qa,
+        {
+            "pod_assemble": "pod_assemble",
+            "pod_revise_prep": "pod_revise_prep",
+        },
+    )
+    graph_builder.add_edge("pod_revise_prep", "pod_backend")
+    graph_builder.add_edge("pod_assemble", "human_review")
 
     return graph_builder.compile()

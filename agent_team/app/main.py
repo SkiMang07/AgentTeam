@@ -4,8 +4,11 @@ import argparse
 
 from openai import AuthenticationError, RateLimitError
 
+from agents.backend import BackendAgent
 from agents.chief_of_staff import ChiefOfStaffAgent
+from agents.frontend import FrontendAgent
 from agents.jt import JTAgent
+from agents.qa import QAAgent
 from agents.researcher import ResearcherAgent
 from agents.reviewer import ReviewerAgent
 from agents.writer import WriterAgent
@@ -53,6 +56,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Enable live web search for the Researcher agent.",
     )
+    parser.add_argument(
+        "--dev-pod",
+        action="store_true",
+        help="Route task through the developer pod (Backend, Frontend, QA agents).",
+    )
     parser.add_argument("task", type=str, nargs="*", help="Task for the agent team")
     return parser.parse_args()
 
@@ -95,8 +103,11 @@ def main() -> None:
     researcher = ResearcherAgent(client, obsidian_tool=obsidian_tool)
     reviewer = ReviewerAgent(client)
     writer = WriterAgent(client, voice_loader=voice_loader)
+    backend = BackendAgent(client)
+    frontend = FrontendAgent(client)
+    qa = QAAgent(client)
 
-    graph = build_graph(chief_of_staff, jt, researcher, reviewer, writer)
+    graph = build_graph(chief_of_staff, jt, researcher, reviewer, writer, backend, frontend, qa)
     session_project_memory = empty_project_memory()
     pending_task = " ".join(args.task).strip()
 
@@ -113,8 +124,10 @@ def main() -> None:
             return
 
         jt_requested, jt_mode = detect_jt_request(task=task, cli_jt=args.jt, cli_mode=args.jt_mode)
+        dev_pod_requested = args.dev_pod
         print(f"JT requested (CLI): {jt_requested}")
         print(f"JT mode (CLI): {jt_mode}")
+        print(f"Dev pod requested (CLI): {dev_pod_requested}")
         if args.web_search:
             print("[tools] Web search enabled for Researcher.")
 
@@ -126,6 +139,7 @@ def main() -> None:
             "web_search_enabled": args.web_search,
             "jt_requested": jt_requested,
             "jt_mode": jt_mode,
+            "dev_pod_requested": dev_pod_requested,
             "jt_feedback": [],
             "jt_rewrite": None,
             "jt_findings": None,
