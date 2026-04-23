@@ -20,6 +20,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
 from agents.advisor import AdvisorAgent
+from agents.advisor_router import AdvisorRouterAgent
 from agents.backend import BackendAgent
 from agents.chief_of_staff import ChiefOfStaffAgent
 from agents.communication_influence_advisor import CommunicationInfluenceAdvisorAgent
@@ -99,6 +100,7 @@ def _init_agents() -> dict[str, Any]:
         "frontend": FrontendAgent(client),
         "qa": QAAgent(client),
         "advisor": AdvisorAgent(client),
+        "advisor_router": AdvisorRouterAgent(client),
         "strategy_systems_advisor": StrategySystemsAdvisorAgent(client),
         "leadership_culture_advisor": LeadershipCultureAdvisorAgent(client),
         "communication_influence_advisor": CommunicationInfluenceAdvisorAgent(client),
@@ -129,6 +131,7 @@ def make_graph(on_node_enter=None, on_node_exit=None, human_review_fn=None):
         a["frontend"],
         a["qa"],
         advisor=a["advisor"],
+        advisor_router=a["advisor_router"],
         strategy_systems_advisor=a["strategy_systems_advisor"],
         leadership_culture_advisor=a["leadership_culture_advisor"],
         communication_influence_advisor=a["communication_influence_advisor"],

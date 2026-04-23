@@ -68,8 +68,18 @@ class DryRunResponsesClient:
             return json.dumps({"relevant_paths": []})
 
         if "Create and route the Chief of Staff work order." in user_prompt:
-            task = user_prompt.split("Task:\n", maxsplit=1)[-1].lower()
+            task = user_prompt
+            if "Current task:\n" in user_prompt:
+                task = user_prompt.split("Current task:\n", maxsplit=1)[-1]
+                task = task.split("\n\nObsidian vault context", maxsplit=1)[0]
+            task = task.lower()
+            cli_dev_flag = "CLI dev pod requested flag: True" in user_prompt
+            cli_advisor_flag = "CLI advisor pod requested flag: True" in user_prompt
             route = "write_direct" if "write_direct" in task else "research"
+            inferred_dev = "implementation" in task or "code" in task
+            inferred_advisor = any(phrase in task for phrase in ("advisor", "brainstorm", "strategy", "evaluate"))
+            dev_pod_requested = cli_dev_flag or (inferred_dev and not cli_advisor_flag)
+            advisor_pod_requested = cli_advisor_flag or inferred_advisor
             work_order = {
                 "objective": "Complete the requested task.",
                 "deliverable_type": "draft_response",
@@ -80,12 +90,57 @@ class DryRunResponsesClient:
                 "research_needed": route == "research",
                 "open_questions": [],
                 "jt_requested": "jt" in task,
+                "dev_pod_requested": dev_pod_requested,
+                "advisor_pod_requested": advisor_pod_requested,
             }
             return json.dumps(
                 {
                     "work_order": work_order,
                     "route": route,
                     "rationale": "dry-run deterministic routing",
+                }
+            )
+
+        if "You are the Advisor Router for the Advisor Pod." in system_prompt:
+            task = user_prompt.lower()
+            if "rewrite this sentence to be clearer" in task:
+                selected: list[str] = []
+                reasons: dict[str, str] = {}
+            elif "ui flow" in task:
+                selected = ["communication_influence"]
+                reasons = {"communication_influence": "UI flow clarity and user-facing communication are central."}
+            elif "langgraph routing" in task or "implementation plan" in task:
+                selected = ["entrepreneur_execution"]
+                reasons = {"entrepreneur_execution": "Task is a technical execution planning request."}
+            elif "customer facing success plans" in task and "internal strategy memos" in task:
+                selected = ["strategy_systems", "communication_influence", "entrepreneur_execution"]
+                reasons = {
+                    "strategy_systems": "Needs strategy framing across multiple deliverable types.",
+                    "communication_influence": "Includes customer-facing and memo communication concerns.",
+                    "entrepreneur_execution": "Includes implementation-planning and delivery implications.",
+                }
+            else:
+                selected = ["strategy_systems"]
+                reasons = {"strategy_systems": "Default dry-run advisor for general strategic questions."}
+
+            all_ids = (
+                "strategy_systems",
+                "leadership_culture",
+                "communication_influence",
+                "growth_mindset",
+                "entrepreneur_execution",
+            )
+            skipped = {
+                advisor_id: "Not selected for this task in dry-run routing."
+                for advisor_id in all_ids
+                if advisor_id not in selected
+            }
+            return json.dumps(
+                {
+                    "selected_advisors": selected,
+                    "selection_reason": reasons,
+                    "skipped_advisors": skipped,
+                    "advisor_route_confidence": "high",
                 }
             )
 
@@ -188,5 +243,11 @@ class DryRunResponsesClient:
                     "obvious_missing_items": [],
                 }
             )
+
+        if "You are the Advisor Agent — the Chief Advisor and council leader" in system_prompt:
+            return "DRY RUN ADVISOR SYNTHESIS: combined selected advisor viewpoints."
+
+        if "Apply your cluster's frameworks to the task above." in user_prompt:
+            return "DRY RUN ADVISOR NOTE: cluster-specific recommendation."
 
         return ""

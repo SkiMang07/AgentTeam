@@ -51,6 +51,14 @@ class EvidenceItem(TypedDict):
     evidence_points: list[str]
 
 
+
+
+class AdvisorRouteResult(TypedDict):
+    selected_advisors: list[str]
+    selection_reason: dict[str, str]
+    skipped_advisors: dict[str, str]
+    advisor_route_confidence: Literal["low", "medium", "high"]
+
 class ProjectMemory(TypedDict):
     current_objective: str
     active_deliverable_type: str
@@ -125,6 +133,9 @@ class SharedState(TypedDict):
     pod_revision_count: NotRequired[int]
     advisor_pod_requested: NotRequired[bool]
     advisor_brief: NotRequired[str]
+    advisor_route: NotRequired[AdvisorRouteResult]
+    advisor_selected_advisors: NotRequired[list[str]]
+    advisor_invoked_advisors: NotRequired[list[str]]
     advisor_outputs: NotRequired[dict[str, str]]
     advisor_synthesis: NotRequired[str]
 

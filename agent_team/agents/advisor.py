@@ -9,7 +9,7 @@ PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "advisor.md"
 
 
 class AdvisorAgent:
-    """Chief Advisor — synthesizes all five cluster outputs into a single advisory draft."""
+    """Chief Advisor — synthesizes selected cluster outputs into a single advisory draft."""
 
     def __init__(self, client: ResponsesClient) -> None:
         self._client = client

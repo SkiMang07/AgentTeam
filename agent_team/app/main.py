@@ -5,6 +5,7 @@ import argparse
 from openai import AuthenticationError, RateLimitError
 
 from agents.advisor import AdvisorAgent
+from agents.advisor_router import AdvisorRouterAgent
 from agents.backend import BackendAgent
 from agents.chief_of_staff import ChiefOfStaffAgent
 from agents.communication_influence_advisor import CommunicationInfluenceAdvisorAgent
@@ -118,6 +119,7 @@ def main() -> None:
     frontend = FrontendAgent(client)
     qa = QAAgent(client)
     advisor = AdvisorAgent(client)
+    advisor_router = AdvisorRouterAgent(client)
     strategy_systems_adv = StrategySystemsAdvisorAgent(client)
     leadership_culture_adv = LeadershipCultureAdvisorAgent(client)
     communication_influence_adv = CommunicationInfluenceAdvisorAgent(client)
@@ -134,6 +136,7 @@ def main() -> None:
         frontend,
         qa,
         advisor=advisor,
+        advisor_router=advisor_router,
         strategy_systems_advisor=strategy_systems_adv,
         leadership_culture_advisor=leadership_culture_adv,
         communication_influence_advisor=communication_influence_adv,
