@@ -56,13 +56,13 @@ class ChiefOfStaffAgent:
                 "Set work_order.jt_requested from explicit task text only; do not infer hidden intent. "
                 "If project memory is provided, use it only as continuity context for planning; "
                 "do not treat memory as evidence or claimed facts unless they are present in current task inputs. "
-                "Use vault context to better understand Andrew's active projects, priorities, and knowledge landscape "
-                "when forming the work order — but do not treat vault context as approved facts. "
+                "Use vault context to extract specific facts, tool descriptions, and current state into success_criteria — "
+                "do not treat vault context as approved facts for the Researcher, but do use it to write concrete, falsifiable success_criteria items. "
                 "Do not include extra keys.\n\n"
                 f"CLI JT requested flag: {inferred_jt_requested}\n\n"
                 "Current task:\n"
                 f"{user_task}\n\n"
-                "Obsidian vault context (use for routing and work order framing only):\n"
+                "Obsidian vault context (use to ground the work order — pull specific facts, tool descriptions, and current state into success_criteria):\n"
                 f"{obsidian_block}\n\n"
                 "Session project memory (continuity only):\n"
                 f"- current_objective: {project_memory.get('current_objective', '')}\n"
@@ -82,6 +82,25 @@ class ChiefOfStaffAgent:
             prior_memory=project_memory,
             user_task=user_task,
         )
+        # Override: web_search requires the Researcher to run regardless of CoS routing decision.
+        # Also sync research_needed=True so route_after_chief (which checks work_order first) routes
+        # correctly — without this sync the route field is silently ignored by the graph.
+        if state.get("web_search_enabled") and data["route"] not in {"memory_lookup"}:
+            synced_work_order = {**data["work_order"], "research_needed": True}
+            data = {**data, "route": "research", "work_order": synced_work_order}
+
+        # Safeguard: if vault context was loaded, research_needed must be True so the Researcher
+        # can convert vault content into approved_facts. Vault context in the CoS prompt is a
+        # planning aid — it does NOT auto-populate approved_facts for the Writer.
+        vault_context_available = bool(
+            obsidian_block
+            and "(Obsidian vault not configured)" not in obsidian_block
+            and "(Obsidian context unavailable" not in obsidian_block
+            and len(obsidian_block.strip()) > 50
+        )
+        if vault_context_available and data["route"] not in {"memory_lookup"}:
+            synced_work_order = {**data["work_order"], "research_needed": True}
+            data = {**data, "route": "research", "work_order": synced_work_order}
         work_order = data["work_order"]
         updated_project_memory = (
             project_memory
@@ -228,6 +247,9 @@ class ChiefOfStaffAgent:
         route = data.get("route")
         if route not in {"research", "write_direct", "memory_lookup"}:
             route = "research" if work_order["research_needed"] else "write_direct"
+        # If CoS said write_direct but research is needed, honour research_needed
+        if route == "write_direct" and work_order["research_needed"]:
+            route = "research"
         if ChiefOfStaffAgent._is_memory_lookup_request(user_task):
             route = "memory_lookup"
 

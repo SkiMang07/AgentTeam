@@ -48,6 +48,11 @@ def parse_args() -> argparse.Namespace:
         default=[],
         help="Explicit local file or folder path to include as bounded evidence input. Repeat to add multiple paths.",
     )
+    parser.add_argument(
+        "--web-search",
+        action="store_true",
+        help="Enable live web search for the Researcher agent.",
+    )
     parser.add_argument("task", type=str, nargs="*", help="Task for the agent team")
     return parser.parse_args()
 
@@ -110,12 +115,15 @@ def main() -> None:
         jt_requested, jt_mode = detect_jt_request(task=task, cli_jt=args.jt, cli_mode=args.jt_mode)
         print(f"JT requested (CLI): {jt_requested}")
         print(f"JT mode (CLI): {jt_mode}")
+        if args.web_search:
+            print("[tools] Web search enabled for Researcher.")
 
         initial_state: SharedState = {
             "user_task": task,
             "status": "received",
             "dry_run": args.dry_run,
             "debug": args.debug,
+            "web_search_enabled": args.web_search,
             "jt_requested": jt_requested,
             "jt_mode": jt_mode,
             "jt_feedback": [],

@@ -363,11 +363,17 @@ def build_graph(
 
     def route_after_chief(state: SharedState) -> str:
         work_order = state.get("work_order")
-        if state.get("route") == "memory_lookup" or state.get("memory_lookup_requested", False):
+        route = state.get("route")
+        if route == "memory_lookup" or state.get("memory_lookup_requested", False):
             return "memory_lookup_prep"
+        # Explicit route field takes precedence — CoS may have applied overrides (web_search,
+        # vault context) that set route="research" even if work_order.research_needed was
+        # originally False. Always honour the explicit route when it says "research".
+        if route == "research":
+            return "researcher"
         if isinstance(work_order, dict) and isinstance(work_order.get("research_needed"), bool):
             return "researcher" if work_order["research_needed"] else "evidence_extract"
-        return "researcher" if state.get("route") == "research" else "evidence_extract"
+        return "evidence_extract"
 
     def route_after_writer(state: SharedState) -> str:
         if state.get("memory_lookup_requested", False):

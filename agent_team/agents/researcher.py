@@ -35,9 +35,11 @@ class ResearcherAgent:
         obsidian_block = self._load_obsidian_context(state["user_task"])
 
         # Decide whether to use web search:
-        # Use it when research is needed and there is no sufficient local evidence
+        # Only when explicitly enabled via --web-search flag, research is needed,
+        # and no local file evidence has already been provided.
         research_needed = work_order.get("research_needed", True)
-        use_web_search = research_needed and not has_file_evidence
+        web_search_enabled = state.get("web_search_enabled", False)
+        use_web_search = web_search_enabled and research_needed and not has_file_evidence
 
         user_prompt = (
             "Extract facts and gaps for the Chief of Staff work order. Return strict JSON with keys: facts, gaps. "

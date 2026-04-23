@@ -7,6 +7,25 @@ from tools.openai_client import ResponsesClient
 from tools.voice_loader import VoiceLoader
 
 PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "writer.md"
+ARTIFACTS_DIR = Path(__file__).resolve().parents[1] / "prompts" / "artifacts"
+
+# Map deliverable_type values to their template filenames.
+ARTIFACT_TEMPLATES: dict[str, str] = {
+    "executive_brief": "executive_brief.md",
+    "decision_memo": "decision_memo.md",
+    "project_plan": "project_plan.md",
+}
+
+
+def _load_artifact_template(deliverable_type: str) -> str:
+    """Return the artifact template text for deliverable_type, or empty string if none exists."""
+    filename = ARTIFACT_TEMPLATES.get(deliverable_type.strip().lower() if deliverable_type else "")
+    if not filename:
+        return ""
+    template_path = ARTIFACTS_DIR / filename
+    if not template_path.exists():
+        return ""
+    return template_path.read_text(encoding="utf-8")
 
 
 class WriterAgent:
@@ -22,7 +41,7 @@ class WriterAgent:
         # baked into every model call without any runtime overhead.
         if voice_loader and voice_loader.available:
             voice_block = voice_loader.load_for_prompt()
-            self._prompt = f"{base_prompt}\n\n{voice_block}" if voice_block else base_prompt
+            self._prompt = f"{voice_block}\n\n{base_prompt}" if voice_block else base_prompt
         else:
             self._prompt = base_prompt
 
@@ -103,6 +122,14 @@ class WriterAgent:
                 f"{prior_draft}"
             )
 
+        deliverable_type = work_order.get("deliverable_type", "")
+        artifact_template = _load_artifact_template(deliverable_type)
+        artifact_block = (
+            f"\n\nArtifact template (follow this structure exactly — it overrides default prose format for this deliverable type):\n{artifact_template}"
+            if artifact_template
+            else ""
+        )
+
         raw = self._client.ask(
             system_prompt=self._prompt,
             user_prompt=(
@@ -116,7 +143,7 @@ class WriterAgent:
                 f"{redraft_source_block}\n\n"
                 f"Current task:\n{state['user_task']}\n\n"
                 f"Work order objective:\n{work_order.get('objective', '')}\n\n"
-                f"Work order deliverable_type:\n{work_order.get('deliverable_type', '')}\n\n"
+                f"Work order deliverable_type:\n{deliverable_type}\n\n"
                 f"Work order success_criteria:\n{success_criteria if success_criteria else '- (none provided)'}\n\n"
                 f"Work order open_questions:\n{open_questions if open_questions else '- (none provided)'}\n\n"
                 f"Current evidence:\n"
@@ -130,6 +157,7 @@ class WriterAgent:
                 f"- active_deliverable_type: {project_memory.get('active_deliverable_type', '')}\n"
                 f"- open_questions: {project_memory.get('open_questions', [])}\n"
                 f"- latest_approved_output: {project_memory.get('latest_approved_output', '')}"
+                f"{artifact_block}"
             ),
         )
 
