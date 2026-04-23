@@ -231,6 +231,14 @@ Alternatively: tighten README and docs to match current implementation before ad
 
 ## Change log
 
+### 2026-04-23 (Advisor pod selective routing)
+- Added canonical advisor roster with explicit advisor metadata (`id`, `name`, `when_to_use`, `when_not_to_use`, `expected_input_needs`)
+- Added Advisor Router stage before advisor invocation; router returns structured route contract (`selected_advisors`, `selection_reason`, `skipped_advisors`, `advisor_route_confidence`)
+- Added no-advisor path (`selected_advisors = []`) so simple tasks can skip specialist advisor invocation entirely
+- Updated brainstorm graph flow to invoke only selected advisors instead of all five by default
+- Added debug output for advisor selection and advisor skip rationale while keeping human review as final gate
+- Updated README to document selective advisor routing behavior
+
 ### 2026-04-22 (test suite verification — session 2 complete)
 - Re-ran full test suite after routing and voice fixes; all three tests improved over baseline
 - Test 1: 8.5/10 — Researcher runs, vault facts accurate and specific, prose output, no closers, no bullets

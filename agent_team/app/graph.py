@@ -5,6 +5,7 @@ from time import perf_counter
 from langgraph.graph import END, START, StateGraph
 
 from agents.advisor import AdvisorAgent
+from agents.advisor_router import AdvisorRouterAgent
 from agents.backend import BackendAgent
 from agents.chief_of_staff import ChiefOfStaffAgent
 from agents.communication_influence_advisor import CommunicationInfluenceAdvisorAgent
@@ -26,6 +27,7 @@ from app.state import (
     get_memory_lookup_fields,
     normalize_project_memory,
 )
+from app.advisor_registry import ADVISOR_IDS
 from tools.local_file_reader import build_evidence_bundle
 
 
@@ -39,6 +41,7 @@ def build_graph(
     frontend: FrontendAgent | None = None,
     qa: QAAgent | None = None,
     advisor: AdvisorAgent | None = None,
+    advisor_router: AdvisorRouterAgent | None = None,
     strategy_systems_advisor: StrategySystemsAdvisorAgent | None = None,
     leadership_culture_advisor: LeadershipCultureAdvisorAgent | None = None,
     communication_influence_advisor: CommunicationInfluenceAdvisorAgent | None = None,
@@ -304,6 +307,15 @@ def build_graph(
         elif state.get("dev_pod_requested", False):
             pod_verdict = state.get("pod_qa_verdict", "unknown")
             print(f"Reviewer verdict: pod_qa_{pod_verdict}")
+        elif state.get("advisor_pod_requested", False):
+            advisor_route = state.get("advisor_route", {})
+            selected = advisor_route.get("selected_advisors", []) if isinstance(advisor_route, dict) else []
+            print(f"Advisor route selected: {selected}")
+            if isinstance(advisor_route, dict):
+                reasons = advisor_route.get("selection_reason", {})
+                if isinstance(reasons, dict):
+                    for advisor_id, reason in reasons.items():
+                        print(f"- advisor reason [{advisor_id}]: {reason}")
         else:
             print(f"Reviewer verdict: {'approved' if review_approved else 'needs_revision'}")
         if state.get("file_read_summary"):
@@ -502,35 +514,63 @@ def build_graph(
         return {
             **state,
             "advisor_brief": advisor_brief,
+            "advisor_route": {
+                "selected_advisors": [],
+                "selection_reason": {},
+                "skipped_advisors": {},
+                "advisor_route_confidence": "low",
+            },
+            "advisor_selected_advisors": [],
+            "advisor_invoked_advisors": [],
             "advisor_outputs": {},
             "advisor_synthesis": "",
             "status": "advisor_started",
         }
 
+    def advisor_router_node(state: SharedState) -> SharedState:
+        if advisor_router is None:
+            raise RuntimeError("AdvisorRouterAgent not provided to build_graph")
+        return advisor_router.run(state)
+
+    def _mark_advisor_invoked(state: SharedState, advisor_id: str) -> SharedState:
+        invoked = [item for item in state.get("advisor_invoked_advisors", []) if isinstance(item, str)]
+        if advisor_id not in invoked:
+            invoked.append(advisor_id)
+        return {
+            **state,
+            "advisor_invoked_advisors": invoked,
+        }
+
     def advisor_strategy_systems_node(state: SharedState) -> SharedState:
         if strategy_systems_advisor is None:
             raise RuntimeError("StrategySystemsAdvisorAgent not provided to build_graph")
-        return strategy_systems_advisor.run(state)
+        return _mark_advisor_invoked(strategy_systems_advisor.run(state), "strategy_systems")
 
     def advisor_leadership_culture_node(state: SharedState) -> SharedState:
         if leadership_culture_advisor is None:
             raise RuntimeError("LeadershipCultureAdvisorAgent not provided to build_graph")
-        return leadership_culture_advisor.run(state)
+        return _mark_advisor_invoked(leadership_culture_advisor.run(state), "leadership_culture")
 
     def advisor_communication_influence_node(state: SharedState) -> SharedState:
         if communication_influence_advisor is None:
             raise RuntimeError("CommunicationInfluenceAdvisorAgent not provided to build_graph")
-        return communication_influence_advisor.run(state)
+        return _mark_advisor_invoked(
+            communication_influence_advisor.run(state),
+            "communication_influence",
+        )
 
     def advisor_growth_mindset_node(state: SharedState) -> SharedState:
         if growth_mindset_advisor is None:
             raise RuntimeError("GrowthMindsetAdvisorAgent not provided to build_graph")
-        return growth_mindset_advisor.run(state)
+        return _mark_advisor_invoked(growth_mindset_advisor.run(state), "growth_mindset")
 
     def advisor_entrepreneur_execution_node(state: SharedState) -> SharedState:
         if entrepreneur_execution_advisor is None:
             raise RuntimeError("EntrepreneurExecutionAdvisorAgent not provided to build_graph")
-        return entrepreneur_execution_advisor.run(state)
+        return _mark_advisor_invoked(
+            entrepreneur_execution_advisor.run(state),
+            "entrepreneur_execution",
+        )
 
     def advisor_assemble_node(state: SharedState) -> SharedState:
         if advisor is None:
@@ -538,6 +578,7 @@ def build_graph(
         return advisor.synthesize(state)
 
     timed_advisor_entry_node = timed_node("advisor_entry", advisor_entry_node)
+    timed_advisor_router_node = timed_node("advisor_router", advisor_router_node)
     timed_advisor_strategy_systems_node = timed_node("advisor_strategy_systems", advisor_strategy_systems_node)
     timed_advisor_leadership_culture_node = timed_node("advisor_leadership_culture", advisor_leadership_culture_node)
     timed_advisor_communication_influence_node = timed_node("advisor_communication_influence", advisor_communication_influence_node)
@@ -551,6 +592,33 @@ def build_graph(
         if verdict == "pass" or revision_count >= max_pod_revisions:
             return "pod_assemble"
         return "pod_revise_prep"
+
+    def route_after_advisor_router(state: SharedState) -> str:
+        selected = [
+            advisor_id
+            for advisor_id in state.get("advisor_selected_advisors", [])
+            if isinstance(advisor_id, str)
+        ]
+        for advisor_id in ADVISOR_IDS:
+            if advisor_id in selected:
+                return f"advisor_{advisor_id}"
+        return "advisor_assemble"
+
+    def route_after_advisor_node(state: SharedState) -> str:
+        selected = [
+            advisor_id
+            for advisor_id in state.get("advisor_selected_advisors", [])
+            if isinstance(advisor_id, str)
+        ]
+        invoked = {
+            advisor_id
+            for advisor_id in state.get("advisor_invoked_advisors", [])
+            if isinstance(advisor_id, str)
+        }
+        for advisor_id in ADVISOR_IDS:
+            if advisor_id in selected and advisor_id not in invoked:
+                return f"advisor_{advisor_id}"
+        return "advisor_assemble"
 
     def route_after_chief(state: SharedState) -> str:
         if get_canonical_dev_pod_requested(state):
@@ -633,6 +701,7 @@ def build_graph(
     graph_builder.add_node("pod_assemble", timed_pod_assemble_node)
 
     graph_builder.add_node("advisor_entry", timed_advisor_entry_node)
+    graph_builder.add_node("advisor_router", timed_advisor_router_node)
     graph_builder.add_node("advisor_strategy_systems", timed_advisor_strategy_systems_node)
     graph_builder.add_node("advisor_leadership_culture", timed_advisor_leadership_culture_node)
     graph_builder.add_node("advisor_communication_influence", timed_advisor_communication_influence_node)
@@ -702,12 +771,79 @@ def build_graph(
     graph_builder.add_edge("pod_revise_prep", "pod_backend")
     graph_builder.add_edge("pod_assemble", "human_review")
 
-    graph_builder.add_edge("advisor_entry", "advisor_strategy_systems")
-    graph_builder.add_edge("advisor_strategy_systems", "advisor_leadership_culture")
-    graph_builder.add_edge("advisor_leadership_culture", "advisor_communication_influence")
-    graph_builder.add_edge("advisor_communication_influence", "advisor_growth_mindset")
-    graph_builder.add_edge("advisor_growth_mindset", "advisor_entrepreneur_execution")
-    graph_builder.add_edge("advisor_entrepreneur_execution", "advisor_assemble")
+    graph_builder.add_edge("advisor_entry", "advisor_router")
+    graph_builder.add_conditional_edges(
+        "advisor_router",
+        route_after_advisor_router,
+        {
+            "advisor_strategy_systems": "advisor_strategy_systems",
+            "advisor_leadership_culture": "advisor_leadership_culture",
+            "advisor_communication_influence": "advisor_communication_influence",
+            "advisor_growth_mindset": "advisor_growth_mindset",
+            "advisor_entrepreneur_execution": "advisor_entrepreneur_execution",
+            "advisor_assemble": "advisor_assemble",
+        },
+    )
+    graph_builder.add_conditional_edges(
+        "advisor_strategy_systems",
+        route_after_advisor_node,
+        {
+            "advisor_strategy_systems": "advisor_strategy_systems",
+            "advisor_leadership_culture": "advisor_leadership_culture",
+            "advisor_communication_influence": "advisor_communication_influence",
+            "advisor_growth_mindset": "advisor_growth_mindset",
+            "advisor_entrepreneur_execution": "advisor_entrepreneur_execution",
+            "advisor_assemble": "advisor_assemble",
+        },
+    )
+    graph_builder.add_conditional_edges(
+        "advisor_leadership_culture",
+        route_after_advisor_node,
+        {
+            "advisor_strategy_systems": "advisor_strategy_systems",
+            "advisor_leadership_culture": "advisor_leadership_culture",
+            "advisor_communication_influence": "advisor_communication_influence",
+            "advisor_growth_mindset": "advisor_growth_mindset",
+            "advisor_entrepreneur_execution": "advisor_entrepreneur_execution",
+            "advisor_assemble": "advisor_assemble",
+        },
+    )
+    graph_builder.add_conditional_edges(
+        "advisor_communication_influence",
+        route_after_advisor_node,
+        {
+            "advisor_strategy_systems": "advisor_strategy_systems",
+            "advisor_leadership_culture": "advisor_leadership_culture",
+            "advisor_communication_influence": "advisor_communication_influence",
+            "advisor_growth_mindset": "advisor_growth_mindset",
+            "advisor_entrepreneur_execution": "advisor_entrepreneur_execution",
+            "advisor_assemble": "advisor_assemble",
+        },
+    )
+    graph_builder.add_conditional_edges(
+        "advisor_growth_mindset",
+        route_after_advisor_node,
+        {
+            "advisor_strategy_systems": "advisor_strategy_systems",
+            "advisor_leadership_culture": "advisor_leadership_culture",
+            "advisor_communication_influence": "advisor_communication_influence",
+            "advisor_growth_mindset": "advisor_growth_mindset",
+            "advisor_entrepreneur_execution": "advisor_entrepreneur_execution",
+            "advisor_assemble": "advisor_assemble",
+        },
+    )
+    graph_builder.add_conditional_edges(
+        "advisor_entrepreneur_execution",
+        route_after_advisor_node,
+        {
+            "advisor_strategy_systems": "advisor_strategy_systems",
+            "advisor_leadership_culture": "advisor_leadership_culture",
+            "advisor_communication_influence": "advisor_communication_influence",
+            "advisor_growth_mindset": "advisor_growth_mindset",
+            "advisor_entrepreneur_execution": "advisor_entrepreneur_execution",
+            "advisor_assemble": "advisor_assemble",
+        },
+    )
     graph_builder.add_edge("advisor_assemble", "human_review")
 
     return graph_builder.compile()

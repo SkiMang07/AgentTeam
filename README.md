@@ -15,7 +15,16 @@ The system routes every task through one of three branches after Chief of Staff:
 `Chief of Staff → Pod Entry → Backend → Frontend → QA (bounded revision loop) → Assemble → Human Review`
 
 **Brainstorm** — the advisor pod path
-`Chief of Staff → Advisor Entry → 5 specialist clusters → Advisor Synthesis → Human Review`
+`Chief of Staff → Advisor Entry → Advisor Router → selected specialist clusters (0-3) → Advisor Synthesis → Human Review`
+
+
+Selective advisor routing (Brainstorm branch):
+
+- Advisor roster is canonical and explicit in `agent_team/app/advisor_registry.py` (id, name, when_to_use, when_not_to_use, expected input needs).
+- Advisor Router runs before any specialist advisor node and returns structured routing JSON in shared state (`advisor_route`).
+- Router defaults to 0-2 advisors, allows 3 only on clearly complex/cross-functional tasks, and can select none for simple tasks.
+- Graph invocation is selective: only chosen advisors run; skipped advisors are recorded with reasons.
+- Human review remains the final gate.
 
 The five advisor clusters are: Strategy & Systems (Dalio, Meadows, Senge, Christensen, Moore, Collins, Kahneman), Leadership & Culture (Sinek, Brown, Lencioni, Scott, Meyer, HBR), Communication & Influence (Voss, Duhigg, Duarte, Berger, Gladwell), Growth & Mindset (Clear, Manson, Lakhiani, Grant), and Entrepreneur & Execution (Horowitz, Bet-David, Lawson).
 
@@ -59,6 +68,7 @@ agent_team/
     main.py        ← CLI entry point and session loop
     graph.py       ← LangGraph orchestration, all three branch paths
     state.py       ← SharedState TypedDict and canonical helper functions
+    advisor_registry.py ← Canonical advisor roster and ids
     config.py
   agents/
     chief_of_staff.py       ← routes to Plan / Build / Brainstorm
@@ -70,6 +80,7 @@ agent_team/
     frontend.py             ← Build pod
     qa.py                   ← Build pod
     advisor.py              ← Brainstorm pod (synthesis)
+    advisor_router.py       ← Brainstorm pod selective advisor router
     base_sub_advisor.py     ← Brainstorm pod (shared base)
     strategy_systems_advisor.py
     leadership_culture_advisor.py
@@ -86,6 +97,7 @@ agent_team/
     frontend.md
     qa.md
     advisor.md
+    advisor_router.md
     strategy_systems_advisor.md
     leadership_culture_advisor.md
     communication_influence_advisor.md
@@ -108,7 +120,7 @@ user submits task → Chief of Staff classifies and routes → Researcher gather
 user submits task → Chief of Staff routes → Pod Entry → Backend → Frontend → QA (bounded revision loop) → Assemble → Human Review
 
 **Brainstorm branch** (`--advisor` flag or task explicitly requests advisor input):
-user submits task → Chief of Staff routes → Advisor Entry → 5 cluster advisors in sequence → Advisor Synthesis → Human Review
+user submits task → Chief of Staff routes → Advisor Entry → Advisor Router selects 0-3 advisors → only selected advisor nodes run → Advisor Synthesis → Human Review
 
 Project memory (session-local, explicit, narrow):
 
