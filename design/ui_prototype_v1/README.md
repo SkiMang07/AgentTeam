@@ -1,105 +1,114 @@
-# UI Prototype v1 (Static, Branch-Aware Design)
+# UI Prototype v1 (Static, Workstream-Aware Design)
 
-This folder contains a **standalone static HTML prototype** for a premium dark, desktop-first AgentTeam operator console.
+This folder contains a **standalone static HTML prototype** for a dark, desktop-first AgentTeam operator console.
 
 ## How to open
 
 1. From the repository root, open `design/ui_prototype_v1/index.html` directly in a browser.
-2. No dependencies, build tools, frameworks, or backend services are required.
+2. No dependencies, frameworks, build tools, or backend services are required.
 
 ## Architecture reflected in this prototype
 
-The prototype reflects the current three-branch model after Chief of Staff routing:
+The UI reflects the current three real branches after Chief of Staff routing:
 
 - **Plan**
 - **Build**
 - **Brainstorm**
 
-Layout stays branch-aware and mode-specific:
+Layout remains:
 
 - **Left:** Request Setup
 - **Middle:** Run Orchestration
 - **Right:** Workspace
 
-## Request Setup controls (design-only)
+## What changed in this revision
 
-### Plan mode
+### 1) Single-select mode → multi-select workstreams
 
-- Uses **Output format** (renamed from artifact language in setup controls).
-- Output format options are:
+Top-level selection is now **Requested branches** with multi-select options:
+
+- Brainstorm
+- Plan
+- Build
+
+This allows design-time branch composition in one session.
+
+### 2) Added design sequence preview
+
+A **Design sequence preview** appears under Requested branches.
+
+Examples represented in the UI:
+
+- Brainstorm
+- Plan
+- Build
+- Brainstorm → Plan
+- Plan → Build
+- Brainstorm → Plan → Build
+
+Important: this sequence is a **design direction preview**, not runtime orchestration behavior today.
+
+### 3) Request Setup updates by branch
+
+#### Plan section
+
+- Uses **Output format** (not artifact-type language).
+- Options:
   - Chat
   - Executive Brief
   - Decision Memo
   - Project Plan
   - Let CoS decide
   - Determine during planning
-- JT remains a **Plan-only** modifier.
-- Local files and web search controls remain visible only in Plan mode.
-- Memory is represented as continuity/status, not as a backend feature toggle.
+- JT remains Plan-only and optional.
+- Local files + web search controls are shown only when Plan is selected.
+- Memory is shown as continuity/status, not as a fake backend switch.
 
-### Build mode
+#### Build section
 
-- Replaces older invented “build target” mock options with a more structured request shape:
+- Replaced older invented target dropdown with more honest structured inputs:
   - Request
   - Build surface
   - Output type
   - Constraints
   - Acceptance notes
-- These controls are intentionally **future-facing UI contract design**, not a claim that runtime currently accepts this typed form.
+- Treated explicitly as **future-facing static contract design**.
 
-### Brainstorm mode
+#### Brainstorm section
 
-- Adds an **Output format** control with:
+- Added **Output format** control with:
   - Chat
   - Let CoS decide
   - Determine during planning
-- Keeps Brainstorm tied to advisor clusters + synthesis rather than introducing new artifact classes.
-- Plan and Brainstorm can explicitly return **Chat** in the prototype.
+- Keeps Brainstorm tied to advisor-cluster flow plus synthesis.
 
-## Orchestration rail and workspace (design-only)
+Plan and Brainstorm now both explicitly support **Chat** output in the prototype.
 
-### Plan rail
+### 4) Orchestration view: branch-grounded + composite preview
 
-1. Chief of Staff
-2. Researcher / Evidence
-3. Writer
-4. JT (when enabled)
-5. Reviewer
-6. Chief of Staff final check
-7. Human Review
+Middle panel keeps branch structures grounded in current architecture:
 
-JT remains positioned after Writer and before Reviewer.
+- **Plan:** Chief of Staff → Researcher / Evidence → Writer → JT (optional) → Reviewer → Chief of Staff Final Check → Human Review
+- **Build:** Pod Entry → Backend → Frontend → QA → optional QA revision loop → Assemble → Human Review
+- **Brainstorm:** Advisor Entry → 5 advisor clusters → Advisor Synthesis → Human Review
 
-### Build rail
+For multi-select workstreams, the panel renders one coherent composite sequence with explicit handoff system states between branches. This is marked as design-only.
 
-1. Pod Entry (system state)
-2. Backend
-3. Frontend
-4. QA
-5. QA revision loop (optional system state)
-6. Assemble (system state)
-7. Human Review
+### 5) Workspace now includes follow-on interaction design
 
-### Brainstorm rail
+Right panel still supports branch-aware output views, and now also includes a follow-on interaction area for:
 
-1. Advisor Entry (system state)
-2. Strategy and Systems
-3. Leadership and Culture
-4. Communication and Influence
-5. Growth and Mindset
-6. Entrepreneur and Execution
-7. Advisor Synthesis
-8. Human Review
+- Ask a follow up
+- Refine this
+- Rerun from this output
+- Continue from this result
 
-Workspace tabs remain branch-specific:
+For multi-workstream selection, workspace copy models output handoff into the next branch in sequence within the same session.
 
-- **Plan:** Draft, Artifact Preview, Reviewer Findings, Approval
-- **Build:** Backend Output, Frontend Output, QA Findings, Assembled Output, Approval
-- **Brainstorm:** Advisor Synthesis, Cluster Notes, Approval
+## Honesty / scope notes
 
-## Scope and honesty notes
-
-- This remains a **design-only static prototype**.
-- It is **not wired to runtime graph/state execution**.
-- It does **not** imply downloadable artifact generation.
-- Python runtime code is unchanged.
+- This is still a **design-only static prototype**.
+- It is **not wired** to runtime Python graph/state execution.
+- It does **not** claim real compound orchestration support yet.
+- It does **not** claim persistent workspace storage.
+- It does **not** claim downloadable artifact generation.
