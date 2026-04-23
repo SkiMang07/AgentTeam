@@ -20,6 +20,14 @@ Dev pod routing rules:
 - Do NOT set dev_pod_requested=true for tasks about explaining code, reviewing strategy, writing documents, or general prose — even if they mention technology.
 - When dev_pod_requested=true, also write a pod_task_brief: a focused 3–5 sentence brief for the Backend and Frontend agents. It must state the specific artifact to build, the language/framework if known or inferable, any constraints from the task, and what a working implementation must do. Omit if dev_pod_requested=false.
 
+Advisor pod routing rules:
+- Set advisor_pod_requested=true when the task is explicitly asking for strategic advice, brainstorming, perspective, decision support, or input from advisors/mentors on a question, decision, or situation.
+- Strong signals: task text contains "what do my advisors think", "get advisor input", "advisor perspective", "brainstorm", "help me think through", "what would you recommend", "strategic advice", "what should I do about", "what's the right move", "give me perspectives on", or similar advisory/deliberative framing.
+- Also set advisor_pod_requested=true when the task explicitly invokes "the advisor team", "the council", or asks for a multi-lens perspective on a decision.
+- Do NOT set advisor_pod_requested=true for execution tasks (write code, draft email, create document, summarize) even if they have strategic implications. Advisory tasks are about thinking, not producing.
+- dev_pod_requested and advisor_pod_requested are mutually exclusive — never set both to true. If the task has both advisory and execution dimensions, route to whichever is the primary ask.
+- When advisor_pod_requested=true, also write an advisor_brief: a focused 3–5 sentence brief for the advisor cluster agents. It must state the specific question or decision at hand, the relevant context, what kind of input would be most valuable, and any constraints or constraints on the decision. Omit if advisor_pod_requested=false.
+
 Critical rule — vault context and research_needed:
 - If Obsidian vault context is provided in this prompt and it is non-empty (i.e. it contains actual project content, not just "(Obsidian vault not configured)" or a short error), you MUST set research_needed=true.
 - Vault context shown here does NOT automatically become approved_facts for the Writer. It only becomes usable facts after the Researcher processes it. If you set research_needed=false when vault context is present, the Writer receives empty approved_facts and produces generic output with no grounding.
@@ -46,3 +54,5 @@ Output rules:
 - If asked, include JT routing fields (`jt_requested`, `jt_mode`) based only on explicit user request text.
 - Include `dev_pod_requested` (boolean) in work_order based on the dev pod routing rules above.
 - When `dev_pod_requested` is true, include `pod_task_brief` as a top-level key in the JSON (not inside work_order). Omit it entirely when false.
+- Include `advisor_pod_requested` (boolean) in work_order based on the advisor pod routing rules above.
+- When `advisor_pod_requested` is true, include `advisor_brief` as a top-level key in the JSON (not inside work_order). Omit it entirely when false.

@@ -17,6 +17,7 @@ class ChiefWorkOrder(TypedDict):
     open_questions: list[str]
     jt_requested: bool
     dev_pod_requested: bool
+    advisor_pod_requested: bool
 
 
 class ChiefFinalValidation(TypedDict):
@@ -122,6 +123,10 @@ class SharedState(TypedDict):
     pod_qa_findings: NotRequired[list[str]]
     pod_qa_verdict: NotRequired[Literal["pass", "revise"]]
     pod_revision_count: NotRequired[int]
+    advisor_pod_requested: NotRequired[bool]
+    advisor_brief: NotRequired[str]
+    advisor_outputs: NotRequired[dict[str, str]]
+    advisor_synthesis: NotRequired[str]
 
 
 def get_canonical_jt_requested(state: Mapping[str, Any]) -> bool:
@@ -140,6 +145,15 @@ def get_canonical_dev_pod_requested(state: Mapping[str, Any]) -> bool:
         if isinstance(value, bool):
             return value
     return bool(state.get("dev_pod_requested", False))
+
+
+def get_canonical_advisor_pod_requested(state: Mapping[str, Any]) -> bool:
+    work_order = state.get("work_order")
+    if isinstance(work_order, Mapping):
+        value = work_order.get("advisor_pod_requested")
+        if isinstance(value, bool):
+            return value
+    return bool(state.get("advisor_pod_requested", False))
 
 
 def empty_project_memory() -> ProjectMemory:

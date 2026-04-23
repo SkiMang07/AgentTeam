@@ -4,13 +4,19 @@ import argparse
 
 from openai import AuthenticationError, RateLimitError
 
+from agents.advisor import AdvisorAgent
 from agents.backend import BackendAgent
 from agents.chief_of_staff import ChiefOfStaffAgent
+from agents.communication_influence_advisor import CommunicationInfluenceAdvisorAgent
+from agents.entrepreneur_execution_advisor import EntrepreneurExecutionAdvisorAgent
 from agents.frontend import FrontendAgent
+from agents.growth_mindset_advisor import GrowthMindsetAdvisorAgent
 from agents.jt import JTAgent
+from agents.leadership_culture_advisor import LeadershipCultureAdvisorAgent
 from agents.qa import QAAgent
 from agents.researcher import ResearcherAgent
 from agents.reviewer import ReviewerAgent
+from agents.strategy_systems_advisor import StrategySystemsAdvisorAgent
 from agents.writer import WriterAgent
 from app.config import get_settings
 from app.graph import build_graph
@@ -61,6 +67,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Route task through the developer pod (Backend, Frontend, QA agents).",
     )
+    parser.add_argument(
+        "--advisor",
+        action="store_true",
+        help="Route task through the advisor pod (all five advisor clusters + synthesis).",
+    )
     parser.add_argument("task", type=str, nargs="*", help="Task for the agent team")
     return parser.parse_args()
 
@@ -106,8 +117,29 @@ def main() -> None:
     backend = BackendAgent(client)
     frontend = FrontendAgent(client)
     qa = QAAgent(client)
+    advisor = AdvisorAgent(client)
+    strategy_systems_adv = StrategySystemsAdvisorAgent(client)
+    leadership_culture_adv = LeadershipCultureAdvisorAgent(client)
+    communication_influence_adv = CommunicationInfluenceAdvisorAgent(client)
+    growth_mindset_adv = GrowthMindsetAdvisorAgent(client)
+    entrepreneur_execution_adv = EntrepreneurExecutionAdvisorAgent(client)
 
-    graph = build_graph(chief_of_staff, jt, researcher, reviewer, writer, backend, frontend, qa)
+    graph = build_graph(
+        chief_of_staff,
+        jt,
+        researcher,
+        reviewer,
+        writer,
+        backend,
+        frontend,
+        qa,
+        advisor=advisor,
+        strategy_systems_advisor=strategy_systems_adv,
+        leadership_culture_advisor=leadership_culture_adv,
+        communication_influence_advisor=communication_influence_adv,
+        growth_mindset_advisor=growth_mindset_adv,
+        entrepreneur_execution_advisor=entrepreneur_execution_adv,
+    )
     session_project_memory = empty_project_memory()
     pending_task = " ".join(args.task).strip()
 
@@ -125,9 +157,11 @@ def main() -> None:
 
         jt_requested, jt_mode = detect_jt_request(task=task, cli_jt=args.jt, cli_mode=args.jt_mode)
         dev_pod_requested = args.dev_pod
+        advisor_pod_requested = args.advisor
         print(f"JT requested (CLI): {jt_requested}")
         print(f"JT mode (CLI): {jt_mode}")
         print(f"Dev pod requested (CLI): {dev_pod_requested}")
+        print(f"Advisor pod requested (CLI): {advisor_pod_requested}")
         if args.web_search:
             print("[tools] Web search enabled for Researcher.")
 
@@ -140,6 +174,7 @@ def main() -> None:
             "jt_requested": jt_requested,
             "jt_mode": jt_mode,
             "dev_pod_requested": dev_pod_requested,
+            "advisor_pod_requested": advisor_pod_requested,
             "jt_feedback": [],
             "jt_rewrite": None,
             "jt_findings": None,

@@ -4,16 +4,23 @@ from time import perf_counter
 
 from langgraph.graph import END, START, StateGraph
 
+from agents.advisor import AdvisorAgent
 from agents.backend import BackendAgent
 from agents.chief_of_staff import ChiefOfStaffAgent
+from agents.communication_influence_advisor import CommunicationInfluenceAdvisorAgent
+from agents.entrepreneur_execution_advisor import EntrepreneurExecutionAdvisorAgent
 from agents.frontend import FrontendAgent
+from agents.growth_mindset_advisor import GrowthMindsetAdvisorAgent
 from agents.jt import JTAgent
+from agents.leadership_culture_advisor import LeadershipCultureAdvisorAgent
 from agents.qa import QAAgent
 from agents.researcher import ResearcherAgent
 from agents.reviewer import ReviewerAgent
+from agents.strategy_systems_advisor import StrategySystemsAdvisorAgent
 from agents.writer import WriterAgent
 from app.state import (
     SharedState,
+    get_canonical_advisor_pod_requested,
     get_canonical_dev_pod_requested,
     get_canonical_jt_requested,
     get_memory_lookup_fields,
@@ -31,6 +38,12 @@ def build_graph(
     backend: BackendAgent | None = None,
     frontend: FrontendAgent | None = None,
     qa: QAAgent | None = None,
+    advisor: AdvisorAgent | None = None,
+    strategy_systems_advisor: StrategySystemsAdvisorAgent | None = None,
+    leadership_culture_advisor: LeadershipCultureAdvisorAgent | None = None,
+    communication_influence_advisor: CommunicationInfluenceAdvisorAgent | None = None,
+    growth_mindset_advisor: GrowthMindsetAdvisorAgent | None = None,
+    entrepreneur_execution_advisor: EntrepreneurExecutionAdvisorAgent | None = None,
 ):
     graph_builder = StateGraph(SharedState)
     max_auto_redrafts = 1
@@ -458,6 +471,67 @@ def build_graph(
     timed_pod_revise_prep_node = timed_node("pod_revise_prep", pod_revise_prep_node)
     timed_pod_assemble_node = timed_node("pod_assemble", pod_assemble_node)
 
+    # ── Advisor pod nodes ──────────────────────────────────────────────────────
+
+    def advisor_entry_node(state: SharedState) -> SharedState:
+        """Prepare the advisor brief from the work order or existing brief."""
+        work_order = state.get("work_order") or {}
+        existing_brief = state.get("advisor_brief", "")
+        if not existing_brief:
+            criteria = "\n".join(f"- {c}" for c in work_order.get("success_criteria", []))
+            advisor_brief = (
+                f"Objective: {work_order.get('objective', '')}\n"
+                f"Open questions: {work_order.get('open_questions', [])}\n"
+                f"Success criteria:\n{criteria or '- (none provided)'}"
+            )
+        else:
+            advisor_brief = existing_brief
+        return {
+            **state,
+            "advisor_brief": advisor_brief,
+            "advisor_outputs": {},
+            "advisor_synthesis": "",
+            "status": "advisor_started",
+        }
+
+    def advisor_strategy_systems_node(state: SharedState) -> SharedState:
+        if strategy_systems_advisor is None:
+            raise RuntimeError("StrategySystemsAdvisorAgent not provided to build_graph")
+        return strategy_systems_advisor.run(state)
+
+    def advisor_leadership_culture_node(state: SharedState) -> SharedState:
+        if leadership_culture_advisor is None:
+            raise RuntimeError("LeadershipCultureAdvisorAgent not provided to build_graph")
+        return leadership_culture_advisor.run(state)
+
+    def advisor_communication_influence_node(state: SharedState) -> SharedState:
+        if communication_influence_advisor is None:
+            raise RuntimeError("CommunicationInfluenceAdvisorAgent not provided to build_graph")
+        return communication_influence_advisor.run(state)
+
+    def advisor_growth_mindset_node(state: SharedState) -> SharedState:
+        if growth_mindset_advisor is None:
+            raise RuntimeError("GrowthMindsetAdvisorAgent not provided to build_graph")
+        return growth_mindset_advisor.run(state)
+
+    def advisor_entrepreneur_execution_node(state: SharedState) -> SharedState:
+        if entrepreneur_execution_advisor is None:
+            raise RuntimeError("EntrepreneurExecutionAdvisorAgent not provided to build_graph")
+        return entrepreneur_execution_advisor.run(state)
+
+    def advisor_assemble_node(state: SharedState) -> SharedState:
+        if advisor is None:
+            raise RuntimeError("AdvisorAgent not provided to build_graph")
+        return advisor.synthesize(state)
+
+    timed_advisor_entry_node = timed_node("advisor_entry", advisor_entry_node)
+    timed_advisor_strategy_systems_node = timed_node("advisor_strategy_systems", advisor_strategy_systems_node)
+    timed_advisor_leadership_culture_node = timed_node("advisor_leadership_culture", advisor_leadership_culture_node)
+    timed_advisor_communication_influence_node = timed_node("advisor_communication_influence", advisor_communication_influence_node)
+    timed_advisor_growth_mindset_node = timed_node("advisor_growth_mindset", advisor_growth_mindset_node)
+    timed_advisor_entrepreneur_execution_node = timed_node("advisor_entrepreneur_execution", advisor_entrepreneur_execution_node)
+    timed_advisor_assemble_node = timed_node("advisor_assemble", advisor_assemble_node)
+
     def route_after_pod_qa(state: SharedState) -> str:
         verdict = state.get("pod_qa_verdict", "revise")
         revision_count = state.get("pod_revision_count", 0)
@@ -468,6 +542,8 @@ def build_graph(
     def route_after_chief(state: SharedState) -> str:
         if get_canonical_dev_pod_requested(state):
             return "pod_entry"
+        if get_canonical_advisor_pod_requested(state):
+            return "advisor_entry"
         work_order = state.get("work_order")
         route = state.get("route")
         if route == "memory_lookup" or state.get("memory_lookup_requested", False):
@@ -543,6 +619,14 @@ def build_graph(
     graph_builder.add_node("pod_revise_prep", timed_pod_revise_prep_node)
     graph_builder.add_node("pod_assemble", timed_pod_assemble_node)
 
+    graph_builder.add_node("advisor_entry", timed_advisor_entry_node)
+    graph_builder.add_node("advisor_strategy_systems", timed_advisor_strategy_systems_node)
+    graph_builder.add_node("advisor_leadership_culture", timed_advisor_leadership_culture_node)
+    graph_builder.add_node("advisor_communication_influence", timed_advisor_communication_influence_node)
+    graph_builder.add_node("advisor_growth_mindset", timed_advisor_growth_mindset_node)
+    graph_builder.add_node("advisor_entrepreneur_execution", timed_advisor_entrepreneur_execution_node)
+    graph_builder.add_node("advisor_assemble", timed_advisor_assemble_node)
+
     graph_builder.add_edge(START, "chief_of_staff")
     graph_builder.add_conditional_edges(
         "chief_of_staff",
@@ -552,6 +636,7 @@ def build_graph(
             "evidence_extract": "evidence_extract",
             "memory_lookup_prep": "memory_lookup_prep",
             "pod_entry": "pod_entry",
+            "advisor_entry": "advisor_entry",
         },
     )
     graph_builder.add_edge("memory_lookup_prep", "writer")
@@ -603,5 +688,13 @@ def build_graph(
     )
     graph_builder.add_edge("pod_revise_prep", "pod_backend")
     graph_builder.add_edge("pod_assemble", "human_review")
+
+    graph_builder.add_edge("advisor_entry", "advisor_strategy_systems")
+    graph_builder.add_edge("advisor_strategy_systems", "advisor_leadership_culture")
+    graph_builder.add_edge("advisor_leadership_culture", "advisor_communication_influence")
+    graph_builder.add_edge("advisor_communication_influence", "advisor_growth_mindset")
+    graph_builder.add_edge("advisor_growth_mindset", "advisor_entrepreneur_execution")
+    graph_builder.add_edge("advisor_entrepreneur_execution", "advisor_assemble")
+    graph_builder.add_edge("advisor_assemble", "human_review")
 
     return graph_builder.compile()
