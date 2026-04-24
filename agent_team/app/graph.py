@@ -117,7 +117,9 @@ def build_graph(
                 if isinstance(point, str) and point.strip():
                     evidence_facts.append(f"[{file_path}] {point}")
 
-        approved_facts = _dedupe_preserving_order([*research_facts, *evidence_facts])
+        # File-derived evidence facts come first so they're not buried by generic
+        # researcher output when the writer scans the approved_facts list.
+        approved_facts = _dedupe_preserving_order([*evidence_facts, *research_facts])
         simple_grounded_retrieval = _is_simple_grounded_retrieval_task(
             task=state.get("user_task", ""),
             required_structures=required_structures,

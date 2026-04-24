@@ -108,6 +108,25 @@ class WriterAgent:
         files_read = state.get("files_read", [])
         has_local_file_evidence = isinstance(files_read, list) and len(files_read) > 0
 
+        # Raw file content — passed directly so the model sees full text, not just extracted snippets.
+        # Capped per file to avoid blowing the context window.
+        _MAX_RAW_CHARS_PER_FILE = 3000
+        _MAX_RAW_FILES = 5
+        raw_files_block = ""
+        if has_local_file_evidence:
+            _model_metadata = state.get("model_metadata", {})
+            _file_contents: dict = (
+                _model_metadata.get("file_contents", {})
+                if isinstance(_model_metadata, dict)
+                else {}
+            )
+            raw_parts: list[str] = []
+            for _fp, _content in list(_file_contents.items())[:_MAX_RAW_FILES]:
+                if isinstance(_content, str) and _content.strip():
+                    truncated = _content[:_MAX_RAW_CHARS_PER_FILE]
+                    raw_parts.append(f"--- {_fp} ---\n{truncated}")
+            raw_files_block = "\n\n".join(raw_parts)
+
         revision_targets = state.get("revision_targets", [])
         prior_draft = state.get("redraft_source_draft", "")
         reviewer_findings = state.get("reviewer_findings", {})
@@ -169,6 +188,8 @@ class WriterAgent:
                 f"- Files skipped: {state.get('files_skipped', [])}\n"
                 f"- Local file evidence present: {has_local_file_evidence}\n"
                 f"Writer guidance notes (non-fact revision guidance):\n{guidance_block if guidance_block else '- (none provided)'}\n\n"
+                f"Raw file content (treat as ground truth — use exact names, labels, and structures from these files):\n"
+                f"{raw_files_block if raw_files_block else '- (no local files provided)'}\n\n"
                 f"Structured evidence bundle:\n{evidence_block}\n\n"
                 f"Required structures (binding contracts):\n{required_structures_block}\n\n"
                 f"Approved facts:\n{facts_block if facts_block else '- (none provided)'}\n\n"

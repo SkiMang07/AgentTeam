@@ -32,7 +32,12 @@ class _StubClient:
 class _PlanWriterEchoClient(DryRunResponsesClient):
     def ask(self, system_prompt: str, user_prompt: str) -> str:  # noqa: ARG002
         if "Draft output for the Chief of Staff work order" in user_prompt:
-            if "Required structures (binding contracts):" in user_prompt:
+            # Only echo workstream names when the file evidence pipeline actually
+            # populated required_structures — i.e. the exact workstream names are
+            # present in the prompt.  "Required structures (binding contracts):" is
+            # unconditionally included in the writer prompt so checking that string
+            # alone is a false-positive; checking for the actual content is not.
+            if "Alpha Intake" in user_prompt and "Beta Build" in user_prompt:
                 return (
                     "Project plan workstreams:\n"
                     "1. Alpha Intake\n"
