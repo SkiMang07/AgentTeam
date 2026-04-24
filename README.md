@@ -120,7 +120,7 @@ user submits task → Chief of Staff classifies and routes → Researcher gather
 user submits task → Chief of Staff routes → Pod Entry → Backend → Frontend → QA (bounded revision loop) → Assemble → Human Review
 
 **Brainstorm branch** (`--advisor` flag or task explicitly requests advisor input):
-user submits task → Chief of Staff routes → Advisor Entry → Advisor Router selects 0-3 advisors → only selected advisor nodes run → Advisor Synthesis → Human Review
+user submits task → Chief of Staff routes → (if local files were loaded: Researcher → Evidence Extract) → Advisor Entry → Advisor Router selects 0-3 advisors → only selected advisor nodes run → Advisor Synthesis → Human Review
 
 Project memory (session-local, explicit, narrow):
 
@@ -295,6 +295,8 @@ The graph builds a structured evidence bundle from files actually read and inclu
 - non-empty line counts
 
 Researcher and Writer both consume this evidence bundle so facts and drafts are grounded in selected local files rather than generic responses.
+On Brainstorm runs, when local files are present the graph now runs Researcher + Evidence Extract before Advisor Router so advisor prompts receive file-grounded facts and structure (not just generic advisor context).
+Advisor prompts treat file-provided labels, workstreams, constraints, and section structure as binding context when present.
 Reviewer validates both content grounding and file-scope honesty.
 The system should not claim it read files that were skipped or unsupported.
 

@@ -21,11 +21,20 @@ class AdvisorRouterAgent:
     def run(self, state: SharedState) -> SharedState:
         task = state.get("user_task", "")
         work_order = state.get("work_order") or {}
+        advisor_brief = state.get("advisor_brief", "")
+        approved_facts = [fact for fact in state.get("approved_facts", []) if isinstance(fact, str)]
+        files_read = state.get("files_read", [])
         deterministic = self._deterministic_selection(task, work_order)
         if deterministic is not None:
             route = deterministic
         else:
-            route = self._model_selection(task, work_order)
+            route = self._model_selection(
+                task,
+                work_order,
+                advisor_brief=advisor_brief if isinstance(advisor_brief, str) else "",
+                approved_facts=approved_facts,
+                files_read=files_read if isinstance(files_read, list) else [],
+            )
 
         selected = route["selected_advisors"]
         if selected:
@@ -49,7 +58,15 @@ class AdvisorRouterAgent:
             "status": "advisor_routed",
         }
 
-    def _model_selection(self, task: str, work_order: Mapping[str, Any]) -> AdvisorRouteResult:
+    def _model_selection(
+        self,
+        task: str,
+        work_order: Mapping[str, Any],
+        *,
+        advisor_brief: str,
+        approved_facts: list[str],
+        files_read: list[str],
+    ) -> AdvisorRouteResult:
         roster_block = "\n".join(
             [
                 (
@@ -71,6 +88,10 @@ class AdvisorRouterAgent:
             f"- deliverable_type: {work_order.get('deliverable_type', '')}\n"
             f"- success_criteria: {work_order.get('success_criteria', [])}\n"
             f"- open_questions: {work_order.get('open_questions', [])}\n\n"
+            f"Advisor brief:\n{advisor_brief or '(none)'}\n\n"
+            "Grounding signals:\n"
+            f"- files_read: {files_read}\n"
+            f"- approved_facts: {approved_facts}\n\n"
             "Advisor roster:\n"
             f"{roster_block}\n"
         )

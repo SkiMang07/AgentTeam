@@ -23,7 +23,10 @@ class BaseSubAdvisorAgent:
             f"Task: {task}\n\n"
             f"Advisor Brief: {brief}\n\n"
             "Apply your cluster's frameworks to the task above. Be specific, direct, and "
-            "grounded in the thinkers' actual models. Avoid generic advice."
+            "grounded in the thinkers' actual models. Avoid generic advice. "
+            "When the advisor brief includes local file evidence, treat those file-derived names, "
+            "labels, constraints, and structures as binding context. You may critique or refine them, "
+            "but do not silently rename or replace them with generic frameworks."
         )
 
         response = self._client.ask(

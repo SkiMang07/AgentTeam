@@ -42,6 +42,9 @@ Output rules:
 - Do not invent unsupported factual claims.
 - If the task asks you to critique and rewrite provided source text, keep the rewrite fully grounded in that source text plus approved facts only.
 - Never add new facts, examples, achievements, projects, milestones, metrics, names, or context that were not provided.
+- When local file evidence is present, treat it as primary context and preserve explicit source structure (labels, named sections, workstreams, constraints, and scope statements).
+- Do not rename file-provided workstreams, headings, labels, or section names. If a file defines names, reuse those exact names verbatim.
+- You may refine sequencing or clarity, but you may not silently replace file-provided structures with generic frameworks.
 - If the source is vague, improve clarity, concision, and tone without expanding factual scope.
 - If a draft is already decent and clear, use a light touch and make only high-value edits instead of a theatrical rewrite.
 - If reviewer revision targets are provided, treat them as mandatory and make the smallest edits needed to satisfy them.

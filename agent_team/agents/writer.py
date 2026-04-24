@@ -93,6 +93,8 @@ class WriterAgent:
                         if isinstance(point, str):
                             evidence_lines.append(f"  - {point}")
         evidence_block = "\n".join(evidence_lines) if evidence_lines else "- (no local file evidence loaded)"
+        files_read = state.get("files_read", [])
+        has_local_file_evidence = isinstance(files_read, list) and len(files_read) > 0
 
         revision_targets = state.get("revision_targets", [])
         prior_draft = state.get("redraft_source_draft", "")
@@ -138,6 +140,9 @@ class WriterAgent:
                 "Do not introduce new factual specifics beyond the source task text and approved facts. "
                 "Never claim you read files outside files_read. "
                 "When files_read is non-empty, prioritize file-derived approved facts and evidence bundle details."
+                " When local file evidence is present, preserve explicit names, labels, section headers,"
+                " constraints, and workstream titles from that evidence as primary structure."
+                " Do not rename provided workstreams or silently replace provided structures with generic frameworks."
                 f"{priority_block}"
                 f"{revision_target_block}\n\n"
                 f"{redraft_source_block}\n\n"
@@ -149,6 +154,7 @@ class WriterAgent:
                 f"Current evidence:\n"
                 f"- Files read: {state.get('files_read', [])}\n"
                 f"- Files skipped: {state.get('files_skipped', [])}\n"
+                f"- Local file evidence present: {has_local_file_evidence}\n"
                 f"Writer guidance notes (non-fact revision guidance):\n{guidance_block if guidance_block else '- (none provided)'}\n\n"
                 f"Structured evidence bundle:\n{evidence_block}\n\n"
                 f"Approved facts:\n{facts_block if facts_block else '- (none provided)'}\n\n"
