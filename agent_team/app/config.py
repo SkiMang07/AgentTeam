@@ -16,6 +16,10 @@ class Settings:
     # Optional: absolute path to your voice/style guide file inside Obsidian (or anywhere).
     # When set, the Writer injects this into its system prompt on every draft.
     voice_file_path: str = ""
+    # Optional: default directory where agent output files are written.
+    # Set OUTPUT_DIR in your .env to make every run save files there automatically.
+    # The UI can override this per-run via the Output folder field.
+    output_dir: str = ""
 
 
 load_dotenv()
@@ -29,10 +33,12 @@ def get_settings() -> Settings:
     model = os.getenv("OPENAI_MODEL", "gpt-4.1-mini").strip()
     obsidian_vault_path = os.getenv("OBSIDIAN_VAULT_PATH", "").strip()
     voice_file_path = os.getenv("VOICE_FILE_PATH", "").strip()
+    output_dir = os.getenv("OUTPUT_DIR", "").strip()
 
     return Settings(
         openai_api_key=api_key,
         model=model,
         obsidian_vault_path=obsidian_vault_path,
         voice_file_path=voice_file_path,
+        output_dir=output_dir,
     )

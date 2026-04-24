@@ -58,6 +58,7 @@ app.add_middleware(
 # once and rebuild the LangGraph per-request (graph compilation is cheap).
 _agents: dict[str, Any] | None = None
 _agents_lock = threading.Lock()
+_default_output_dir: str = ""  # Populated from OUTPUT_DIR in .env at first agent init
 
 # ── In-flight session state ───────────────────────────────────────────────────
 # session_id -> {event_queue, review_event, review_result}
@@ -71,10 +72,15 @@ _session_memory: dict[str, Any] = {}
 
 def _init_agents() -> dict[str, Any]:
     """Create and return all agent instances. Called once at startup."""
+    global _default_output_dir
     try:
         settings = get_settings()
     except ValueError as e:
         raise RuntimeError(f"Configuration error: {e}") from e
+
+    if settings.output_dir:
+        _default_output_dir = settings.output_dir
+        print(f"[server] Default output directory: {_default_output_dir}")
 
     client = ResponsesClient(settings)
 
@@ -185,6 +191,35 @@ def approve(req: ApproveRequest):
     return {"ok": True}
 
 
+@app.get("/open-folder")
+def open_folder(path: str):
+    """Open a folder or file in the OS file manager (macOS Finder / Linux Nautilus).
+
+    Called by the UI after a run produces files, letting the user reveal them
+    without leaving the browser.
+    """
+    import subprocess
+    import platform
+
+    target = Path(path)
+    if not target.exists():
+        raise HTTPException(status_code=404, detail=f"Path not found: {path}")
+
+    system = platform.system()
+    try:
+        if system == "Darwin":
+            # -R reveals the item in Finder (selects it in its parent folder)
+            subprocess.Popen(["open", "-R", str(target)])
+        elif system == "Linux":
+            subprocess.Popen(["xdg-open", str(target.parent)])
+        else:
+            subprocess.Popen(["explorer", str(target.parent)])
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Could not open folder: {exc}") from exc
+
+    return {"ok": True, "path": str(target)}
+
+
 @app.get("/run")
 def run_stream(
     task: str,
@@ -264,14 +299,16 @@ def run_stream(
     def run_in_thread() -> None:
         try:
             # ── Output sandbox setup ──────────────────────────────────────────
-            # Create a per-run subdirectory inside output_dir so multiple runs
-            # never collide. file_writer is passed into the graph and captured
-            # by both the writer agent (for proactive file creation) and the
-            # artifact_writer_node (for auto-writing the final approved output).
+            # Resolve effective output dir: UI param → .env OUTPUT_DIR → none.
+            # Create a per-run subdirectory so multiple runs never collide.
+            # file_writer is passed into the graph and captured by both the
+            # writer agent (proactive file creation) and artifact_writer_node
+            # (auto-writes output.md after every approved run).
+            effective_output_dir = output_dir.strip() or _default_output_dir
             session_file_writer: FileWriter | None = None
             sandbox_root_str = ""
-            if output_dir.strip():
-                sandbox_path = Path(output_dir.strip()) / f"run_{session_id[:8]}"
+            if effective_output_dir:
+                sandbox_path = Path(effective_output_dir) / f"run_{session_id[:8]}"
                 session_file_writer = FileWriter(sandbox_path)
                 sandbox_root_str = session_file_writer.sandbox_root
                 print(f"[server] Output sandbox: {sandbox_root_str}")

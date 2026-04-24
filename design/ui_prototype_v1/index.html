@@ -162,6 +162,13 @@
               <div class="preview-note" id="sequenceNote">Single branch mode.</div>
             </div>
 
+            <div class="section">
+              <p class="section-title">Output folder</p>
+              <label for="outputDir">Save files to (absolute path — leave blank to use server default)</label>
+              <input id="outputDir" placeholder="e.g. /Users/you/Projects/MyProject/outputs" />
+              <div class="preview-note" style="margin-top:6px;">When set, approved outputs are saved as <code style="color:#8ea2ba">output.md</code> inside a per-run subfolder. The writer will also create structured files (specs, plans, API contracts) here when the task calls for them.</div>
+            </div>
+
             <div class="section mode-block active" data-mode="plan">
               <p class="section-title">Plan controls</p>
               <div class="request-field-wrap">
@@ -720,7 +727,32 @@
             memoryIndicator.textContent = 'Memory: updated this run';
             if (currentEvtSource) { currentEvtSource.close(); currentEvtSource = null; }
 
-            const finalHtml = `<div class="doc"><div class="sec"><pre style="white-space:pre-wrap;word-break:break-word;color:#d6dfec;font-family:inherit;margin:0;">${esc(event.output)}</pre></div></div>`;
+            // Build files panel if any files were written this run
+            const filesCreated = Array.isArray(event.files_created) ? event.files_created : [];
+            let filesPanelHtml = '';
+            if (filesCreated.length > 0) {
+              const sandboxRoot = event.sandbox_root || '';
+              const revealBtn = sandboxRoot
+                ? `<button onclick="fetch('/open-folder?path='+encodeURIComponent('${sandboxRoot.replace(/'/g,"\\'")}'))" style="margin-left:8px;border:1px solid #2f3e52;border-radius:6px;background:#0d131b;color:#8ea2ba;font-size:10px;padding:3px 8px;cursor:pointer;">Show in Finder</button>`
+                : '';
+              const fileList = filesCreated.map(p => {
+                const name = p.split('/').pop();
+                return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #1a2330;">
+                  <span style="color:#52c97a;font-size:11px;">✓</span>
+                  <span style="color:#c6d1df;font-size:11px;font-family:monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(p)}">${esc(name)}</span>
+                  <button onclick="fetch('/open-folder?path='+encodeURIComponent('${esc(p).replace(/'/g,"\\'")}'))" style="border:1px solid #2f3e52;border-radius:5px;background:#0d131b;color:#8ea2ba;font-size:10px;padding:2px 7px;cursor:pointer;flex-shrink:0;">Reveal</button>
+                </div>`;
+              }).join('');
+              filesPanelHtml = `<div style="border:1px solid #1f2d3d;border-radius:10px;padding:10px;margin-top:10px;background:rgba(8,14,20,0.8);">
+                <div style="display:flex;align-items:center;margin-bottom:8px;">
+                  <span style="font-size:11px;text-transform:uppercase;letter-spacing:0.08em;color:#9eaab9;">Files saved (${filesCreated.length})</span>
+                  ${revealBtn}
+                </div>
+                ${fileList}
+              </div>`;
+            }
+
+            const finalHtml = `<div class="doc"><div class="sec"><pre style="white-space:pre-wrap;word-break:break-word;color:#d6dfec;font-family:inherit;margin:0;">${esc(event.output)}</pre></div></div>${filesPanelHtml}`;
 
             if (isSeq) {
               // Park output in seq_output; the sequence runner activates
@@ -728,7 +760,9 @@
               setViewContent('seq_output', finalHtml);
             } else {
               runState.textContent     = event.status === 'finalized' ? 'Complete' : 'Stopped';
-              promptStatus.textContent = `Done — status: ${event.status}`;
+              promptStatus.textContent = filesCreated.length > 0
+                ? `Done — ${filesCreated.length} file${filesCreated.length > 1 ? 's' : ''} saved`
+                : `Done — status: ${event.status}`;
               setViewContent('approval', finalHtml);
               activateTab('approval');
             }
@@ -782,7 +816,8 @@
           output_format: branch === 'plan'       ? (document.getElementById('planArtifact')?.value || 'Chat')
                        : branch === 'brainstorm' ? (document.getElementById('brainOutput')?.value  || 'Chat')
                        : 'Chat',
-          mem_session: memSessionKey,
+          mem_session:  memSessionKey,
+          output_dir:   (document.getElementById('outputDir')?.value || '').trim(),
         };
       }
 
