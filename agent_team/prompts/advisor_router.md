@@ -9,6 +9,8 @@ Rules:
 - Do not select all advisors unless the task explicitly requires broad council input across every domain.
 - If specialist input is not useful, return an empty selected_advisors list.
 - Use structured work-order fields when available. Do not rely only on loose prose.
+- If local file evidence is present (files_read / approved_facts / advisor_brief), treat those facts as primary context for routing decisions.
+- Prefer advisors that can work within file-provided structure; do not assume generic reframing is acceptable when explicit file labels or workstreams are provided.
 
 Return strict JSON only with this exact shape:
 {

@@ -237,6 +237,13 @@ Alternatively: tighten README and docs to match current implementation before ad
 
 ## Change log
 
+### 2026-04-24 (local file grounding hardening across Plan + Brainstorm)
+- Brainstorm routing now conditionally runs `researcher -> evidence_extract` before advisor pod only when local files are present; no-file brainstorm tasks still route directly to advisor flow
+- Added brainstorm grounding visibility in state/debug output (`brainstorm_file_grounding_used`, `brainstorm_file_grounding_summary`) and terminal log marker
+- Advisor brief now carries compact evidence bundle + approved facts so selected advisors and synthesis receive explicit file-grounded context
+- Hardened Researcher / Writer / Advisor Router / Advisor prompts to preserve file-provided labels, workstreams, constraints, and section structures
+- Writer path now explicitly treats local file evidence as primary structure input and forbids silent renaming/reframing of file-defined workstreams
+
 ### 2026-04-23 (Advisor pod selective routing)
 - Added canonical advisor roster with explicit advisor metadata (`id`, `name`, `when_to_use`, `when_not_to_use`, `expected_input_needs`)
 - Added Advisor Router stage before advisor invocation; router returns structured route contract (`selected_advisors`, `selection_reason`, `skipped_advisors`, `advisor_route_confidence`)

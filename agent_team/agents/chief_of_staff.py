@@ -114,6 +114,16 @@ class ChiefOfStaffAgent:
         if vault_context_available and data["route"] not in {"memory_lookup"}:
             synced_work_order = {**data["work_order"], "research_needed": True}
             data = {**data, "route": "research", "work_order": synced_work_order}
+        files_read = state.get("files_read", [])
+        has_local_file_evidence = isinstance(files_read, list) and len(files_read) > 0
+        if (
+            has_local_file_evidence
+            and not data["work_order"].get("advisor_pod_requested", False)
+            and not data["work_order"].get("dev_pod_requested", False)
+            and data["route"] not in {"memory_lookup"}
+        ):
+            synced_work_order = {**data["work_order"], "research_needed": True}
+            data = {**data, "route": "research", "work_order": synced_work_order}
         work_order = data["work_order"]
         updated_project_memory = (
             project_memory

@@ -26,7 +26,10 @@ class AdvisorAgent:
             f"Task: {task}\n\n"
             f"Advisor Brief: {brief}\n\n"
             f"--- Cluster Advisor Outputs ---\n\n"
-            f"{cluster_block}"
+            f"{cluster_block}\n\n"
+            "If local file evidence is present in the brief, preserve explicit file-provided structures "
+            "(for example named workstreams) in the synthesis. You may critique or improve the structure "
+            "but must not silently replace it with generic categories."
         )
 
         synthesis = self._client.ask(

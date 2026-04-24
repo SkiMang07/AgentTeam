@@ -115,12 +115,23 @@ def build_graph(
         read = len(state.get("files_read", []))
         skipped = len(state.get("files_skipped", []))
         file_read_summary = f"requested={requested}, read={read}, skipped={skipped}"
+        brainstorm_file_grounding_used = bool(
+            get_canonical_advisor_pod_requested(state) and read > 0 and evidence_bundle
+        )
+        brainstorm_file_grounding_summary = (
+            f"brainstorm_file_grounding_used={brainstorm_file_grounding_used}; "
+            f"evidence_items={len(evidence_bundle)}; approved_facts={len(approved_facts)}"
+        )
+        if brainstorm_file_grounding_used:
+            print(f"[advisor_grounding] {brainstorm_file_grounding_summary}")
 
         return {
             **state,
             "evidence_bundle": evidence_bundle,
             "approved_facts": approved_facts,
             "file_read_summary": file_read_summary,
+            "brainstorm_file_grounding_used": brainstorm_file_grounding_used,
+            "brainstorm_file_grounding_summary": brainstorm_file_grounding_summary,
             "status": "evidence_extracted",
         }
 
@@ -512,13 +523,22 @@ def build_graph(
         else:
             advisor_brief = existing_brief
 
-        # Append a compact file-evidence block when local files were loaded.
-        # This ensures all advisor cluster agents and the synthesis agent have
-        # project-grounded context without requiring changes to BaseSubAdvisorAgent.
-        model_metadata = state.get("model_metadata") or {}
-        file_contents = model_metadata.get("file_contents") if isinstance(model_metadata, dict) else {}
-        if isinstance(file_contents, dict) and file_contents:
-            evidence_bundle = build_evidence_bundle(file_contents)
+        evidence_bundle = state.get("evidence_bundle", [])
+        if not isinstance(evidence_bundle, list):
+            evidence_bundle = []
+
+        # Fallback: if brainstorm entered without evidence extraction but files
+        # exist, still render compact evidence from file contents.
+        if not evidence_bundle:
+            model_metadata = state.get("model_metadata") or {}
+            file_contents = model_metadata.get("file_contents") if isinstance(model_metadata, dict) else {}
+            if isinstance(file_contents, dict) and file_contents:
+                evidence_bundle = build_evidence_bundle(file_contents)
+
+        approved_facts = [
+            fact for fact in state.get("approved_facts", []) if isinstance(fact, str) and fact.strip()
+        ]
+        if evidence_bundle:
             evidence_lines: list[str] = []
             for item in evidence_bundle:
                 fp = item.get("file_path", "")
@@ -529,9 +549,16 @@ def build_graph(
             if evidence_lines:
                 advisor_brief = (
                     advisor_brief
-                    + "\n\nLocal file context (use to ground your analysis):\n"
+                    + "\n\nLocal file context (binding for project-specific structure and labels):\n"
                     + "\n".join(evidence_lines)
                 )
+        if approved_facts:
+            facts_lines = "\n".join(f"  - {fact}" for fact in approved_facts[:30])
+            advisor_brief = (
+                advisor_brief
+                + "\n\nApproved facts (treat as primary context when they come from local files):\n"
+                + facts_lines
+            )
 
         return {
             **state,
@@ -646,6 +673,10 @@ def build_graph(
         if get_canonical_dev_pod_requested(state):
             return "pod_entry"
         if get_canonical_advisor_pod_requested(state):
+            files_read = state.get("files_read", [])
+            has_local_file_evidence = isinstance(files_read, list) and len(files_read) > 0
+            if has_local_file_evidence:
+                return "researcher"
             return "advisor_entry"
         work_order = state.get("work_order")
         route = state.get("route")
@@ -664,6 +695,11 @@ def build_graph(
         if state.get("memory_lookup_requested", False):
             return "human_review"
         return "jt" if get_canonical_jt_requested(state) else "reviewer"
+
+    def route_after_evidence_extract(state: SharedState) -> str:
+        if get_canonical_advisor_pod_requested(state):
+            return "advisor_entry"
+        return "writer"
 
     def route_after_reviewer(state: SharedState) -> str:
         if state.get("reviewer_parse_failed", False):
@@ -745,7 +781,14 @@ def build_graph(
     )
     graph_builder.add_edge("memory_lookup_prep", "writer")
     graph_builder.add_edge("researcher", "evidence_extract")
-    graph_builder.add_edge("evidence_extract", "writer")
+    graph_builder.add_conditional_edges(
+        "evidence_extract",
+        route_after_evidence_extract,
+        {
+            "advisor_entry": "advisor_entry",
+            "writer": "writer",
+        },
+    )
     graph_builder.add_conditional_edges(
         "writer",
         route_after_writer,

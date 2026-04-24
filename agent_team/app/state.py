@@ -138,6 +138,8 @@ class SharedState(TypedDict):
     advisor_invoked_advisors: NotRequired[list[str]]
     advisor_outputs: NotRequired[dict[str, str]]
     advisor_synthesis: NotRequired[str]
+    brainstorm_file_grounding_used: NotRequired[bool]
+    brainstorm_file_grounding_summary: NotRequired[str]
 
 
 def get_canonical_jt_requested(state: Mapping[str, Any]) -> bool:
