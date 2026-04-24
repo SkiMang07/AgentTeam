@@ -220,24 +220,28 @@ class DryRunResponsesClient:
             )
 
         if "You are the Advisor Router for the Advisor Pod." in system_prompt:
+            # Dry-run stubs for the semantic routing path.
+            # Production routing is fully LLM-driven; these stubs cover the four
+            # representative test cases used in dry-run workflow validation.
             task = user_prompt.lower()
-            if "rewrite this sentence to be clearer" in task:
+            if "rewrite this sentence to be clearer" in task or "proofread" in task:
+                # Fast-exit: simple rewrite — no advisors needed.
                 selected: list[str] = []
                 reasons: dict[str, str] = {}
-            elif "ui flow" in task:
+            elif "prioritize" in task or "tradeoff" in task or "portfolio" in task or "operating model" in task:
+                # Strategy/systems domain match.
+                selected = ["strategy_systems"]
+                reasons = {"strategy_systems": "Objective falls within strategy and tradeoff framing domain."}
+            elif "stakeholder" in task or "persuade" in task or "narrative" in task or "announcement" in task:
+                # Communication/influence domain match.
                 selected = ["communication_influence"]
-                reasons = {"communication_influence": "UI flow clarity and user-facing communication are central."}
-            elif "langgraph routing" in task or "implementation plan" in task:
+                reasons = {"communication_influence": "Objective requires messaging and stakeholder influence framing."}
+            elif "ship" in task or "launch" in task or "execution plan" in task or "implementation plan" in task:
+                # Entrepreneur/execution domain match.
                 selected = ["entrepreneur_execution"]
-                reasons = {"entrepreneur_execution": "Task is a technical execution planning request."}
-            elif "customer facing success plans" in task and "internal strategy memos" in task:
-                selected = ["strategy_systems", "communication_influence", "entrepreneur_execution"]
-                reasons = {
-                    "strategy_systems": "Needs strategy framing across multiple deliverable types.",
-                    "communication_influence": "Includes customer-facing and memo communication concerns.",
-                    "entrepreneur_execution": "Includes implementation-planning and delivery implications.",
-                }
+                reasons = {"entrepreneur_execution": "Objective is delivery-focused and requires execution planning."}
             else:
+                # Default: strategy as the broadest general-purpose advisor.
                 selected = ["strategy_systems"]
                 reasons = {"strategy_systems": "Default dry-run advisor for general strategic questions."}
 

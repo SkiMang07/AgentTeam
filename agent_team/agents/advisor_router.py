@@ -24,9 +24,10 @@ class AdvisorRouterAgent:
         advisor_brief = state.get("advisor_brief", "")
         approved_facts = [fact for fact in state.get("approved_facts", []) if isinstance(fact, str)]
         files_read = state.get("files_read", [])
-        deterministic = self._deterministic_selection(task, work_order)
-        if deterministic is not None:
-            route = deterministic
+
+        fast_exit = self._fast_exit(task, work_order)
+        if fast_exit is not None:
+            route = fast_exit
         else:
             route = self._model_selection(
                 task,
@@ -72,9 +73,15 @@ class AdvisorRouterAgent:
                 (
                     f"- id: {advisor['id']}\n"
                     f"  name: {advisor['name']}\n"
+                    f"  domain: {advisor['domain']}\n"
                     f"  when_to_use: {advisor['when_to_use']}\n"
                     f"  when_not_to_use: {advisor['when_not_to_use']}\n"
-                    f"  expected_input_needs: {advisor['expected_input_needs']}"
+                    f"  expected_input_needs: {advisor['expected_input_needs']}\n"
+                    f"  example_triggers:\n"
+                    + "\n".join(f"    * {t}" for t in advisor["example_triggers"])
+                    + "\n"
+                    f"  anti_triggers:\n"
+                    + "\n".join(f"    * {t}" for t in advisor["anti_triggers"])
                 )
                 for advisor in ADVISOR_ROSTER
             ]
@@ -100,7 +107,14 @@ class AdvisorRouterAgent:
         parsed = self._safe_parse(raw)
         return self._normalize_route(parsed, task=task, work_order=work_order)
 
-    def _deterministic_selection(self, task: str, work_order: Mapping[str, Any]) -> AdvisorRouteResult | None:
+    def _fast_exit(self, task: str, work_order: Mapping[str, Any]) -> AdvisorRouteResult | None:
+        """Return a pre-computed route only for cases where LLM reasoning adds no value.
+
+        Currently handles one case: the task is clearly a simple rewrite or copy-edit,
+        where no specialist advisor input is warranted.
+
+        All other tasks are routed to the LLM for semantic reasoning.
+        """
         normalized_task = task.lower()
         deliverable_type = str(work_order.get("deliverable_type", "")).lower()
 
@@ -113,26 +127,6 @@ class AdvisorRouterAgent:
                     for advisor_id in ADVISOR_IDS
                 },
                 confidence="high",
-            )
-
-        deterministic_hits: dict[str, str] = {}
-        if "ui" in normalized_task or "ux" in normalized_task or "user flow" in normalized_task:
-            deterministic_hits["communication_influence"] = "Task explicitly references UI/UX/user flow clarity and messaging."
-        if any(token in normalized_task for token in ("implementation plan", "langgraph", "architecture", "technical")):
-            deterministic_hits["entrepreneur_execution"] = "Task is implementation-focused and needs execution sequencing."
-        if any(token in normalized_task for token in ("strategy", "portfolio", "tradeoff", "cross functional")):
-            deterministic_hits["strategy_systems"] = "Task requires strategy/system tradeoff framing."
-
-        if deterministic_hits:
-            selected = list(deterministic_hits.keys())[:2]
-            return self._build_route(
-                selected=selected,
-                reason={advisor_id: deterministic_hits[advisor_id] for advisor_id in selected},
-                skipped_defaults={
-                    advisor_id: "Not selected by deterministic routing signals for this task."
-                    for advisor_id in ADVISOR_IDS
-                },
-                confidence="high" if len(selected) == 1 else "medium",
             )
 
         return None
@@ -162,8 +156,9 @@ class AdvisorRouterAgent:
             else "low"
         )
 
-        complexity = self._is_clearly_complex(task, work_order)
-        max_allowed = 3 if complexity else 2
+        # Post-hoc ceiling: cap at 3 for complex tasks, 2 otherwise.
+        # This is a guardrail on the model's output, not a routing decision.
+        max_allowed = 3 if self._is_clearly_complex(task, work_order) else 2
         selected = selected[:max_allowed]
 
         reason_raw = payload.get("selection_reason", {})
@@ -189,6 +184,11 @@ class AdvisorRouterAgent:
 
     @staticmethod
     def _is_clearly_complex(task: str, work_order: Mapping[str, Any]) -> bool:
+        """Post-hoc cap: allow up to 3 advisors when the task is demonstrably cross-functional.
+
+        This does not make routing decisions — it only sets the ceiling on how many
+        advisors the model's selection is trimmed to.
+        """
         normalized = task.lower()
         has_cross_functional_signal = any(
             phrase in normalized
