@@ -51,6 +51,14 @@ class EvidenceItem(TypedDict):
     evidence_points: list[str]
 
 
+class RequiredStructure(TypedDict):
+    type: str
+    label: str
+    items: list[str]
+    constraints: list[str]
+    source_file: str
+
+
 
 
 class AdvisorRouteResult(TypedDict):
@@ -101,6 +109,7 @@ class SharedState(TypedDict):
     files_skipped: NotRequired[list[str]]
     skip_reasons: NotRequired[dict[str, str]]
     evidence_bundle: NotRequired[list[EvidenceItem]]
+    required_structures: NotRequired[list[RequiredStructure]]
     file_read_summary: NotRequired[str]
     current_run: NotRequired[CurrentRunState]
     project_memory: NotRequired[ProjectMemory]
@@ -138,6 +147,7 @@ class SharedState(TypedDict):
     advisor_invoked_advisors: NotRequired[list[str]]
     advisor_outputs: NotRequired[dict[str, str]]
     advisor_synthesis: NotRequired[str]
+    simple_grounded_retrieval: NotRequired[bool]
     brainstorm_file_grounding_used: NotRequired[bool]
     brainstorm_file_grounding_summary: NotRequired[str]
 

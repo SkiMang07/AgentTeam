@@ -22,6 +22,7 @@ class FileReadResult(TypedDict):
 class EvidenceItem(TypedDict):
     file_path: str
     evidence_points: list[str]
+    required_structures: list[dict[str, str | list[str]]]
 
 
 MAX_HEADINGS = 4
@@ -123,6 +124,7 @@ def build_evidence_bundle(file_contents: dict[str, str]) -> list[EvidenceItem]:
         headings = _extract_headings(lines)
         bullets = _extract_bullets(lines)
         snippets = _extract_key_snippets(lines)
+        required_structures = _extract_required_structures(file_path, lines)
 
         points.append(f"Total non-empty lines: {len(lines)}")
         points.extend(headings)
@@ -133,6 +135,7 @@ def build_evidence_bundle(file_contents: dict[str, str]) -> list[EvidenceItem]:
             {
                 "file_path": file_path,
                 "evidence_points": points,
+                "required_structures": required_structures,
             }
         )
     return bundle
@@ -207,3 +210,46 @@ def _is_numbered_bullet(line: str) -> bool:
     if len(parts) != 2:
         return False
     return parts[0].isdigit()
+
+
+def _extract_required_structures(
+    file_path: str,
+    lines: list[str],
+) -> list[dict[str, str | list[str]]]:
+    constraints: list[str] = []
+    normalized_lines = [line.lower() for line in lines]
+    if any("use exactly" in line for line in normalized_lines):
+        constraints.append("use_exactly")
+    if any("do not rename" in line for line in normalized_lines):
+        constraints.append("do_not_rename")
+    if any("preserve" in line and "name" in line for line in normalized_lines):
+        constraints.append("preserve_names")
+
+    ordered_items = [
+        line.split(".", 1)[1].strip()
+        for line in lines
+        if _is_numbered_bullet(line) and line.split(".", 1)[1].strip()
+    ]
+    if not ordered_items:
+        return []
+
+    list_label = "ordered_items"
+    for idx, line in enumerate(lines):
+        if _is_numbered_bullet(line):
+            context_window = lines[max(0, idx - 3):idx]
+            for context in reversed(context_window):
+                lowered = context.lower()
+                if "workstream" in lowered:
+                    list_label = "workstreams"
+                    break
+            break
+
+    return [
+        {
+            "type": "ordered_list",
+            "label": list_label,
+            "items": ordered_items,
+            "constraints": constraints,
+            "source_file": file_path,
+        }
+    ]
