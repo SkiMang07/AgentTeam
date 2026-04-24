@@ -19,12 +19,25 @@ class AdvisorAgent:
         task = state.get("user_task", "")
         brief = state.get("advisor_brief", "")
         outputs: dict[str, str] = state.get("advisor_outputs") or {}
+        required_structures = state.get("required_structures", [])
 
         cluster_block = self._format_cluster_outputs(outputs)
+        required_structures_block = (
+            "\n".join(
+                f"- type: {item.get('type', '')}; label: {item.get('label', '')}; "
+                f"items: {item.get('items', [])}; constraints: {item.get('constraints', [])}; "
+                f"source_file: {item.get('source_file', '')}"
+                for item in required_structures
+                if isinstance(item, dict)
+            )
+            if isinstance(required_structures, list) and required_structures
+            else "- (none)"
+        )
 
         user_prompt = (
             f"Task: {task}\n\n"
             f"Advisor Brief: {brief}\n\n"
+            f"Required structures (binding file contracts):\n{required_structures_block}\n\n"
             f"--- Cluster Advisor Outputs ---\n\n"
             f"{cluster_block}\n\n"
             "If local file evidence is present in the brief, preserve explicit file-provided structures "

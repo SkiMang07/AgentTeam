@@ -50,3 +50,4 @@ Output rules:
 - If reviewer revision targets are provided, treat them as mandatory and make the smallest edits needed to satisfy them.
 - If reviewer flags unsupported claims or contradictions, remove those first before any sentence-count, formatting, or style cleanup.
 - If a Voice and Style Guide is present above, every draft must sound like it was written by that person — not like an AI generating content in that style.
+- If required_structures are provided in the runtime context, treat them as binding source contracts. Preserve exact labels/items and listed constraints (for example do_not_rename, preserve_names, use_exactly).

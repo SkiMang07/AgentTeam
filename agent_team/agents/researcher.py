@@ -29,6 +29,12 @@ class ResearcherAgent:
         project_memory = normalize_project_memory(state.get("project_memory"))
         evidence_bundle = self._load_structured_evidence(state)
         evidence_block = self._render_evidence_block(evidence_bundle)
+        required_structures = state.get("required_structures", [])
+        required_structures_block = (
+            json.dumps(required_structures, indent=2)
+            if isinstance(required_structures, list) and required_structures
+            else "[]"
+        )
         has_file_evidence = bool(evidence_bundle)
 
         # Load Obsidian vault context for this task
@@ -62,6 +68,7 @@ class ResearcherAgent:
             f"- Files read: {state.get('files_read', [])}\n"
             f"Local file evidence available: {has_file_evidence}\n"
             f"Structured local file evidence:\n{evidence_block}\n\n"
+            f"Required structures extracted from files (binding contracts):\n{required_structures_block}\n\n"
             f"Web search enabled for this run: {use_web_search}\n\n"
             "Continuity memory (context only; not default evidence):\n"
             f"- current_objective: {project_memory.get('current_objective', '')}\n"

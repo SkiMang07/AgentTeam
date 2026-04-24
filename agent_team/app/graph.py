@@ -100,6 +100,13 @@ def build_graph(
             file_contents = {}
 
         evidence_bundle = build_evidence_bundle(file_contents)
+        required_structures: list[dict[str, object]] = []
+        for item in evidence_bundle:
+            item_structures = item.get("required_structures", [])
+            if isinstance(item_structures, list):
+                for structure in item_structures:
+                    if isinstance(structure, dict):
+                        required_structures.append(structure)
         research_facts = [fact for fact in state.get("research_facts", []) if isinstance(fact, str)]
 
         evidence_facts: list[str] = []
@@ -111,6 +118,11 @@ def build_graph(
                     evidence_facts.append(f"[{file_path}] {point}")
 
         approved_facts = _dedupe_preserving_order([*research_facts, *evidence_facts])
+        simple_grounded_retrieval = _is_simple_grounded_retrieval_task(
+            task=state.get("user_task", ""),
+            required_structures=required_structures,
+            files_read=state.get("files_read", []),
+        )
         requested = len(state.get("files_requested", []))
         read = len(state.get("files_read", []))
         skipped = len(state.get("files_skipped", []))
@@ -129,6 +141,8 @@ def build_graph(
             **state,
             "evidence_bundle": evidence_bundle,
             "approved_facts": approved_facts,
+            "required_structures": required_structures,
+            "simple_grounded_retrieval": simple_grounded_retrieval,
             "file_read_summary": file_read_summary,
             "brainstorm_file_grounding_used": brainstorm_file_grounding_used,
             "brainstorm_file_grounding_summary": brainstorm_file_grounding_summary,
@@ -144,6 +158,29 @@ def build_graph(
             seen.add(item)
             deduped.append(item)
         return deduped
+
+    def _is_simple_grounded_retrieval_task(
+        *,
+        task: object,
+        required_structures: list[dict[str, object]],
+        files_read: object,
+    ) -> bool:
+        if not isinstance(task, str):
+            return False
+        if not isinstance(files_read, list) or not files_read:
+            return False
+        if not required_structures:
+            return False
+        normalized = " ".join(task.lower().split())
+        retrieval_phrases = (
+            "what are the three workstreams",
+            "what does the file say",
+            "based on my files",
+            "what are the names",
+            "list the items",
+            "list the workstreams",
+        )
+        return any(phrase in normalized for phrase in retrieval_phrases)
 
     def writer_node(state: SharedState) -> SharedState:
         written_state = writer.run(state)
@@ -559,6 +596,23 @@ def build_graph(
                 + "\n\nApproved facts (treat as primary context when they come from local files):\n"
                 + facts_lines
             )
+        required_structures = state.get("required_structures", [])
+        if isinstance(required_structures, list) and required_structures:
+            structure_lines: list[str] = []
+            for structure in required_structures:
+                if not isinstance(structure, dict):
+                    continue
+                structure_lines.append(
+                    f"- type: {structure.get('type', '')}; label: {structure.get('label', '')}; "
+                    f"items: {structure.get('items', [])}; constraints: {structure.get('constraints', [])}; "
+                    f"source_file: {structure.get('source_file', '')}"
+                )
+            if structure_lines:
+                advisor_brief = (
+                    advisor_brief
+                    + "\n\nRequired structures (binding contracts from local files):\n"
+                    + "\n".join(structure_lines)
+                )
 
         return {
             **state,
@@ -574,6 +628,30 @@ def build_graph(
             "advisor_outputs": {},
             "advisor_synthesis": "",
             "status": "advisor_started",
+        }
+
+    def advisor_simple_grounded_answer_node(state: SharedState) -> SharedState:
+        required_structures = state.get("required_structures", [])
+        lines: list[str] = []
+        if isinstance(required_structures, list):
+            for structure in required_structures:
+                if not isinstance(structure, dict):
+                    continue
+                items = structure.get("items", [])
+                label = structure.get("label", "items")
+                if isinstance(items, list) and items:
+                    heading = f"The {len(items)} {label} from your file are:"
+                    lines.append(heading)
+                    for idx, item in enumerate(items, start=1):
+                        if isinstance(item, str):
+                            lines.append(f"{idx}. {item}")
+                    break
+        concise_answer = "\n".join(lines) if lines else "I could not find grounded list items in the provided files."
+        return {
+            **state,
+            "draft": concise_answer,
+            "advisor_synthesis": concise_answer,
+            "status": "advisor_simple_grounded_answered",
         }
 
     def advisor_router_node(state: SharedState) -> SharedState:
@@ -634,6 +712,10 @@ def build_graph(
     timed_advisor_growth_mindset_node = timed_node("advisor_growth_mindset", advisor_growth_mindset_node)
     timed_advisor_entrepreneur_execution_node = timed_node("advisor_entrepreneur_execution", advisor_entrepreneur_execution_node)
     timed_advisor_assemble_node = timed_node("advisor_assemble", advisor_assemble_node)
+    timed_advisor_simple_grounded_answer_node = timed_node(
+        "advisor_simple_grounded_answer",
+        advisor_simple_grounded_answer_node,
+    )
 
     def route_after_pod_qa(state: SharedState) -> str:
         verdict = state.get("pod_qa_verdict", "revise")
@@ -668,6 +750,11 @@ def build_graph(
             if advisor_id in selected and advisor_id not in invoked:
                 return f"advisor_{advisor_id}"
         return "advisor_assemble"
+
+    def route_after_advisor_entry(state: SharedState) -> str:
+        if state.get("simple_grounded_retrieval", False):
+            return "advisor_simple_grounded_answer"
+        return "advisor_router"
 
     def route_after_chief(state: SharedState) -> str:
         if get_canonical_dev_pod_requested(state):
@@ -766,6 +853,7 @@ def build_graph(
     graph_builder.add_node("advisor_growth_mindset", timed_advisor_growth_mindset_node)
     graph_builder.add_node("advisor_entrepreneur_execution", timed_advisor_entrepreneur_execution_node)
     graph_builder.add_node("advisor_assemble", timed_advisor_assemble_node)
+    graph_builder.add_node("advisor_simple_grounded_answer", timed_advisor_simple_grounded_answer_node)
 
     graph_builder.add_edge(START, "chief_of_staff")
     graph_builder.add_conditional_edges(
@@ -836,7 +924,14 @@ def build_graph(
     graph_builder.add_edge("pod_revise_prep", "pod_backend")
     graph_builder.add_edge("pod_assemble", "human_review")
 
-    graph_builder.add_edge("advisor_entry", "advisor_router")
+    graph_builder.add_conditional_edges(
+        "advisor_entry",
+        route_after_advisor_entry,
+        {
+            "advisor_router": "advisor_router",
+            "advisor_simple_grounded_answer": "advisor_simple_grounded_answer",
+        },
+    )
     graph_builder.add_conditional_edges(
         "advisor_router",
         route_after_advisor_router,
@@ -910,5 +1005,6 @@ def build_graph(
         },
     )
     graph_builder.add_edge("advisor_assemble", "human_review")
+    graph_builder.add_edge("advisor_simple_grounded_answer", "human_review")
 
     return graph_builder.compile()

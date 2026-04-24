@@ -93,6 +93,18 @@ class WriterAgent:
                         if isinstance(point, str):
                             evidence_lines.append(f"  - {point}")
         evidence_block = "\n".join(evidence_lines) if evidence_lines else "- (no local file evidence loaded)"
+        required_structures = state.get("required_structures", [])
+        required_structures_block = (
+            "\n".join(
+                f"- type: {item.get('type', '')}; label: {item.get('label', '')}; "
+                f"items: {item.get('items', [])}; constraints: {item.get('constraints', [])}; "
+                f"source_file: {item.get('source_file', '')}"
+                for item in required_structures
+                if isinstance(item, dict)
+            )
+            if isinstance(required_structures, list) and required_structures
+            else "- (none)"
+        )
         files_read = state.get("files_read", [])
         has_local_file_evidence = isinstance(files_read, list) and len(files_read) > 0
 
@@ -142,6 +154,7 @@ class WriterAgent:
                 "When files_read is non-empty, prioritize file-derived approved facts and evidence bundle details."
                 " When local file evidence is present, preserve explicit names, labels, section headers,"
                 " constraints, and workstream titles from that evidence as primary structure."
+                " Treat required_structures as binding contracts. Preserve listed items and constraints exactly."
                 " Do not rename provided workstreams or silently replace provided structures with generic frameworks."
                 f"{priority_block}"
                 f"{revision_target_block}\n\n"
@@ -157,6 +170,7 @@ class WriterAgent:
                 f"- Local file evidence present: {has_local_file_evidence}\n"
                 f"Writer guidance notes (non-fact revision guidance):\n{guidance_block if guidance_block else '- (none provided)'}\n\n"
                 f"Structured evidence bundle:\n{evidence_block}\n\n"
+                f"Required structures (binding contracts):\n{required_structures_block}\n\n"
                 f"Approved facts:\n{facts_block if facts_block else '- (none provided)'}\n\n"
                 "Continuity memory (context only unless the task explicitly asks to inspect/reuse it):\n"
                 f"- current_objective: {project_memory.get('current_objective', '')}\n"
