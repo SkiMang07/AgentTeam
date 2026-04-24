@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
+from typing import Any, Callable
 
 from openai import OpenAI
 
 from app.config import Settings
+
+log = logging.getLogger(__name__)
 
 
 class ResponsesClient:
@@ -47,6 +51,109 @@ class ResponsesClient:
         response = self._client.responses.create(**kwargs)
         return response.output_text.strip()
 
+    def ask_with_function_tools(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        tools: list[dict],
+        tool_handlers: dict[str, Callable[..., Any]],
+        max_rounds: int = 5,
+    ) -> tuple[str, list[dict]]:
+        """Execute a conversation with custom function tools, handling the call loop.
+
+        Unlike ``ask_with_tools`` (which passes hosted tools like
+        ``web_search_preview`` that OpenAI executes automatically),
+        this method handles **custom function tools** by:
+          1. Calling the model.
+          2. Detecting ``function_call`` items in the response output.
+          3. Executing each via the matching handler in *tool_handlers*.
+          4. Feeding the results back using ``previous_response_id``.
+          5. Repeating until no more function calls are returned (or *max_rounds*
+             is exhausted).
+
+        Args:
+            system_prompt: Agent system prompt.
+            user_prompt: User / task prompt.
+            tools: List of OpenAI function tool schemas (``{"type": "function", ...}``).
+            tool_handlers: Mapping of tool name → callable that executes the tool
+                and returns a string result.
+            max_rounds: Maximum tool-call iterations before returning.
+
+        Returns:
+            Tuple of (final_text, tool_calls_log) where tool_calls_log is a list
+            of dicts with keys ``tool``, ``arguments``, and ``result``.
+        """
+        tool_calls_log: list[dict] = []
+
+        # Initial request
+        response = self._client.responses.create(
+            model=self._model,
+            input=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            tools=tools,
+        )
+
+        for _round in range(max_rounds):
+            # Collect function_call items from the response output
+            function_calls = [
+                item
+                for item in (response.output or [])
+                if getattr(item, "type", None) == "function_call"
+            ]
+
+            if not function_calls:
+                # No more tool calls — we have the final answer
+                break
+
+            # Execute each function call and build tool result items
+            tool_results: list[dict] = []
+            for fc in function_calls:
+                handler = tool_handlers.get(fc.name)
+                if handler is None:
+                    result = f"error: no handler registered for tool '{fc.name}'"
+                    log.warning("[openai_client] No handler for tool '%s'", fc.name)
+                else:
+                    try:
+                        args = json.loads(fc.arguments)
+                        result = str(handler(**args))
+                        log.info(
+                            "[openai_client] Tool '%s' executed: %s",
+                            fc.name,
+                            result[:120],
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        result = f"error executing {fc.name}: {exc}"
+                        log.warning(
+                            "[openai_client] Tool '%s' raised: %s", fc.name, exc
+                        )
+
+                tool_calls_log.append(
+                    {
+                        "tool": fc.name,
+                        "arguments": fc.arguments,
+                        "result": result,
+                    }
+                )
+                tool_results.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": fc.call_id,
+                        "output": result,
+                    }
+                )
+
+            # Feed results back, continuing from the previous response
+            response = self._client.responses.create(
+                model=self._model,
+                previous_response_id=response.id,
+                input=tool_results,
+                tools=tools,
+            )
+
+        return response.output_text.strip(), tool_calls_log
+
 
 class DryRunResponsesClient:
     def __init__(self) -> None:
@@ -61,6 +168,17 @@ class DryRunResponsesClient:
     ) -> str:
         """Dry-run variant of ask_with_tools — delegates to ask()."""
         return self.ask(system_prompt, user_prompt)
+
+    def ask_with_function_tools(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        tools: list[dict] | None = None,  # noqa: ARG002
+        tool_handlers: dict | None = None,  # noqa: ARG002
+        max_rounds: int = 5,  # noqa: ARG002
+    ) -> tuple[str, list[dict]]:
+        """Dry-run: no tool calls; delegates to ask()."""
+        return self.ask(system_prompt, user_prompt), []
 
     def ask(self, system_prompt: str, user_prompt: str) -> str:  # noqa: ARG002
         # Obsidian vault navigator folder selection

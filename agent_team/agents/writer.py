@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from app.state import SharedState, normalize_project_memory
+from tools.agent_tools import CREATE_FILE_TOOL, make_file_tool_handlers
+from tools.file_writer import FileWriter
 from tools.openai_client import ResponsesClient
 from tools.voice_loader import VoiceLoader
+
+log = logging.getLogger(__name__)
 
 PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "writer.md"
 ARTIFACTS_DIR = Path(__file__).resolve().parents[1] / "prompts" / "artifacts"
@@ -150,44 +155,84 @@ class WriterAgent:
             else ""
         )
 
-        raw = self._client.ask(
-            system_prompt=self._prompt,
-            user_prompt=(
-                "Draft output for the Chief of Staff work order using only approved facts and structured evidence. "
-                "If facts are missing, state assumptions and limits clearly. "
-                "Do not introduce new factual specifics beyond the source task text and approved facts. "
-                "Never claim you read files outside files_read. "
-                "When files_read is non-empty, prioritize file-derived approved facts and evidence bundle details."
-                " When local file evidence is present, preserve explicit names, labels, section headers,"
-                " constraints, and workstream titles from that evidence as primary structure."
-                " Treat required_structures as binding contracts. Preserve listed items and constraints exactly."
-                " Do not rename provided workstreams or silently replace provided structures with generic frameworks."
-                f"{priority_block}"
-                f"{revision_target_block}\n\n"
-                f"{redraft_source_block}\n\n"
-                f"Current task:\n{state['user_task']}\n\n"
-                f"Work order objective:\n{work_order.get('objective', '')}\n\n"
-                f"Work order deliverable_type:\n{deliverable_type}\n\n"
-                f"Work order success_criteria:\n{success_criteria if success_criteria else '- (none provided)'}\n\n"
-                f"Work order open_questions:\n{open_questions if open_questions else '- (none provided)'}\n\n"
-                f"Current evidence:\n"
-                f"- Files read: {state.get('files_read', [])}\n"
-                f"- Files skipped: {state.get('files_skipped', [])}\n"
-                f"- Local file evidence present: {has_local_file_evidence}\n"
-                f"Writer guidance notes (non-fact revision guidance):\n{guidance_block if guidance_block else '- (none provided)'}\n\n"
-                f"Raw file content (treat as ground truth — use exact names, labels, and structures from these files):\n"
-                f"{raw_files_block if raw_files_block else '- (no local files provided)'}\n\n"
-                f"Structured evidence bundle:\n{evidence_block}\n\n"
-                f"Required structures (binding contracts):\n{required_structures_block}\n\n"
-                f"Approved facts:\n{facts_block if facts_block else '- (none provided)'}\n\n"
-                "Continuity memory (context only unless the task explicitly asks to inspect/reuse it):\n"
-                f"- current_objective: {project_memory.get('current_objective', '')}\n"
-                f"- active_deliverable_type: {project_memory.get('active_deliverable_type', '')}\n"
-                f"- open_questions: {project_memory.get('open_questions', [])}\n"
-                f"- latest_approved_output: {project_memory.get('latest_approved_output', '')}"
-                f"{artifact_block}"
-            ),
+        user_prompt = (
+            "Draft output for the Chief of Staff work order using only approved facts and structured evidence. "
+            "If facts are missing, state assumptions and limits clearly. "
+            "Do not introduce new factual specifics beyond the source task text and approved facts. "
+            "Never claim you read files outside files_read. "
+            "When files_read is non-empty, prioritize file-derived approved facts and evidence bundle details."
+            " When local file evidence is present, preserve explicit names, labels, section headers,"
+            " constraints, and workstream titles from that evidence as primary structure."
+            " Treat required_structures as binding contracts. Preserve listed items and constraints exactly."
+            " Do not rename provided workstreams or silently replace provided structures with generic frameworks."
+            f"{priority_block}"
+            f"{revision_target_block}\n\n"
+            f"{redraft_source_block}\n\n"
+            f"Current task:\n{state['user_task']}\n\n"
+            f"Work order objective:\n{work_order.get('objective', '')}\n\n"
+            f"Work order deliverable_type:\n{deliverable_type}\n\n"
+            f"Work order success_criteria:\n{success_criteria if success_criteria else '- (none provided)'}\n\n"
+            f"Work order open_questions:\n{open_questions if open_questions else '- (none provided)'}\n\n"
+            f"Current evidence:\n"
+            f"- Files read: {state.get('files_read', [])}\n"
+            f"- Files skipped: {state.get('files_skipped', [])}\n"
+            f"- Local file evidence present: {has_local_file_evidence}\n"
+            f"Writer guidance notes (non-fact revision guidance):\n{guidance_block if guidance_block else '- (none provided)'}\n\n"
+            f"Raw file content (treat as ground truth — use exact names, labels, and structures from these files):\n"
+            f"{raw_files_block if raw_files_block else '- (no local files provided)'}\n\n"
+            f"Structured evidence bundle:\n{evidence_block}\n\n"
+            f"Required structures (binding contracts):\n{required_structures_block}\n\n"
+            f"Approved facts:\n{facts_block if facts_block else '- (none provided)'}\n\n"
+            "Continuity memory (context only unless the task explicitly asks to inspect/reuse it):\n"
+            f"- current_objective: {project_memory.get('current_objective', '')}\n"
+            f"- active_deliverable_type: {project_memory.get('active_deliverable_type', '')}\n"
+            f"- open_questions: {project_memory.get('open_questions', [])}\n"
+            f"- latest_approved_output: {project_memory.get('latest_approved_output', '')}"
+            f"{artifact_block}"
         )
+
+        # ── File creation (when a sandbox output directory is available) ──────
+        # When the run was started with an output_dir, the writer can proactively
+        # create structured deliverables as actual files (spec docs, plans, API
+        # contracts, etc.) using the create_file tool.  Without a sandbox the
+        # writer falls back to the plain ask() path and returns inline text only.
+        sandbox_root = state.get("sandbox_root", "")
+        existing_files_created: list[str] = list(state.get("files_created", []))
+        tool_calls_log: list[dict] = []
+
+        if sandbox_root:
+            file_creation_addendum = (
+                "\n\n--- File creation available ---\n"
+                "You have access to the create_file tool. "
+                "For any deliverable that a reader will open and reference later "
+                "(spec docs, developer handoff plans, API contracts, feature backlogs, "
+                "conversation flow maps, reports, briefs), call create_file to persist "
+                "it as a downloadable file instead of returning it only as inline text. "
+                "You may call create_file multiple times to produce multiple files "
+                "(e.g. one file per major section or component). "
+                "Use clear, descriptive filenames and subdirectories as appropriate "
+                "(e.g. 'plans/developer_handoff.md', 'specs/api_contract.json'). "
+                "After creating files, return a concise inline summary listing the "
+                "filenames and what each contains.\n"
+                "--- End file creation instructions ---"
+            )
+            file_writer = FileWriter(sandbox_root)
+            tool_handlers = make_file_tool_handlers(file_writer)
+            raw, tool_calls_log = self._client.ask_with_function_tools(
+                system_prompt=self._prompt,
+                user_prompt=user_prompt + file_creation_addendum,
+                tools=[CREATE_FILE_TOOL],
+                tool_handlers=tool_handlers,
+            )
+            new_files = file_writer.files_created
+            existing_files_created.extend(new_files)
+            if new_files:
+                log.info("[writer] Created %d file(s): %s", len(new_files), new_files)
+        else:
+            raw = self._client.ask(
+                system_prompt=self._prompt,
+                user_prompt=user_prompt,
+            )
 
         prior_writer_history = state.get("model_metadata", {}).get("writer_outputs", [])
         writer_history = [*prior_writer_history, raw]
@@ -195,10 +240,12 @@ class WriterAgent:
         return {
             **state,
             "draft": raw,
+            "files_created": existing_files_created,
             "status": "drafted",
             "model_metadata": {
                 **state.get("model_metadata", {}),
                 "writer_raw": raw,
                 "writer_outputs": writer_history,
+                "writer_tool_calls": tool_calls_log,
             },
         }

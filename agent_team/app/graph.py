@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import logging
 from time import perf_counter
+from typing import Any
 
 from langgraph.graph import END, START, StateGraph
+
+log = logging.getLogger(__name__)
 
 from agents.advisor import AdvisorAgent
 from agents.advisor_router import AdvisorRouterAgent
@@ -50,6 +54,7 @@ def build_graph(
     on_node_enter=None,
     on_node_exit=None,
     human_review_fn=None,
+    file_writer: Any | None = None,
 ):
     graph_builder = StateGraph(SharedState)
     max_auto_redrafts = 1
@@ -832,6 +837,41 @@ def build_graph(
             "status": "review_rejected_after_redraft",
         }
 
+    # ── Artifact writer node ──────────────────────────────────────────────────
+    # Runs after human_review approval. If a file_writer was provided at graph
+    # build time (i.e. the run was started with an output_dir), it auto-writes
+    # the approved final_output as output.md — a guaranteed persistent copy
+    # regardless of whether the writer agent also created files.
+    # Non-finalized states (stopped_by_human, rejected) pass through unchanged.
+
+    def artifact_writer_node(state: SharedState) -> SharedState:
+        if file_writer is None:
+            return state
+
+        if state.get("status") != "finalized":
+            return state
+
+        final_output = state.get("final_output", "")
+        if not final_output:
+            return state
+
+        existing: list[str] = list(state.get("files_created", []))
+
+        try:
+            path = file_writer.write_file("output.md", final_output)
+            existing.append(path)
+            log.info("[artifact_writer] Auto-wrote final output → %s", path)
+            print(f"[artifact_writer] Final output saved → {path}")
+        except Exception as exc:  # noqa: BLE001
+            log.warning("[artifact_writer] Could not write output.md: %s", exc)
+
+        return {
+            **state,
+            "files_created": existing,
+        }
+
+    timed_artifact_writer_node = timed_node("artifact_writer", artifact_writer_node)
+
     graph_builder.add_node("chief_of_staff", timed_chief_node)
     graph_builder.add_node("researcher", timed_researcher_node)
     graph_builder.add_node("evidence_extract", timed_evidence_extract_node)
@@ -842,6 +882,7 @@ def build_graph(
     graph_builder.add_node("chief_final", timed_chief_final_node)
     graph_builder.add_node("auto_redraft_prep", timed_node("auto_redraft_prep", auto_redraft_prep_node))
     graph_builder.add_node("human_review", timed_node("human_review", human_review_node))
+    graph_builder.add_node("artifact_writer", timed_artifact_writer_node)
     graph_builder.add_node("reviewer_parse_failure", timed_node("reviewer_parse_failure", reviewer_parse_failure_node))
     graph_builder.add_node(
         "review_rejected_after_redraft",
@@ -915,7 +956,8 @@ def build_graph(
             "review_rejected_after_redraft": "review_rejected_after_redraft",
         },
     )
-    graph_builder.add_edge("human_review", END)
+    graph_builder.add_edge("human_review", "artifact_writer")
+    graph_builder.add_edge("artifact_writer", END)
     graph_builder.add_edge("reviewer_parse_failure", END)
     graph_builder.add_edge("review_rejected_after_redraft", END)
 

@@ -151,6 +151,18 @@ class SharedState(TypedDict):
     brainstorm_file_grounding_used: NotRequired[bool]
     brainstorm_file_grounding_summary: NotRequired[str]
     raw_file_context: NotRequired[str]
+    web_search_enabled: NotRequired[bool]
+    # ── File output sandboxing ────────────────────────────────────────────────
+    # output_dir: user-provided base directory (e.g. "/Users/me/AgentTeam/outputs").
+    # sandbox_root: per-run subdirectory resolved at run start;
+    #   all agent writes are restricted to this path.
+    # files_created: absolute paths of every file written during this run.
+    # allowed_read_dirs: directories the agent is permitted to read from;
+    #   files_path entries outside these dirs are blocked.
+    output_dir: NotRequired[str]
+    sandbox_root: NotRequired[str]
+    files_created: NotRequired[list[str]]
+    allowed_read_dirs: NotRequired[list[str]]
 
 
 def get_canonical_jt_requested(state: Mapping[str, Any]) -> bool:

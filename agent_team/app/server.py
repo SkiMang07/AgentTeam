@@ -38,6 +38,7 @@ from app.config import get_settings
 from app.graph import build_graph
 from app.jt_request import detect_jt_request
 from app.state import SharedState, empty_project_memory, normalize_project_memory
+from tools.file_writer import FileWriter
 from tools.local_file_reader import load_local_files
 from tools.obsidian_context import ObsidianContextTool
 from tools.openai_client import ResponsesClient
@@ -118,7 +119,7 @@ def get_agents() -> dict[str, Any]:
     return _agents
 
 
-def make_graph(on_node_enter=None, on_node_exit=None, human_review_fn=None):
+def make_graph(on_node_enter=None, on_node_exit=None, human_review_fn=None, file_writer=None):
     """Build a fresh LangGraph instance with the given per-run callbacks."""
     a = get_agents()
     return build_graph(
@@ -140,6 +141,7 @@ def make_graph(on_node_enter=None, on_node_exit=None, human_review_fn=None):
         on_node_enter=on_node_enter,
         on_node_exit=on_node_exit,
         human_review_fn=human_review_fn,
+        file_writer=file_writer,
     )
 
 
@@ -192,6 +194,8 @@ def run_stream(
     web_search: bool = False,
     output_format: str = "Chat",
     mem_session: str = "",
+    output_dir: str = "",
+    allowed_read_dirs: str = "",
 ):
     """
     SSE stream that runs the agent graph and emits progress events.
@@ -201,9 +205,20 @@ def run_stream(
         {type: "node_start",    node: str}
         {type: "node_complete", node: str, elapsed_ms: int}
         {type: "human_review",  draft: str, reviewer_findings: dict}
-        {type: "final",         output: str, status: str, execution_path: list}
+        {type: "final",         output: str, status: str, execution_path: list,
+                                files_created: list[str]}
         {type: "error",         message: str}
         {type: "heartbeat"}
+
+    File output params:
+        output_dir: Absolute path to a directory where the agents may write
+            output files for this run. A per-run subdirectory
+            ``run_<session_id[:8]>`` is created inside it automatically.
+            If omitted, no files are written.
+        allowed_read_dirs: Comma-separated list of absolute directory paths the
+            agents are permitted to read source files from. Any path in
+            ``files_path`` that does not resolve under one of these directories
+            is silently blocked. Leave empty to allow all paths (default).
     """
     session_id = str(uuid.uuid4())
     event_queue: queue.Queue = queue.Queue()
@@ -216,6 +231,7 @@ def run_stream(
     }
 
     files_list = [f.strip() for f in files_path.split(",") if f.strip()]
+    allowed_dirs = [d.strip() for d in allowed_read_dirs.split(",") if d.strip()]
 
     # ── Per-run callbacks (captured in closures) ──────────────────────────────
 
@@ -247,16 +263,49 @@ def run_stream(
 
     def run_in_thread() -> None:
         try:
+            # ── Output sandbox setup ──────────────────────────────────────────
+            # Create a per-run subdirectory inside output_dir so multiple runs
+            # never collide. file_writer is passed into the graph and captured
+            # by both the writer agent (for proactive file creation) and the
+            # artifact_writer_node (for auto-writing the final approved output).
+            session_file_writer: FileWriter | None = None
+            sandbox_root_str = ""
+            if output_dir.strip():
+                sandbox_path = Path(output_dir.strip()) / f"run_{session_id[:8]}"
+                session_file_writer = FileWriter(sandbox_path)
+                sandbox_root_str = session_file_writer.sandbox_root
+                print(f"[server] Output sandbox: {sandbox_root_str}")
+
+            # ── Read-path sandboxing ──────────────────────────────────────────
+            # If the caller supplied allowed_read_dirs, reject any files_path
+            # entries that don't resolve under one of the permitted directories.
+            validated_files = files_list
+            if allowed_dirs:
+                resolved_allowed = [Path(d).resolve() for d in allowed_dirs]
+                validated_files = []
+                for f in files_list:
+                    file_resolved = Path(f).resolve()
+                    if any(
+                        str(file_resolved).startswith(str(allowed))
+                        for allowed in resolved_allowed
+                    ):
+                        validated_files.append(f)
+                    else:
+                        print(
+                            f"[server] Blocked read (outside allowed_read_dirs): {f}"
+                        )
+
             graph = make_graph(
                 on_node_enter=on_node_enter,
                 on_node_exit=on_node_exit,
                 human_review_fn=human_review_fn,
+                file_writer=session_file_writer,
             )
 
             jt_requested, jt_mode = detect_jt_request(
                 task=task, cli_jt=jt_enabled, cli_mode=None
             )
-            file_read_result = load_local_files(files_list)
+            file_read_result = load_local_files(validated_files)
 
             # Hint the Chief of Staff toward the requested output format
             enhanced_task = task
@@ -298,6 +347,11 @@ def run_stream(
                 "model_metadata": {
                     "file_contents": file_read_result["file_contents"],
                 },
+                # File output sandboxing
+                "output_dir": output_dir.strip(),
+                "sandbox_root": sandbox_root_str,
+                "files_created": [],
+                "allowed_read_dirs": allowed_dirs,
             }
 
             result = graph.invoke(initial_state)
@@ -306,6 +360,10 @@ def run_stream(
             _session_memory[mem_session or session_id] = normalize_project_memory(
                 result.get("project_memory")
             )
+
+            files_created = result.get("files_created", [])
+            if files_created:
+                print(f"[server] Files created this run ({len(files_created)}): {files_created}")
 
             event_queue.put({
                 "type": "final",
@@ -317,6 +375,8 @@ def run_stream(
                 "node_timings_ms": (
                     result.get("model_metadata", {}).get("node_timings_ms", {})
                 ),
+                "files_created": files_created,
+                "sandbox_root": result.get("sandbox_root", ""),
             })
 
         except Exception as exc:  # noqa: BLE001
