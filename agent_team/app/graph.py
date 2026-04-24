@@ -511,6 +511,28 @@ def build_graph(
             )
         else:
             advisor_brief = existing_brief
+
+        # Append a compact file-evidence block when local files were loaded.
+        # This ensures all advisor cluster agents and the synthesis agent have
+        # project-grounded context without requiring changes to BaseSubAdvisorAgent.
+        model_metadata = state.get("model_metadata") or {}
+        file_contents = model_metadata.get("file_contents") if isinstance(model_metadata, dict) else {}
+        if isinstance(file_contents, dict) and file_contents:
+            evidence_bundle = build_evidence_bundle(file_contents)
+            evidence_lines: list[str] = []
+            for item in evidence_bundle:
+                fp = item.get("file_path", "")
+                points = item.get("evidence_points", [])
+                evidence_lines.append(f"  [{fp}]")
+                for pt in points[:6]:   # cap at 6 points per file to stay concise
+                    evidence_lines.append(f"    • {pt}")
+            if evidence_lines:
+                advisor_brief = (
+                    advisor_brief
+                    + "\n\nLocal file context (use to ground your analysis):\n"
+                    + "\n".join(evidence_lines)
+                )
+
         return {
             **state,
             "advisor_brief": advisor_brief,

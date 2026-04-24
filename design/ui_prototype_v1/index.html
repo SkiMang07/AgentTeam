@@ -245,6 +245,8 @@
                 <option>Let CoS decide</option>
                 <option>Determine during planning</option>
               </select>
+              <label for="brainFiles" style="margin-top:8px;">Local files (optional)</label>
+              <input id="brainFiles" value="" placeholder="e.g. README.md, PROJECT_PLAN.md" />
               <label for="brainFraming" style="margin-top:8px;">Advisor framing</label>
               <input id="brainFraming" value="5 advisor clusters produce notes for advisor synthesis" />
             </div>
@@ -764,10 +766,18 @@
       // ── Branch run helpers ────────────────────────────────────────────────
       function getBranchParams(branch, taskOverride) {
         const task = taskOverride !== undefined ? taskOverride : getTaskText(branch);
+        // In sequence mode a branch receives the prior branch's approved output as its task.
+        // Passing a large files_path on top of that handoff text causes context overload
+        // (the Writer stall bug). Clear files for any downstream handoff recipient.
+        const isHandoff = taskOverride !== undefined;
+        const filesPath = isHandoff ? ''
+          : branch === 'plan'       ? (document.getElementById('planFiles')?.value   || '')
+          : branch === 'brainstorm' ? (document.getElementById('brainFiles')?.value  || '')
+          : '';
         return {
           task, branch,
           jt_enabled:    branch === 'plan' && document.getElementById('planJt')?.value === 'Enabled',
-          files_path:    branch === 'plan' ? (document.getElementById('planFiles')?.value || '') : '',
+          files_path:    filesPath,
           web_search:    branch === 'plan' && document.getElementById('planWeb')?.value === 'Requested',
           output_format: branch === 'plan'       ? (document.getElementById('planArtifact')?.value || 'Chat')
                        : branch === 'brainstorm' ? (document.getElementById('brainOutput')?.value  || 'Chat')
