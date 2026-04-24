@@ -29,10 +29,10 @@ class ResearcherAgent:
         project_memory = normalize_project_memory(state.get("project_memory"))
         evidence_bundle = self._load_structured_evidence(state)
         evidence_block = self._render_evidence_block(evidence_bundle)
-        required_structures = state.get("required_structures", [])
+        required_structures = self._extract_required_structures(evidence_bundle)
         required_structures_block = (
             json.dumps(required_structures, indent=2)
-            if isinstance(required_structures, list) and required_structures
+            if required_structures
             else "[]"
         )
         has_file_evidence = bool(evidence_bundle)
@@ -139,6 +139,22 @@ class ResearcherAgent:
                     if isinstance(point, str):
                         lines.append(f"  - {point}")
         return "\n".join(lines) if lines else "- (no local file evidence loaded)"
+
+    @staticmethod
+    def _extract_required_structures(
+        evidence_bundle: list[dict[str, object]],
+    ) -> list[dict[str, object]]:
+        required_structures: list[dict[str, object]] = []
+        for item in evidence_bundle:
+            if not isinstance(item, dict):
+                continue
+            structures = item.get("required_structures", [])
+            if not isinstance(structures, list):
+                continue
+            for structure in structures:
+                if isinstance(structure, dict):
+                    required_structures.append(structure)
+        return required_structures
 
     @staticmethod
     def _safe_parse(raw: str) -> dict:

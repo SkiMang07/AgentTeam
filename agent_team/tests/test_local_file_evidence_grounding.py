@@ -113,6 +113,36 @@ class LocalFileEvidenceGroundingTests(unittest.TestCase):
         self.assertIn("- file: README.md", client.last_user_prompt)
         self.assertIn("Bullet: CLI based execution", client.last_user_prompt)
 
+    def test_researcher_required_structures_block_includes_manual_workstream_names(self) -> None:
+        client = _StubClient()
+        agent = ResearcherAgent(client)
+        manual_context = (
+            "# Test Context\n\n"
+            "Use exactly these three workstreams:\n"
+            "1. Alpha Intake\n"
+            "2. Beta Build\n"
+            "3. Gamma Launch\n\n"
+            "Do not rename the workstreams.\n"
+            "The project plan should preserve these names.\n"
+        )
+        state = {
+            "user_task": "What are the three workstreams I should use based on my files included?",
+            "work_order": {
+                "objective": "Retrieve workstream names",
+                "deliverable_type": "draft_response",
+                "success_criteria": ["Use exact names from files"],
+                "open_questions": [],
+            },
+            "files_read": ["tests/manual_grounding_test_context.md"],
+            "model_metadata": {"file_contents": {"tests/manual_grounding_test_context.md": manual_context}},
+        }
+
+        agent.run(state)
+        self.assertIn("Required structures extracted from files (binding contracts):", client.last_user_prompt)
+        self.assertIn("Alpha Intake", client.last_user_prompt)
+        self.assertIn("Beta Build", client.last_user_prompt)
+        self.assertIn("Gamma Launch", client.last_user_prompt)
+
     def test_brainstorm_with_local_files_simple_retrieval_uses_concise_grounded_answer(self) -> None:
         dry_client = DryRunResponsesClient()
         graph = build_graph(
