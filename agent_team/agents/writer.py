@@ -108,24 +108,11 @@ class WriterAgent:
         files_read = state.get("files_read", [])
         has_local_file_evidence = isinstance(files_read, list) and len(files_read) > 0
 
-        # Raw file content — passed directly so the model sees full text, not just extracted snippets.
-        # Capped per file to avoid blowing the context window.
-        _MAX_RAW_CHARS_PER_FILE = 3000
-        _MAX_RAW_FILES = 5
-        raw_files_block = ""
-        if has_local_file_evidence:
-            _model_metadata = state.get("model_metadata", {})
-            _file_contents: dict = (
-                _model_metadata.get("file_contents", {})
-                if isinstance(_model_metadata, dict)
-                else {}
-            )
-            raw_parts: list[str] = []
-            for _fp, _content in list(_file_contents.items())[:_MAX_RAW_FILES]:
-                if isinstance(_content, str) and _content.strip():
-                    truncated = _content[:_MAX_RAW_CHARS_PER_FILE]
-                    raw_parts.append(f"--- {_fp} ---\n{truncated}")
-            raw_files_block = "\n\n".join(raw_parts)
+        # Raw file content — built by evidence_extract_node and stored in state so
+        # it doesn't need to be re-read from model_metadata here.  file_contents is
+        # stripped from model_metadata after evidence_extract to keep downstream
+        # prompts lean; raw_file_context is the controlled, capped version for the writer.
+        raw_files_block = state.get("raw_file_context", "") or ""
 
         revision_targets = state.get("revision_targets", [])
         prior_draft = state.get("redraft_source_draft", "")

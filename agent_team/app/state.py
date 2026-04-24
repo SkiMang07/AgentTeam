@@ -150,6 +150,7 @@ class SharedState(TypedDict):
     simple_grounded_retrieval: NotRequired[bool]
     brainstorm_file_grounding_used: NotRequired[bool]
     brainstorm_file_grounding_summary: NotRequired[str]
+    raw_file_context: NotRequired[str]
 
 
 def get_canonical_jt_requested(state: Mapping[str, Any]) -> bool:

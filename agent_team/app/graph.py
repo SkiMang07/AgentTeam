@@ -139,6 +139,19 @@ def build_graph(
         if brainstorm_file_grounding_used:
             print(f"[advisor_grounding] {brainstorm_file_grounding_summary}")
 
+        # Build a compact raw-content block for the writer (capped to avoid large
+        # prompts) then strip file_contents from model_metadata so it does not ride
+        # through every downstream node and blow up context windows.
+        _MAX_RAW_CHARS_PER_FILE = 3000
+        _MAX_RAW_FILES = 5
+        raw_parts: list[str] = []
+        for _fp, _content in list(file_contents.items())[:_MAX_RAW_FILES]:
+            if isinstance(_content, str) and _content.strip():
+                raw_parts.append(f"--- {_fp} ---\n{_content[:_MAX_RAW_CHARS_PER_FILE]}")
+        raw_file_context = "\n\n".join(raw_parts)
+
+        stripped_metadata = {k: v for k, v in (model_metadata if isinstance(model_metadata, dict) else {}).items() if k != "file_contents"}
+
         return {
             **state,
             "evidence_bundle": evidence_bundle,
@@ -148,7 +161,9 @@ def build_graph(
             "file_read_summary": file_read_summary,
             "brainstorm_file_grounding_used": brainstorm_file_grounding_used,
             "brainstorm_file_grounding_summary": brainstorm_file_grounding_summary,
+            "raw_file_context": raw_file_context,
             "status": "evidence_extracted",
+            "model_metadata": stripped_metadata,
         }
 
     def _dedupe_preserving_order(items: list[str]) -> list[str]:
@@ -565,14 +580,6 @@ def build_graph(
         evidence_bundle = state.get("evidence_bundle", [])
         if not isinstance(evidence_bundle, list):
             evidence_bundle = []
-
-        # Fallback: if brainstorm entered without evidence extraction but files
-        # exist, still render compact evidence from file contents.
-        if not evidence_bundle:
-            model_metadata = state.get("model_metadata") or {}
-            file_contents = model_metadata.get("file_contents") if isinstance(model_metadata, dict) else {}
-            if isinstance(file_contents, dict) and file_contents:
-                evidence_bundle = build_evidence_bundle(file_contents)
 
         approved_facts = [
             fact for fact in state.get("approved_facts", []) if isinstance(fact, str) and fact.strip()
