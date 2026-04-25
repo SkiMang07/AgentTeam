@@ -61,12 +61,14 @@
         box-shadow: 0 16px 30px rgba(2, 5, 9, 0.24);
       }
       .panel h2 { margin: 0 0 12px; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: #c6d1df; }
-      .stack { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+      .stack { display: flex; flex-direction: column; gap: 10px; min-height: 0; flex: 1; overflow-y: auto; }
       .section { border: 1px solid var(--border-soft); background: rgba(8, 12, 17, 0.76); border-radius: 11px; padding: 10px; }
       .section-title { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #9eaab9; }
       label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 5px; }
       textarea, select, input { width: 100%; border: 1px solid #1f2a37; border-radius: 9px; background: #0a1017; color: var(--text); padding: 9px 10px; }
       textarea { min-height: 90px; resize: vertical; }
+      /* Chat input — mimics Claude's composer: single-line default, grows with content */
+      #taskInput { min-height: 44px; max-height: 180px; resize: none; overflow-y: auto; line-height: 1.55; padding: 10px 12px; }
       .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
       .status-inline { font-size: 12px; color: #afbccd; }
       .mode-picker { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -137,7 +139,7 @@
       /* ── CoS Intake Chat ── */
       .cos-chat {
         overflow-y: auto;
-        max-height: 260px;
+        max-height: 620px;
         display: flex;
         flex-direction: column;
         gap: 10px;
@@ -180,11 +182,11 @@
       }
       .cos-questions li::before { content: "→ "; color: #52789e; }
       .intake-row { display: flex; gap: 6px; align-items: flex-end; }
-      .intake-row textarea { flex: 1; min-height: 62px; resize: none; font-size: 12px; }
+      .intake-row textarea { flex: 1; resize: none; font-size: 12px; }
       .send-btn {
         flex-shrink: 0;
         width: 40px;
-        height: 62px;
+        height: 44px;
         border: 1px solid #2a3d56;
         border-radius: 9px;
         background: #0c1622;
@@ -762,7 +764,12 @@
             runState.textContent     = 'Awaiting Approval';
             promptStatus.textContent = 'Draft ready — your review is required.';
 
-            const draftHtml = `<div class="doc"><div class="sec"><pre style="white-space:pre-wrap;word-break:break-word;color:#d6dfec;font-family:inherit;margin:0;">${esc(event.draft)}</pre></div></div>`;
+            console.log('[human_review] draft length:', (event.draft || '').length, '| branch:', branch, '| isSeq:', isSeq);
+
+            const draftContent = event.draft || '';
+            const draftHtml = draftContent
+              ? `<div class="doc"><div class="sec"><pre style="white-space:pre-wrap;word-break:break-word;color:#d6dfec;font-family:inherit;margin:0;">${esc(draftContent)}</pre></div></div>`
+              : `<div class="doc"><div class="sec"><p style="color:#6a7e94;font-style:italic;">Draft was empty — check terminal for agent errors.</p></div></div>`;
 
             if (isSeq) {
               // Sequence mode: always use the Sequence Output tab
@@ -958,9 +965,13 @@
       function setIntakeReady(suggestedBranch) {
         intakeReady = true;
         intakeStatus.classList.add('ready');
-        intakeStatusText.textContent = 'Ready — CoS has everything it needs. Hit Run to dispatch.';
-        sendBtn.disabled = true;
-        taskInput.disabled = true;
+        intakeStatusText.textContent = '● Ready — hit Run, or keep typing to refine.';
+        // Keep input open so the user can keep the conversation going
+        taskInput.value = '';
+        taskInput.placeholder = 'Add context or adjustments, or hit Run to dispatch…';
+        taskInput.disabled = false;
+        sendBtn.disabled = false;
+        taskInput.focus();
         // Auto-select CoS-suggested branch if we're in single-branch mode
         if (suggestedBranch) {
           const hint = suggestedBranch.toLowerCase();
@@ -982,6 +993,7 @@
         taskInput.disabled = false;
         taskInput.value   = '';
         taskInput.placeholder = 'Describe your task…';
+        taskInput.style.height = '';
         cosChat.innerHTML = `
           <div class="chat-row">
             <span class="chat-label">Chief of Staff</span>
@@ -990,7 +1002,13 @@
       }
 
       async function runIntake(userText) {
-        if (intakePending || intakeReady) return;
+        if (intakePending) return;
+        // If already ready but user is adding more — reset ready state and re-run intake
+        if (intakeReady) {
+          intakeReady = false;
+          intakeStatus.classList.remove('ready');
+          intakeStatusText.textContent = 'Type your task and press send — CoS will check if anything is needed upfront.';
+        }
         intakePending = true;
         sendBtn.disabled = true;
 
@@ -1023,7 +1041,11 @@
             enrichedTask = fullTask;
             const cosMsg = [data.analysis, data.suggested_approach].filter(Boolean).join('\n\n');
             appendChatMsg('cos', cosMsg);
-            setIntakeReady(data.suggested_branch);
+            // Brief pause then a conversational follow-up so it feels like dialogue
+            setTimeout(() => {
+              appendChatMsg('cos', 'I have enough to dispatch this. Hit Run when you\'re ready — or keep typing if you want to adjust the approach.');
+              setIntakeReady(data.suggested_branch);
+            }, 350);
           } else {
             // CoS has questions — show them and wait for a follow-up
             const analysis = data.analysis || 'A few things before I dispatch this:';
@@ -1044,6 +1066,12 @@
 
         intakePending = false;
       }
+
+      // Auto-resize taskInput like Claude's composer
+      taskInput.addEventListener('input', () => {
+        taskInput.style.height = 'auto';
+        taskInput.style.height = Math.min(taskInput.scrollHeight, 180) + 'px';
+      });
 
       sendBtn.addEventListener('click', () => {
         const text = taskInput.value.trim();
