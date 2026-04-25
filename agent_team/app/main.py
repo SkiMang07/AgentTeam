@@ -23,6 +23,7 @@ from app.config import get_settings
 from app.graph import build_graph
 from app.jt_request import detect_jt_request
 from app.state import SharedState, empty_project_memory, normalize_project_memory
+from tools.agent_knowledge_loader import AgentKnowledgeLoader
 from tools.local_file_reader import load_local_files
 from tools.obsidian_context import ObsidianContextTool
 from tools.openai_client import DryRunResponsesClient, ResponsesClient
@@ -85,6 +86,7 @@ def main() -> None:
         print("\nMode: DRY RUN (no OpenAI calls)\n")
         client = DryRunResponsesClient()
         obsidian_tool: ObsidianContextTool | None = None
+        agent_knowledge_loader: AgentKnowledgeLoader | None = None
         voice_loader = VoiceLoader("")
     else:
         try:
@@ -101,8 +103,16 @@ def main() -> None:
             else:
                 print(f"[tools] Warning: OBSIDIAN_VAULT_PATH set but path not found: {settings.obsidian_vault_path}")
                 obsidian_tool = None
+
+            agent_knowledge_loader = AgentKnowledgeLoader(settings.obsidian_vault_path)
+            if agent_knowledge_loader.available:
+                print(f"[tools] Agent knowledge layer loaded: {settings.obsidian_vault_path}/agent_team/agent_docs")
+            else:
+                print("[tools] Warning: Agent knowledge layer not found (agent_team/agent_docs missing)")
+                agent_knowledge_loader = None
         else:
             obsidian_tool = None
+            agent_knowledge_loader = None
 
         voice_loader = VoiceLoader(settings.voice_file_path)
         if voice_loader.available:
@@ -110,7 +120,11 @@ def main() -> None:
         elif settings.voice_file_path:
             print(f"[tools] Warning: VOICE_FILE_PATH set but file not found: {settings.voice_file_path}")
 
-    chief_of_staff = ChiefOfStaffAgent(client, obsidian_tool=obsidian_tool)
+    chief_of_staff = ChiefOfStaffAgent(
+        client,
+        obsidian_tool=obsidian_tool,
+        agent_knowledge_loader=agent_knowledge_loader,
+    )
     jt = JTAgent(client)
     researcher = ResearcherAgent(client, obsidian_tool=obsidian_tool)
     reviewer = ReviewerAgent(client)
@@ -157,6 +171,36 @@ def main() -> None:
         if not task:
             print("\nNo task provided. Exiting.\n")
             return
+
+        # ── CoS Intake ────────────────────────────────────────────────────────
+        # Run a pre-dispatch intake analysis before touching the graph.
+        # The CoS reads the task, vault context, and agent knowledge layer,
+        # then either confirms it's ready to proceed or asks 2-3 targeted
+        # questions. This keeps clarification upfront rather than buried at
+        # the end of a pipeline run.
+        if not args.dry_run:
+            branch_hint = "build" if args.dev_pod else ("brainstorm" if args.advisor else "plan")
+            print("\n[CoS] Running intake analysis...\n")
+            try:
+                intake = chief_of_staff.intake(task, branch_hint=branch_hint)
+                print(f"[CoS] {intake['analysis']}")
+                print(f"[CoS] Suggested approach: {intake['suggested_approach']}")
+                if not intake["ready"]:
+                    print("\n[CoS] Before I send this to the team, a few things I need from you:\n")
+                    for i, q in enumerate(intake["questions"], 1):
+                        print(f"  {i}. {q}")
+                    try:
+                        clarification = input("\nYour response: ").strip()
+                    except (EOFError, KeyboardInterrupt):
+                        print("\nIntake cancelled. Exiting.\n")
+                        return
+                    if clarification:
+                        task = f"{task}\n\n[CoS intake clarification]: {clarification}"
+                        print()
+                else:
+                    print("[CoS] Ready to dispatch.\n")
+            except Exception as exc:  # noqa: BLE001
+                print(f"[CoS] Intake unavailable ({exc}), proceeding directly.\n")
 
         jt_requested, jt_mode = detect_jt_request(task=task, cli_jt=args.jt, cli_mode=args.jt_mode)
         dev_pod_requested = args.dev_pod

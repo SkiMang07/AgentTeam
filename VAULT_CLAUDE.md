@@ -10,11 +10,34 @@ Human review is always the final gate before output is used.
 
 ## Agent roster
 
-- **Chief of Staff** — interprets the task, builds a structured work order, routes to research or direct writing, runs a final alignment pass before human review
+- **Chief of Staff** — the orchestrating intelligence; runs a conversational intake, builds a structured work order, routes to the right branch, and holds output accountable at the end via a final pass
 - **Researcher** — extracts facts and identifies gaps; can access Obsidian vault context and optionally run live web search (`--web-search` flag)
 - **Writer** — drafts output from approved facts and evidence; has Andrew's voice/style guide baked into its system prompt at startup
 - **Reviewer** — structured QC pass; checks for unsupported claims, missing content, and format issues; returns normalized findings object
 - **JT** — optional adversarial challenge stage; only runs when explicitly requested via `--jt` flag or task text
+- **Backend, Frontend, QA** — developer pod; builds and internally QA-reviews code artifacts before escalating to human review
+- **Advisor cluster** — five specialist advisors (Strategy & Systems, Leadership & Culture, Communication & Influence, Growth Mindset, Entrepreneur & Execution) routed selectively by the Advisor Router; synthesized by the Advisor agent
+
+## Agent knowledge layer
+
+Detailed descriptors for each agent live in `agent_team/agent_docs/`. Each subfolder contains a CLAUDE.md that describes what the agent does, when to route to it, what it needs, and what good output from it looks like. This is the layer the Chief of Staff reads to make informed routing decisions and shape well-scoped briefs.
+
+Current descriptor coverage (all complete):
+- `agent_team/agent_docs/chief_of_staff/CLAUDE.md` ✓
+- `agent_team/agent_docs/researcher/CLAUDE.md` ✓
+- `agent_team/agent_docs/writer/CLAUDE.md` ✓
+- `agent_team/agent_docs/reviewer/CLAUDE.md` ✓
+- `agent_team/agent_docs/jt/CLAUDE.md` ✓
+- `agent_team/agent_docs/backend/CLAUDE.md` ✓
+- `agent_team/agent_docs/frontend/CLAUDE.md` ✓
+- `agent_team/agent_docs/qa/CLAUDE.md` ✓
+- `agent_team/agent_docs/advisor/CLAUDE.md` ✓
+- `agent_team/agent_docs/advisor_router/CLAUDE.md` ✓
+- `agent_team/agent_docs/advisor_strategy_systems/CLAUDE.md` ✓
+- `agent_team/agent_docs/advisor_leadership_culture/CLAUDE.md` ✓
+- `agent_team/agent_docs/advisor_communication_influence/CLAUDE.md` ✓
+- `agent_team/agent_docs/advisor_growth_mindset/CLAUDE.md` ✓
+- `agent_team/agent_docs/advisor_entrepreneur_execution/CLAUDE.md` ✓
 
 ## Three tools integrated (as of 2026-04-22)
 
@@ -51,6 +74,10 @@ All three tools are wired and loading at startup. The pipeline runs end-to-end c
 
 ## What's next
 
+- Write CLAUDE.md descriptors for all remaining agents (researcher, writer, reviewer, jt, backend, frontend, qa, advisor, advisor_router, five advisor cluster agents)
+- Evolve CoS to conversational intake: short upfront conversation with Andrew before dispatching, using agent knowledge layer to ask the right questions
+- Simplify request setup UI to a chat window once CoS intake is in place
+- Build branch-aware final pass logic: CoS validates dev pod output differently than plan or brainstorm output
 - First real pod task: AgriWebb sales discovery tool
 - Confirm JT still works independently on non-pod tasks (regression check pending)
 - Keep CLAUDE.md files updated as the project evolves — stale context produces stale output

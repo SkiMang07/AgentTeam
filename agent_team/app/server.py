@@ -38,6 +38,7 @@ from app.config import get_settings
 from app.graph import build_graph
 from app.jt_request import detect_jt_request
 from app.state import SharedState, empty_project_memory, normalize_project_memory
+from tools.agent_knowledge_loader import AgentKnowledgeLoader
 from tools.file_writer import FileWriter
 from tools.local_file_reader import load_local_files
 from tools.obsidian_context import ObsidianContextTool
@@ -85,6 +86,7 @@ def _init_agents() -> dict[str, Any]:
     client = ResponsesClient(settings)
 
     obsidian_tool: ObsidianContextTool | None = None
+    agent_knowledge_loader: AgentKnowledgeLoader | None = None
     if settings.obsidian_vault_path:
         obsidian_tool = ObsidianContextTool(settings.obsidian_vault_path, client)
         if not obsidian_tool.available:
@@ -93,12 +95,23 @@ def _init_agents() -> dict[str, Any]:
         else:
             print(f"[server] Obsidian vault loaded: {settings.obsidian_vault_path}")
 
+        agent_knowledge_loader = AgentKnowledgeLoader(settings.obsidian_vault_path)
+        if agent_knowledge_loader.available:
+            print(f"[server] Agent knowledge layer loaded: {settings.obsidian_vault_path}/agent_team/agent_docs")
+        else:
+            print("[server] Warning: Agent knowledge layer not found (agent_team/agent_docs missing)")
+            agent_knowledge_loader = None
+
     voice_loader = VoiceLoader(settings.voice_file_path)
     if voice_loader.available:
         print(f"[server] Voice/style guide loaded: {settings.voice_file_path}")
 
     return {
-        "chief_of_staff": ChiefOfStaffAgent(client, obsidian_tool=obsidian_tool),
+        "chief_of_staff": ChiefOfStaffAgent(
+            client,
+            obsidian_tool=obsidian_tool,
+            agent_knowledge_loader=agent_knowledge_loader,
+        ),
         "jt": JTAgent(client),
         "researcher": ResearcherAgent(client, obsidian_tool=obsidian_tool),
         "reviewer": ReviewerAgent(client),
@@ -159,6 +172,11 @@ class ApproveRequest(BaseModel):
     notes: str = ""
 
 
+class IntakeRequest(BaseModel):
+    task: str
+    branch: str = "plan"
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
@@ -178,6 +196,40 @@ def serve_ui():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.post("/intake")
+def intake(req: IntakeRequest):
+    """
+    Run a CoS pre-dispatch intake analysis and return the result synchronously.
+
+    The UI calls this before the main /run to give the CoS a chance to:
+    - Confirm it has enough context to dispatch confidently, or
+    - Return 2-3 targeted questions for the user to answer first.
+
+    Response shape:
+      {
+        ready: bool,
+        questions: list[str],       # empty when ready=true
+        analysis: str,              # CoS's read of the task
+        suggested_branch: str,      # "plan" | "build" | "brainstorm"
+        suggested_approach: str
+      }
+    """
+    try:
+        agents = get_agents()
+        cos = agents["chief_of_staff"]
+        result = cos.intake(req.task, branch_hint=req.branch)
+        return result
+    except Exception as exc:  # noqa: BLE001
+        # Intake failure is non-fatal — the UI should fall back to /run directly
+        return {
+            "ready": True,
+            "questions": [],
+            "analysis": f"Intake unavailable ({exc}). Proceeding directly.",
+            "suggested_branch": req.branch,
+            "suggested_approach": "Dispatching with available context.",
+        }
 
 
 @app.post("/approve")

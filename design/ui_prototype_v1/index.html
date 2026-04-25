@@ -133,6 +133,89 @@
       .footnote { margin-top: 8px; font-size: 11px; color: #93a5bc; }
       .mode-block { display: none; }
       .mode-block.active { display: block; }
+
+      /* ── CoS Intake Chat ── */
+      .cos-chat {
+        overflow-y: auto;
+        max-height: 260px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 4px 2px;
+        scroll-behavior: smooth;
+      }
+      .chat-row { display: flex; flex-direction: column; gap: 3px; }
+      .chat-row.user-row { align-items: flex-end; }
+      .chat-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: #52789e; padding: 0 4px; }
+      .chat-label.user-lbl { color: #5a6e82; }
+      .chat-bubble {
+        border-radius: 11px;
+        padding: 9px 12px;
+        font-size: 12px;
+        line-height: 1.55;
+        max-width: 92%;
+        word-break: break-word;
+      }
+      .chat-bubble.cos {
+        background: rgba(95,130,171,0.10);
+        border: 1px solid #2a3e57;
+        color: #c6d4e4;
+        align-self: flex-start;
+      }
+      .chat-bubble.user {
+        background: rgba(18,28,42,0.90);
+        border: 1px solid #1e2d3e;
+        color: #e7edf5;
+        align-self: flex-end;
+      }
+      .chat-bubble.typing { color: #4e6a88; font-style: italic; }
+      .cos-questions { margin-top: 7px; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; }
+      .cos-questions li {
+        background: rgba(82,113,154,0.08);
+        border: 1px solid #2a3d56;
+        border-radius: 8px;
+        padding: 7px 10px;
+        font-size: 11.5px;
+        color: #a8bcd4;
+      }
+      .cos-questions li::before { content: "→ "; color: #52789e; }
+      .intake-row { display: flex; gap: 6px; align-items: flex-end; }
+      .intake-row textarea { flex: 1; min-height: 62px; resize: none; font-size: 12px; }
+      .send-btn {
+        flex-shrink: 0;
+        width: 40px;
+        height: 62px;
+        border: 1px solid #2a3d56;
+        border-radius: 9px;
+        background: #0c1622;
+        color: #52789e;
+        font-size: 18px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: border-color 0.15s, color 0.15s;
+      }
+      .send-btn:hover { border-color: #52719a; color: #9ab4d0; }
+      .send-btn:disabled { opacity: 0.38; cursor: not-allowed; }
+      .intake-status { font-size: 11px; color: #5a6e82; margin-top: 4px; display: flex; align-items: center; gap: 6px; }
+      .ready-dot { width: 7px; height: 7px; border-radius: 50%; background: #64906c; flex-shrink: 0; display: none; }
+      .intake-status.ready .ready-dot { display: block; }
+      .intake-status.ready { color: #64906c; }
+      .advanced-toggle {
+        font-size: 11px; color: #4e6276; cursor: pointer;
+        display: flex; align-items: center; gap: 4px;
+        user-select: none; padding: 2px 0;
+      }
+      .advanced-toggle:hover { color: #7a9ab8; }
+      .advanced-panel { display: none; }
+      .advanced-panel.open { display: block; }
+      .reset-intake {
+        font-size: 10px; color: #3d566e; cursor: pointer;
+        text-decoration: underline; margin-left: auto;
+        background: none; border: none; padding: 0;
+      }
+      .reset-intake:hover { color: #6a8ea8; }
       @media (max-width: 1200px) { .grid { grid-template-columns: 1fr; } }
     </style>
   </head>
@@ -150,112 +233,93 @@
         <article class="panel">
           <h2>Request Setup</h2>
           <div class="stack">
+
+            <!-- ── CoS intake chat ── -->
+            <div class="section" style="flex:1;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <p class="section-title" style="margin:0;">Chief of Staff · Intake</p>
+                <button class="reset-intake" id="resetIntake">Reset</button>
+              </div>
+              <div class="cos-chat" id="cosChat">
+                <div class="chat-row">
+                  <span class="chat-label">Chief of Staff</span>
+                  <div class="chat-bubble cos">What do you need from the team today?</div>
+                </div>
+              </div>
+              <div class="intake-row" style="margin-top:8px;">
+                <textarea id="taskInput" placeholder="Describe your task…"></textarea>
+                <button class="send-btn" id="sendBtn" title="Send to CoS">↑</button>
+              </div>
+              <div class="intake-status" id="intakeStatus">
+                <div class="ready-dot"></div>
+                <span id="intakeStatusText">Type your task and press send — CoS will check if anything is needed upfront.</span>
+              </div>
+            </div>
+
+            <!-- ── Branch hint ── -->
             <div class="section">
-              <p class="section-title">Requested branches</p>
-              <div class="mode-picker">
+              <p class="section-title">Branch hint</p>
+              <div class="mode-picker" id="branchPicker">
                 <button class="mode-btn" data-mode="brainstorm">Brainstorm</button>
                 <button class="mode-btn active" data-mode="plan">Plan</button>
                 <button class="mode-btn" data-mode="build">Build</button>
               </div>
-              <label for="sequencePreview" style="margin-top:8px;">Design sequence preview</label>
-              <input id="sequencePreview" value="Plan" readonly />
               <div class="preview-note" id="sequenceNote">Single branch mode.</div>
             </div>
 
+            <!-- ── Output folder ── -->
             <div class="section">
               <p class="section-title">Output folder</p>
               <label for="outputDir">Save files to (absolute path — leave blank to use server default)</label>
               <input id="outputDir" placeholder="e.g. /Users/you/Projects/MyProject/outputs" />
-              <div class="preview-note" style="margin-top:6px;">When set, approved outputs are saved as <code style="color:#8ea2ba">output.md</code> inside a per-run subfolder. The writer will also create structured files (specs, plans, API contracts) here when the task calls for them.</div>
             </div>
 
-            <div class="section mode-block active" data-mode="plan">
-              <p class="section-title">Plan controls</p>
-              <div class="request-field-wrap">
-                <label for="planRequest">Request</label>
-                <textarea id="planRequest">Draft a decision memo for the next release cadence and include explicit human-approval points.</textarea>
+            <!-- ── Advanced (collapsible) ── -->
+            <div>
+              <div class="advanced-toggle" id="advancedToggle">
+                <span id="advancedChevron">▸</span>&nbsp;Advanced options
               </div>
-              <div class="handoff-note" style="display:none;padding:8px;border:1px dashed #2b3d52;border-radius:8px;font-size:11px;color:#8ea2ba;margin-bottom:4px;">Task: auto-populated from the previous branch's approved output.</div>
-              <div class="row" style="margin-top:8px;">
-                <div>
-                  <label for="planArtifact">Output format</label>
-                  <select id="planArtifact">
-                    <option selected>Chat</option>
-                    <option>Executive Brief</option>
-                    <option>Decision Memo</option>
-                    <option>Project Plan</option>
-                    <option>Let CoS decide</option>
-                    <option>Determine during planning</option>
-                  </select>
-                </div>
-                <div>
-                  <label for="planJt">JT modifier</label>
-                  <select id="planJt">
-                    <option selected>Enabled</option>
-                    <option>Disabled</option>
-                  </select>
-                </div>
-              </div>
-              <label for="planFiles" style="margin-top:8px;">Local files (Plan only)</label>
-              <input id="planFiles" value="README.md, PROJECT_PLAN.md, prompts/artifacts/decision_memo.md" />
-              <div class="row" style="margin-top:8px;">
-                <div>
-                  <label for="planWeb">Web search intent</label>
-                  <select id="planWeb">
-                    <option selected>Off unless task requires it</option>
-                    <option>Requested</option>
-                  </select>
-                </div>
-                <div>
-                  <label for="planMemory">Memory continuity status</label>
-                  <select id="planMemory">
-                    <option selected>Continuity available</option>
-                    <option>No continuity in this session</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div class="section mode-block" data-mode="build">
-              <p class="section-title">Build controls (future-facing static contract)</p>
-              <div class="request-field-wrap">
-                <label for="buildRequest">Request</label>
-                <textarea id="buildRequest">Implement CLI support for branch selection and keep human review as an explicit gate.</textarea>
-              </div>
-              <div class="handoff-note" style="display:none;padding:8px;border:1px dashed #2b3d52;border-radius:8px;font-size:11px;color:#8ea2ba;margin-bottom:4px;">Task: auto-populated from the previous branch's approved output.</div>
-              <div class="row" style="margin-top:8px;">
-                <div>
-                  <label for="buildSurface">Build surface</label>
-                  <input id="buildSurface" value="CLI routing and branch handoff behavior" />
-                </div>
-                <div>
-                  <label for="buildOutputType">Output type</label>
-                  <input id="buildOutputType" value="Implementation notes + patch summary" />
+              <div class="advanced-panel" id="advancedPanel">
+                <div class="section" style="margin-top:6px;">
+                  <div class="row">
+                    <div>
+                      <label for="advJt">JT modifier</label>
+                      <select id="advJt">
+                        <option selected>Enabled</option>
+                        <option>Disabled</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label for="advWeb">Web search</label>
+                      <select id="advWeb">
+                        <option selected>Off unless needed</option>
+                        <option>Requested</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="row" style="margin-top:8px;">
+                    <div>
+                      <label for="advFormat">Output format</label>
+                      <select id="advFormat">
+                        <option selected>Chat</option>
+                        <option>Executive Brief</option>
+                        <option>Decision Memo</option>
+                        <option>Project Plan</option>
+                        <option>Let CoS decide</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label for="advMemory">Memory continuity</label>
+                      <select id="advMemory">
+                        <option selected>Continuity available</option>
+                        <option>No continuity</option>
+                      </select>
+                    </div>
+                  </div>
+                  <label for="advFiles" style="margin-top:8px;">Local files</label>
+                  <input id="advFiles" placeholder="e.g. README.md, PROJECT_PLAN.md" />
                 </div>
               </div>
-              <label for="buildConstraints" style="margin-top:8px;">Constraints</label>
-              <textarea id="buildConstraints">Python + LangGraph only, no new integrations, no web runtime UI, keep human review explicit.</textarea>
-              <label for="buildAcceptance" style="margin-top:8px;">Acceptance notes</label>
-              <textarea id="buildAcceptance">Backend + frontend pod outputs should pass QA, loop when verdict is revise, then assemble and route to human review.</textarea>
-            </div>
-
-            <div class="section mode-block" data-mode="brainstorm">
-              <p class="section-title">Brainstorm controls</p>
-              <div class="request-field-wrap">
-                <label for="brainQuestion">Question / decision</label>
-                <textarea id="brainQuestion">What operating model should AgentTeam use for the next three milestones?</textarea>
-              </div>
-              <div class="handoff-note" style="display:none;padding:8px;border:1px dashed #2b3d52;border-radius:8px;font-size:11px;color:#8ea2ba;margin-bottom:4px;">Task: auto-populated from the previous branch's approved output.</div>
-              <label for="brainOutput" style="margin-top:8px;">Output format</label>
-              <select id="brainOutput">
-                <option selected>Chat</option>
-                <option>Let CoS decide</option>
-                <option>Determine during planning</option>
-              </select>
-              <label for="brainFiles" style="margin-top:8px;">Local files (optional)</label>
-              <input id="brainFiles" value="" placeholder="e.g. README.md, PROJECT_PLAN.md" />
-              <label for="brainFraming" style="margin-top:8px;">Advisor framing</label>
-              <input id="brainFraming" value="5 advisor clusters produce notes for advisor synthesis" />
             </div>
 
             <div class="status-inline" id="promptStatus">Ready. Controls are wired to the live server.</div>
@@ -429,12 +493,11 @@
       };
 
       // ── DOM refs ──────────────────────────────────────────────────────────
-      const modeButtons     = [...document.querySelectorAll('.mode-btn')];
-      const modeBlocks      = [...document.querySelectorAll('.mode-block')];
+      const modeButtons     = [...document.querySelectorAll('#branchPicker .mode-btn')];
+      const modeBlocks      = []; // removed — unified chat replaces per-branch blocks
       const runState        = document.getElementById('runState');
       const promptStatus    = document.getElementById('promptStatus');
       const memoryIndicator = document.getElementById('memoryIndicator');
-      const sequencePreview = document.getElementById('sequencePreview');
       const branchLabel     = document.getElementById('branchLabel');
       const sequenceLabel   = document.getElementById('sequenceLabel');
       const stateLabel      = document.getElementById('stateLabel');
@@ -448,6 +511,15 @@
       const approvalNotes   = document.getElementById('approvalNotes');
       const approveBtn      = document.getElementById('approveBtn');
       const rejectBtn       = document.getElementById('rejectBtn');
+      // Intake chat refs
+      const cosChat          = document.getElementById('cosChat');
+      const taskInput        = document.getElementById('taskInput');
+      const sendBtn          = document.getElementById('sendBtn');
+      const intakeStatus     = document.getElementById('intakeStatus');
+      const intakeStatusText = document.getElementById('intakeStatusText');
+      const advancedToggle   = document.getElementById('advancedToggle');
+      const advancedPanel    = document.getElementById('advancedPanel');
+      const advancedChevron  = document.getElementById('advancedChevron');
 
       // ── State ─────────────────────────────────────────────────────────────
       let selectedModes        = new Set(['plan']);
@@ -457,6 +529,11 @@
       let currentRunningBranch = null; // which branch is executing right now
       let onBranchComplete     = null; // promise resolver called by handleSseEvent on final/error
       const memSessionKey      = crypto.randomUUID();
+      // Intake state
+      let intakeConversation   = []; // [{role:'user'|'cos', text}]
+      let enrichedTask         = ''; // final task text after CoS intake
+      let intakeReady          = false;
+      let intakePending        = false;
 
       // ── Helpers ───────────────────────────────────────────────────────────
       function esc(str) {
@@ -478,10 +555,9 @@
       }
 
       function getTaskText(branch) {
-        if (branch === 'plan')       return document.getElementById('planRequest')?.value.trim()   || '';
-        if (branch === 'build')      return document.getElementById('buildRequest')?.value.trim()  || '';
-        if (branch === 'brainstorm') return document.getElementById('brainQuestion')?.value.trim() || '';
-        return '';
+        // Prefer enriched task built during CoS intake; fall back to raw textarea
+        if (enrichedTask) return enrichedTask;
+        return taskInput?.value.trim() || '';
       }
 
       function cardById(cardStepId) {
@@ -597,8 +673,7 @@
         const selected = selectedInOrder();
         const sequence = buildSequenceLabel();
         modeButtons.forEach(btn =>  btn.classList.toggle('active', selectedModes.has(btn.dataset.mode)));
-        modeBlocks.forEach(block => block.classList.toggle('active', selectedModes.has(block.dataset.mode)));
-        sequencePreview.value     = sequence;
+        // modeBlocks removed — unified chat replaces per-branch blocks
         branchLabel.textContent   = selected.map(m => branchConfigs[m].label).join(', ');
         sequenceLabel.textContent = sequence;
         humanLabel.textContent    = 'Live server';
@@ -804,20 +879,15 @@
         // Passing a large files_path on top of that handoff text causes context overload
         // (the Writer stall bug). Clear files for any downstream handoff recipient.
         const isHandoff = taskOverride !== undefined;
-        const filesPath = isHandoff ? ''
-          : branch === 'plan'       ? (document.getElementById('planFiles')?.value   || '')
-          : branch === 'brainstorm' ? (document.getElementById('brainFiles')?.value  || '')
-          : '';
+        const filesPath = isHandoff ? '' : (document.getElementById('advFiles')?.value || '');
         return {
           task, branch,
-          jt_enabled:    branch === 'plan' && document.getElementById('planJt')?.value === 'Enabled',
+          jt_enabled:    document.getElementById('advJt')?.value === 'Enabled',
           files_path:    filesPath,
-          web_search:    branch === 'plan' && document.getElementById('planWeb')?.value === 'Requested',
-          output_format: branch === 'plan'       ? (document.getElementById('planArtifact')?.value || 'Chat')
-                       : branch === 'brainstorm' ? (document.getElementById('brainOutput')?.value  || 'Chat')
-                       : 'Chat',
-          mem_session:  memSessionKey,
-          output_dir:   (document.getElementById('outputDir')?.value || '').trim(),
+          web_search:    document.getElementById('advWeb')?.value === 'Requested',
+          output_format: document.getElementById('advFormat')?.value || 'Chat',
+          mem_session:   memSessionKey,
+          output_dir:    (document.getElementById('outputDir')?.value || '').trim(),
         };
       }
 
@@ -858,6 +928,142 @@
           });
         }
       }
+
+      // ── CoS Intake ────────────────────────────────────────────────────────
+      function appendChatMsg(role, text, questions) {
+        const row = document.createElement('div');
+        row.className = `chat-row${role === 'user' ? ' user-row' : ''}`;
+        const lbl = document.createElement('span');
+        lbl.className = `chat-label${role === 'user' ? ' user-lbl' : ''}`;
+        lbl.textContent = role === 'user' ? 'You' : 'Chief of Staff';
+        const bubble = document.createElement('div');
+        bubble.className = `chat-bubble ${role}`;
+        bubble.textContent = text;
+        row.appendChild(lbl);
+        row.appendChild(bubble);
+        if (questions && questions.length) {
+          const ul = document.createElement('ul');
+          ul.className = 'cos-questions';
+          questions.forEach(q => {
+            const li = document.createElement('li');
+            li.textContent = q;
+            ul.appendChild(li);
+          });
+          bubble.appendChild(ul);
+        }
+        cosChat.appendChild(row);
+        cosChat.scrollTop = cosChat.scrollHeight;
+      }
+
+      function setIntakeReady(suggestedBranch) {
+        intakeReady = true;
+        intakeStatus.classList.add('ready');
+        intakeStatusText.textContent = 'Ready — CoS has everything it needs. Hit Run to dispatch.';
+        sendBtn.disabled = true;
+        taskInput.disabled = true;
+        // Auto-select CoS-suggested branch if we're in single-branch mode
+        if (suggestedBranch) {
+          const hint = suggestedBranch.toLowerCase();
+          if (['plan', 'build', 'brainstorm'].includes(hint) && selectedModes.size <= 1) {
+            selectedModes = new Set([hint]);
+            render();
+          }
+        }
+      }
+
+      function clearIntake() {
+        intakeConversation = [];
+        enrichedTask       = '';
+        intakeReady        = false;
+        intakePending      = false;
+        intakeStatus.classList.remove('ready');
+        intakeStatusText.textContent = 'Type your task and press send — CoS will check if anything is needed upfront.';
+        sendBtn.disabled  = false;
+        taskInput.disabled = false;
+        taskInput.value   = '';
+        taskInput.placeholder = 'Describe your task…';
+        cosChat.innerHTML = `
+          <div class="chat-row">
+            <span class="chat-label">Chief of Staff</span>
+            <div class="chat-bubble cos">What do you need from the team today?</div>
+          </div>`;
+      }
+
+      async function runIntake(userText) {
+        if (intakePending || intakeReady) return;
+        intakePending = true;
+        sendBtn.disabled = true;
+
+        appendChatMsg('user', userText);
+        intakeConversation.push({ role: 'user', text: userText });
+
+        // Typing indicator
+        const typingRow = document.createElement('div');
+        typingRow.className = 'chat-row';
+        typingRow.innerHTML = '<span class="chat-label">Chief of Staff</span><div class="chat-bubble cos typing">Thinking…</div>';
+        cosChat.appendChild(typingRow);
+        cosChat.scrollTop = cosChat.scrollHeight;
+
+        // Build full task string from conversation history
+        const userTurns = intakeConversation.filter(m => m.role === 'user');
+        const fullTask  = userTurns.length === 1
+          ? userTurns[0].text
+          : userTurns[0].text + '\n\n[Follow-up]: ' + userTurns.slice(1).map(m => m.text).join('\n[Follow-up]: ');
+
+        try {
+          const res  = await fetch('/intake', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ task: fullTask, branch: activeBranch() }),
+          });
+          const data = await res.json();
+          cosChat.removeChild(typingRow);
+
+          if (data.ready) {
+            enrichedTask = fullTask;
+            const cosMsg = [data.analysis, data.suggested_approach].filter(Boolean).join('\n\n');
+            appendChatMsg('cos', cosMsg);
+            setIntakeReady(data.suggested_branch);
+          } else {
+            // CoS has questions — show them and wait for a follow-up
+            const analysis = data.analysis || 'A few things before I dispatch this:';
+            appendChatMsg('cos', analysis, data.questions || []);
+            intakeConversation.push({ role: 'cos', text: analysis });
+            sendBtn.disabled       = false;
+            taskInput.value        = '';
+            taskInput.placeholder  = 'Your answer…';
+            taskInput.focus();
+          }
+        } catch (_) {
+          // Intake endpoint unavailable — fall back to ready so /run still works
+          cosChat.removeChild(typingRow);
+          enrichedTask = userText;
+          appendChatMsg('cos', 'Ready to dispatch — proceeding with your task as submitted.');
+          setIntakeReady(null);
+        }
+
+        intakePending = false;
+      }
+
+      sendBtn.addEventListener('click', () => {
+        const text = taskInput.value.trim();
+        if (!text || intakePending || intakeReady) return;
+        runIntake(text);
+      });
+
+      taskInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendBtn.click();
+        }
+      });
+
+      document.getElementById('resetIntake').addEventListener('click', clearIntake);
+
+      advancedToggle.addEventListener('click', () => {
+        advancedPanel.classList.toggle('open');
+        advancedChevron.textContent = advancedPanel.classList.contains('open') ? '▾' : '▸';
+      });
 
       // ── Run button ────────────────────────────────────────────────────────
       document.getElementById('runBtn').addEventListener('click', async () => {

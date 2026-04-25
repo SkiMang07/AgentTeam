@@ -14,6 +14,7 @@ from app.state import (
     get_memory_lookup_fields,
     normalize_project_memory,
 )
+from tools.agent_knowledge_loader import AgentKnowledgeLoader
 from tools.obsidian_context import ObsidianContextTool
 from tools.openai_client import ResponsesClient
 
@@ -21,6 +22,7 @@ if TYPE_CHECKING:
     pass
 
 PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "chief_of_staff.md"
+INTAKE_PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "chief_of_staff_intake.md"
 
 
 class ChiefOfStaffAgent:
@@ -28,10 +30,86 @@ class ChiefOfStaffAgent:
         self,
         client: ResponsesClient,
         obsidian_tool: ObsidianContextTool | None = None,
+        agent_knowledge_loader: AgentKnowledgeLoader | None = None,
     ) -> None:
         self._client = client
         self._obsidian_tool = obsidian_tool
+        self._agent_knowledge_loader = agent_knowledge_loader
         self._prompt = PROMPT_PATH.read_text(encoding="utf-8")
+        self._intake_prompt = INTAKE_PROMPT_PATH.read_text(encoding="utf-8")
+
+    # ------------------------------------------------------------------
+    # Intake — pre-dispatch conversational analysis
+    # ------------------------------------------------------------------
+
+    def intake(self, task: str, branch_hint: str = "") -> dict:
+        """
+        Run a pre-dispatch intake analysis for the given task.
+
+        Returns a dict with:
+          ready (bool)              — True if CoS can dispatch without clarification
+          questions (list[str])     — 1-3 targeted questions when ready=False
+          analysis (str)            — CoS's read of what Andrew actually needs
+          suggested_branch (str)    — "plan" | "build" | "brainstorm"
+          suggested_approach (str)  — How CoS plans to proceed
+        """
+        obsidian_block = self._load_obsidian_context(task)
+        agent_knowledge = self._load_agent_knowledge()
+
+        raw = self._client.ask(
+            system_prompt=self._intake_prompt,
+            user_prompt=(
+                f"Task: {task}\n\n"
+                f"Branch hint from UI: {branch_hint or 'not specified'}\n\n"
+                f"Agent team knowledge layer:\n{agent_knowledge}\n\n"
+                f"Vault context for this task:\n{obsidian_block}"
+            ),
+        )
+        return self._normalize_intake_output(self._safe_parse(raw))
+
+    @staticmethod
+    def _normalize_intake_output(data: dict) -> dict:
+        ready = data.get("ready")
+        if not isinstance(ready, bool):
+            ready = True  # default to ready on parse failure
+
+        questions = data.get("questions", [])
+        if not isinstance(questions, list):
+            questions = []
+        questions = [q for q in questions if isinstance(q, str) and q.strip()][:3]
+
+        # If ready=True, questions must be empty
+        if ready:
+            questions = []
+
+        analysis = data.get("analysis", "")
+        if not isinstance(analysis, str):
+            analysis = ""
+
+        suggested_branch = data.get("suggested_branch", "plan")
+        if suggested_branch not in {"plan", "build", "brainstorm"}:
+            suggested_branch = "plan"
+
+        suggested_approach = data.get("suggested_approach", "")
+        if not isinstance(suggested_approach, str):
+            suggested_approach = ""
+
+        return {
+            "ready": ready,
+            "questions": questions,
+            "analysis": analysis.strip(),
+            "suggested_branch": suggested_branch,
+            "suggested_approach": suggested_approach.strip(),
+        }
+
+    def _load_agent_knowledge(self) -> str:
+        """Load all agent CLAUDE.md descriptors from agent_docs/."""
+        if self._agent_knowledge_loader is None or not self._agent_knowledge_loader.available:
+            return "(Agent knowledge layer not configured)"
+        try:
+            return self._agent_knowledge_loader.load_all()
+        except Exception as exc:  # noqa: BLE001
+            return f"(Agent knowledge layer unavailable: {exc})"
 
     def run(self, state: SharedState) -> SharedState:
         user_task = state["user_task"]
