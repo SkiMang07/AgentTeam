@@ -7,3 +7,4 @@ test_outputs/
 .claude/
 handoffs/
 .DS_Store
+outputs/

@@ -181,6 +181,21 @@
         color: #a8bcd4;
       }
       .cos-questions li::before { content: "→ "; color: #52789e; }
+      /* Selectable option chips — shown when CoS offers a multiple-choice fork */
+      .cos-options { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding: 0 2px; }
+      .cos-option-btn {
+        border: 1px solid #2a3d56;
+        border-radius: 999px;
+        padding: 6px 13px;
+        font-size: 11.5px;
+        color: #a8bcd4;
+        background: rgba(82,113,154,0.08);
+        cursor: pointer;
+        transition: background 0.13s, border-color 0.13s, color 0.13s;
+        font-family: inherit;
+      }
+      .cos-option-btn:hover { background: rgba(82,113,154,0.24); border-color: #4a6a8e; color: #d0e4f8; }
+      .cos-option-btn.selected { background: rgba(82,113,154,0.36); border-color: #52789e; color: #e0eeff; }
       .intake-row { display: flex; gap: 6px; align-items: flex-end; }
       .intake-row textarea { flex: 1; resize: none; font-size: 12px; }
       .send-btn {
@@ -218,6 +233,37 @@
         background: none; border: none; padding: 0;
       }
       .reset-intake:hover { color: #6a8ea8; }
+      /* ── Priority folders chip input ── */
+      .priority-input-row { display: flex; gap: 6px; align-items: center; }
+      .priority-input-row input { flex: 1; }
+      .add-pin-btn {
+        flex-shrink: 0;
+        border: 1px solid #2a3d56;
+        border-radius: 8px;
+        background: #0c1622;
+        color: #52789e;
+        font-size: 12px;
+        padding: 7px 11px;
+        cursor: pointer;
+        white-space: nowrap;
+        font-family: inherit;
+        transition: border-color 0.13s, color 0.13s;
+      }
+      .add-pin-btn:hover { border-color: #52719a; color: #9ab4d0; }
+      .pin-chip {
+        border: 1px solid #2a3d56;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 11px;
+        color: #8ac49a;
+        background: rgba(58, 110, 71, 0.12);
+        border-color: #3a6e47;
+        cursor: pointer;
+        font-family: inherit;
+        transition: background 0.13s, color 0.13s;
+      }
+      .pin-chip:hover { background: rgba(58, 110, 71, 0.28); color: #b0e8b8; }
+      .pin-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
       @media (max-width: 1200px) { .grid { grid-template-columns: 1fr; } }
     </style>
   </head>
@@ -226,6 +272,7 @@
       <div class="topbar">
         <div class="title">Agent Team · Live Console</div>
         <div class="top-meta">
+          <div class="badge ghost" id="vaultIndicator" title="">Vault: —</div>
           <div class="badge ghost" id="memoryIndicator">Memory: idle</div>
           <div class="badge" id="runState">Idle</div>
         </div>
@@ -276,6 +323,19 @@
               <input id="outputDir" placeholder="e.g. /Users/you/Projects/MyProject/outputs" />
             </div>
 
+            <!-- ── Priority folders (shown only when vault is loaded) ── -->
+            <div class="section" id="priorityFoldersSection" style="display:none;">
+              <p class="section-title">Priority folders</p>
+              <div style="font-size:11px;color:var(--muted);margin-bottom:7px;">
+                These folders always get full context — everything else is indexed compactly.
+              </div>
+              <div class="priority-input-row">
+                <input id="priorityFolderInput" placeholder="Folder name, e.g. Agent Team" />
+                <button class="add-pin-btn" id="addPriorityFolderBtn">+ Pin</button>
+              </div>
+              <div class="pin-chips" id="priorityChips"></div>
+            </div>
+
             <!-- ── Advanced (collapsible) ── -->
             <div>
               <div class="advanced-toggle" id="advancedToggle">
@@ -318,8 +378,8 @@
                       </select>
                     </div>
                   </div>
-                  <label for="advFiles" style="margin-top:8px;">Local files</label>
-                  <input id="advFiles" placeholder="e.g. README.md, PROJECT_PLAN.md" />
+                  <!-- Local files field removed — vault context is now loaded
+                       automatically server-side from OBSIDIAN_VAULT_PATH. -->
                 </div>
               </div>
             </div>
@@ -475,7 +535,7 @@
         jt:                          'jt',
         reviewer:                    'reviewer',
         auto_redraft_prep:           null,            // internal, no card
-        chief_final:                 'chief_final',
+        chief_of_staff_final:        'chief_final',
         human_review:                'human_review',
         reviewer_parse_failure:      null,
         review_rejected_after_redraft: null,
@@ -882,26 +942,25 @@
       // ── Branch run helpers ────────────────────────────────────────────────
       function getBranchParams(branch, taskOverride) {
         const task = taskOverride !== undefined ? taskOverride : getTaskText(branch);
-        // In sequence mode a branch receives the prior branch's approved output as its task.
-        // Passing a large files_path on top of that handoff text causes context overload
-        // (the Writer stall bug). Clear files for any downstream handoff recipient.
-        const isHandoff = taskOverride !== undefined;
-        const filesPath = isHandoff ? '' : (document.getElementById('advFiles')?.value || '');
         return {
           task, branch,
-          jt_enabled:    document.getElementById('advJt')?.value === 'Enabled',
-          files_path:    filesPath,
-          web_search:    document.getElementById('advWeb')?.value === 'Requested',
-          output_format: document.getElementById('advFormat')?.value || 'Chat',
-          mem_session:   memSessionKey,
-          output_dir:    (document.getElementById('outputDir')?.value || '').trim(),
+          jt_enabled:     document.getElementById('advJt')?.value === 'Enabled',
+          pinned_folders: getPinnedFoldersParam(),
+          // files_path omitted — vault context is now loaded automatically
+          // server-side from OBSIDIAN_VAULT_PATH on every run.
+          web_search:     document.getElementById('advWeb')?.value === 'Requested',
+          output_format:  document.getElementById('advFormat')?.value || 'Chat',
+          mem_session:    memSessionKey,
+          output_dir:     (document.getElementById('outputDir')?.value || '').trim(),
         };
       }
 
       function startEvtSource(params) {
         const es = new EventSource(`/run?${new URLSearchParams(params)}`);
         es.addEventListener('message', e => {
-          try { handleSseEvent(JSON.parse(e.data)); } catch {}
+          try { handleSseEvent(JSON.parse(e.data)); } catch(err) {
+            console.error('[SSE parse error]', err.message, e.data?.slice(0, 300));
+          }
         });
         es.addEventListener('error', () => {
           if (es.readyState === EventSource.CLOSED) return;
@@ -936,8 +995,53 @@
         }
       }
 
+      // ── Priority folders ──────────────────────────────────────────────────
+      let pinnedFolders = []; // session-level, in-memory
+
+      function getPinnedFoldersParam() {
+        return pinnedFolders.join(',');
+      }
+
+      function addPinnedFolder(name) {
+        const trimmed = name.trim();
+        if (!trimmed || pinnedFolders.includes(trimmed)) return;
+        pinnedFolders.push(trimmed);
+        renderPriorityChips();
+      }
+
+      function removePinnedFolder(name) {
+        pinnedFolders = pinnedFolders.filter(f => f !== name);
+        renderPriorityChips();
+      }
+
+      function renderPriorityChips() {
+        const container = document.getElementById('priorityChips');
+        if (!container) return;
+        container.innerHTML = pinnedFolders.map(f =>
+          `<button class="pin-chip" title="Click to remove" onclick="removePinnedFolder('${esc(f).replace(/'/g, "\\'")}')">
+            ${esc(f)} ×
+          </button>`
+        ).join('');
+      }
+
+      document.getElementById('addPriorityFolderBtn').addEventListener('click', () => {
+        const input = document.getElementById('priorityFolderInput');
+        addPinnedFolder(input.value);
+        input.value = '';
+        input.focus();
+      });
+
+      document.getElementById('priorityFolderInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const input = document.getElementById('priorityFolderInput');
+          addPinnedFolder(input.value);
+          input.value = '';
+        }
+      });
+
       // ── CoS Intake ────────────────────────────────────────────────────────
-      function appendChatMsg(role, text, questions) {
+      function appendChatMsg(role, text, questions, options) {
         const row = document.createElement('div');
         row.className = `chat-row${role === 'user' ? ' user-row' : ''}`;
         const lbl = document.createElement('span');
@@ -948,6 +1052,8 @@
         bubble.textContent = text;
         row.appendChild(lbl);
         row.appendChild(bubble);
+
+        // Questions — read-only list, user types the answer
         if (questions && questions.length) {
           const ul = document.createElement('ul');
           ul.className = 'cos-questions';
@@ -958,6 +1064,31 @@
           });
           bubble.appendChild(ul);
         }
+
+        // Options — clickable chips, clicking fills input and auto-sends
+        if (options && options.length) {
+          const optDiv = document.createElement('div');
+          optDiv.className = 'cos-options';
+          options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.className = 'cos-option-btn';
+            btn.textContent = opt;
+            btn.addEventListener('click', () => {
+              // Mark selected visually
+              optDiv.querySelectorAll('.cos-option-btn').forEach(b => b.classList.remove('selected'));
+              btn.classList.add('selected');
+              // Fill input and send
+              taskInput.value = opt;
+              taskInput.style.height = 'auto';
+              taskInput.style.height = Math.min(taskInput.scrollHeight, 180) + 'px';
+              taskInput.focus();
+              if (!intakePending) sendBtn.click();
+            });
+            optDiv.appendChild(btn);
+          });
+          row.appendChild(optDiv);  // options sit below the bubble, not inside it
+        }
+
         cosChat.appendChild(row);
         cosChat.scrollTop = cosChat.scrollHeight;
       }
@@ -1013,6 +1144,8 @@
         sendBtn.disabled = true;
 
         appendChatMsg('user', userText);
+        taskInput.value = '';
+        taskInput.style.height = '';
         intakeConversation.push({ role: 'user', text: userText });
 
         // Typing indicator
@@ -1032,7 +1165,12 @@
           const res  = await fetch('/intake', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ task: fullTask, branch: activeBranch() }),
+            body:    JSON.stringify({
+              task:           fullTask,
+              branch:         activeBranch(),
+              pinned_folders: getPinnedFoldersParam(),
+              // files_path omitted — vault context is auto-loaded server-side
+            }),
           });
           const data = await res.json();
           cosChat.removeChild(typingRow);
@@ -1047,9 +1185,9 @@
               setIntakeReady(data.suggested_branch);
             }, 350);
           } else {
-            // CoS has questions — show them and wait for a follow-up
+            // CoS needs more info — show questions or selectable options
             const analysis = data.analysis || 'A few things before I dispatch this:';
-            appendChatMsg('cos', analysis, data.questions || []);
+            appendChatMsg('cos', analysis, data.questions || [], data.options || []);
             intakeConversation.push({ role: 'cos', text: analysis });
             sendBtn.disabled       = false;
             taskInput.value        = '';
@@ -1075,7 +1213,7 @@
 
       sendBtn.addEventListener('click', () => {
         const text = taskInput.value.trim();
-        if (!text || intakePending || intakeReady) return;
+        if (!text || intakePending) return;
         runIntake(text);
       });
 
@@ -1167,6 +1305,27 @@
 
       approveBtn.addEventListener('click', () => submitApproval(true));
       rejectBtn.addEventListener('click',  () => submitApproval(false));
+
+      // ── Vault status (fetched once on load) ───────────────────────────────
+      fetch('/config')
+        .then(r => r.json())
+        .then(cfg => {
+          const badge = document.getElementById('vaultIndicator');
+          if (badge) {
+            if (cfg.vault_status === 'loaded') {
+              badge.textContent    = `Vault: ${cfg.vault_name}`;
+              badge.title          = cfg.vault_path;
+              badge.style.borderColor = '#3a6e47';
+              badge.style.color       = '#8ac49a';
+              // Reveal the priority folders section — only useful when vault is active
+              const section = document.getElementById('priorityFoldersSection');
+              if (section) section.style.display = '';
+            } else {
+              badge.textContent = 'Vault: not configured';
+            }
+          }
+        })
+        .catch(() => { /* server not yet started — badge stays at default */ });
 
       // ── Initial render ────────────────────────────────────────────────────
       render();

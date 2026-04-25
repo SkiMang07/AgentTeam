@@ -43,6 +43,7 @@ from tools.file_writer import FileWriter
 from tools.local_file_reader import load_local_files
 from tools.obsidian_context import ObsidianContextTool
 from tools.openai_client import ResponsesClient
+from tools.vault_session_loader import VaultSessionLoader
 from tools.voice_loader import VoiceLoader
 
 app = FastAPI(title="Agent Team UI Server")
@@ -60,6 +61,7 @@ app.add_middleware(
 _agents: dict[str, Any] | None = None
 _agents_lock = threading.Lock()
 _default_output_dir: str = ""  # Populated from OUTPUT_DIR in .env at first agent init
+_vault_session_loader: VaultSessionLoader | None = None  # Set in _init_agents()
 
 # ── In-flight session state ───────────────────────────────────────────────────
 # session_id -> {event_queue, review_event, review_result}
@@ -73,7 +75,7 @@ _session_memory: dict[str, Any] = {}
 
 def _init_agents() -> dict[str, Any]:
     """Create and return all agent instances. Called once at startup."""
-    global _default_output_dir
+    global _default_output_dir, _vault_session_loader
     try:
         settings = get_settings()
     except ValueError as e:
@@ -95,12 +97,27 @@ def _init_agents() -> dict[str, Any]:
         else:
             print(f"[server] Obsidian vault loaded: {settings.obsidian_vault_path}")
 
-        agent_knowledge_loader = AgentKnowledgeLoader(settings.obsidian_vault_path)
+        _project_root = Path(__file__).resolve().parents[2]  # AgentTeam/
+        agent_knowledge_loader = AgentKnowledgeLoader(str(_project_root))
         if agent_knowledge_loader.available:
-            print(f"[server] Agent knowledge layer loaded: {settings.obsidian_vault_path}/agent_team/agent_docs")
+            print(f"[server] Agent knowledge layer loaded: {str(_project_root)}/agent_team/agent_docs")
         else:
             print("[server] Warning: Agent knowledge layer not found (agent_team/agent_docs missing)")
             agent_knowledge_loader = None
+
+        # Vault session loader — broad, always-on scan of all CLAUDE.md files.
+        # Used to orient the CoS at intake time without requiring the user to
+        # specify any local files explicitly.
+        _vault_loader = VaultSessionLoader(settings.obsidian_vault_path)
+        if _vault_loader.available:
+            _vault_session_loader = _vault_loader
+            print(
+                f"[server] Vault session loader ready: {_vault_loader.vault_name}"
+                f" ({_vault_loader.vault_path})"
+            )
+        else:
+            _vault_session_loader = None
+            print("[server] Warning: VaultSessionLoader: path not found or not a directory")
 
     voice_loader = VoiceLoader(settings.voice_file_path)
     if voice_loader.available:
@@ -111,6 +128,7 @@ def _init_agents() -> dict[str, Any]:
             client,
             obsidian_tool=obsidian_tool,
             agent_knowledge_loader=agent_knowledge_loader,
+            voice_loader=voice_loader,
         ),
         "jt": JTAgent(client),
         "researcher": ResearcherAgent(client, obsidian_tool=obsidian_tool),
@@ -175,6 +193,8 @@ class ApproveRequest(BaseModel):
 class IntakeRequest(BaseModel):
     task: str
     branch: str = "plan"
+    files_path: str = ""
+    pinned_folders: str = ""  # comma-separated folder names to force into full tier
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -198,6 +218,25 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/config")
+def get_config():
+    """
+    Return server configuration for the UI.
+
+    Called on page load so the UI can display which vault is active without
+    the user having to configure anything manually.
+    """
+    get_agents()  # ensure _vault_session_loader is populated (idempotent after first call)
+    loader = _vault_session_loader
+    if loader is None or not loader.available:
+        return {"vault_path": "", "vault_name": "", "vault_status": "not_configured"}
+    return {
+        "vault_path": loader.vault_path,
+        "vault_name": loader.vault_name,
+        "vault_status": "loaded",
+    }
+
+
 @app.post("/intake")
 def intake(req: IntakeRequest):
     """
@@ -219,7 +258,27 @@ def intake(req: IntakeRequest):
     try:
         agents = get_agents()
         cos = agents["chief_of_staff"]
-        result = cos.intake(req.task, branch_hint=req.branch)
+
+        # Per-run file overrides (still accepted but no longer required — vault
+        # context is now injected automatically from the server-side vault loader).
+        files_list = [f.strip() for f in req.files_path.split(",") if f.strip()]
+        file_read_result = load_local_files(files_list) if files_list else {"file_contents": {}}
+
+        # Auto-inject vault context. Pinned folders (user-specified) always get
+        # full content; remaining folders are split into recent-full and compact-index.
+        pinned_list = [f.strip() for f in req.pinned_folders.split(",") if f.strip()]
+        vault_ctx = ""
+        if _vault_session_loader and _vault_session_loader.available:
+            vault_ctx = _vault_session_loader.render_for_prompt(
+                pinned_folders=pinned_list
+            )
+
+        result = cos.intake(
+            req.task,
+            branch_hint=req.branch,
+            file_context=file_read_result.get("file_contents", {}),
+            vault_context=vault_ctx,
+        )
         return result
     except Exception as exc:  # noqa: BLE001
         # Intake failure is non-fatal — the UI should fall back to /run directly
@@ -283,6 +342,7 @@ def run_stream(
     mem_session: str = "",
     output_dir: str = "",
     allowed_read_dirs: str = "",
+    pinned_folders: str = "",
 ):
     """
     SSE stream that runs the agent graph and emits progress events.
@@ -319,6 +379,7 @@ def run_stream(
 
     files_list = [f.strip() for f in files_path.split(",") if f.strip()]
     allowed_dirs = [d.strip() for d in allowed_read_dirs.split(",") if d.strip()]
+    pinned_list = [f.strip() for f in pinned_folders.split(",") if f.strip()]
 
     # ── Per-run callbacks (captured in closures) ──────────────────────────────
 
@@ -396,6 +457,14 @@ def run_stream(
             )
             file_read_result = load_local_files(validated_files)
 
+            # Inject vault context into the run state so the CoS run() and
+            # Researcher both benefit from the same two-tier vault map.
+            vault_run_ctx = ""
+            if _vault_session_loader and _vault_session_loader.available:
+                vault_run_ctx = _vault_session_loader.render_for_prompt(
+                    pinned_folders=pinned_list
+                )
+
             # Hint the Chief of Staff toward the requested output format
             enhanced_task = task
             if output_format and output_format not in (
@@ -435,6 +504,7 @@ def run_stream(
                 "skip_reasons": file_read_result["skip_reasons"],
                 "model_metadata": {
                     "file_contents": file_read_result["file_contents"],
+                    "vault_context": vault_run_ctx,
                 },
                 # File output sandboxing
                 "output_dir": output_dir.strip(),

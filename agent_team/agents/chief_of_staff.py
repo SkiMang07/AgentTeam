@@ -17,6 +17,7 @@ from app.state import (
 from tools.agent_knowledge_loader import AgentKnowledgeLoader
 from tools.obsidian_context import ObsidianContextTool
 from tools.openai_client import ResponsesClient
+from tools.voice_loader import VoiceLoader
 
 if TYPE_CHECKING:
     pass
@@ -31,10 +32,12 @@ class ChiefOfStaffAgent:
         client: ResponsesClient,
         obsidian_tool: ObsidianContextTool | None = None,
         agent_knowledge_loader: AgentKnowledgeLoader | None = None,
+        voice_loader: VoiceLoader | None = None,
     ) -> None:
         self._client = client
         self._obsidian_tool = obsidian_tool
         self._agent_knowledge_loader = agent_knowledge_loader
+        self._voice_loader = voice_loader
         self._prompt = PROMPT_PATH.read_text(encoding="utf-8")
         self._intake_prompt = INTAKE_PROMPT_PATH.read_text(encoding="utf-8")
 
@@ -42,19 +45,50 @@ class ChiefOfStaffAgent:
     # Intake — pre-dispatch conversational analysis
     # ------------------------------------------------------------------
 
-    def intake(self, task: str, branch_hint: str = "") -> dict:
+    def intake(self, task: str, branch_hint: str = "",
+               file_context: dict | None = None,
+               vault_context: str = "") -> dict:
         """
         Run a pre-dispatch intake analysis for the given task.
 
         Returns a dict with:
           ready (bool)              — True if CoS can dispatch without clarification
           questions (list[str])     — 1-3 targeted questions when ready=False
+          options (list[str])       — selectable chips when task forks into clear paths
           analysis (str)            — CoS's read of what Andrew actually needs
           suggested_branch (str)    — "plan" | "build" | "brainstorm"
           suggested_approach (str)  — How CoS plans to proceed
+
+        Args:
+          vault_context: Full vault scan (all CLAUDE.md files) injected server-side.
+            When provided this replaces the task-focused obsidian LLM call,
+            saving a round-trip and giving CoS a broader orientation.
+            Falls back to _load_obsidian_context() when not supplied.
         """
-        obsidian_block = self._load_obsidian_context(task)
         agent_knowledge = self._load_agent_knowledge()
+
+        # Prefer the broad vault scan (all CLAUDE.mds) when available.
+        # Fall back to task-focused obsidian context for backward compatibility.
+        if vault_context:
+            obsidian_block = vault_context
+        else:
+            obsidian_block = self._load_obsidian_context(task)
+
+        # Build a compact file block for any per-run override files
+        file_block = ""
+        if file_context:
+            parts: list[str] = []
+            for path, content in list(file_context.items())[:5]:  # cap at 5 files
+                if isinstance(content, str) and content.strip():
+                    parts.append(f"--- {path} ---\n{content[:2500]}")
+            if parts:
+                file_block = "\n\n".join(parts)
+
+        voice_block = (
+            self._voice_loader.load_for_prompt()
+            if self._voice_loader and self._voice_loader.available
+            else ""
+        )
 
         raw = self._client.ask(
             system_prompt=self._intake_prompt,
@@ -62,7 +96,9 @@ class ChiefOfStaffAgent:
                 f"Task: {task}\n\n"
                 f"Branch hint from UI: {branch_hint or 'not specified'}\n\n"
                 f"Agent team knowledge layer:\n{agent_knowledge}\n\n"
-                f"Vault context for this task:\n{obsidian_block}"
+                f"Andrew's complete vault — all projects and context:\n{obsidian_block}"
+                + (f"\n\nAndrew's voice and style guide (know who you're talking to):\n{voice_block}" if voice_block else "")
+                + (f"\n\nAdditional files for this run:\n{file_block}" if file_block else "")
             ),
         )
         return self._normalize_intake_output(self._safe_parse(raw))
@@ -78,9 +114,19 @@ class ChiefOfStaffAgent:
             questions = []
         questions = [q for q in questions if isinstance(q, str) and q.strip()][:3]
 
-        # If ready=True, questions must be empty
+        options = data.get("options", [])
+        if not isinstance(options, list):
+            options = []
+        options = [o for o in options if isinstance(o, str) and o.strip()][:4]
+
+        # If ready=True, questions and options must be empty
         if ready:
             questions = []
+            options = []
+
+        # Never allow both — questions take precedence if both somehow appear
+        if questions and options:
+            options = []
 
         analysis = data.get("analysis", "")
         if not isinstance(analysis, str):
@@ -97,6 +143,7 @@ class ChiefOfStaffAgent:
         return {
             "ready": ready,
             "questions": questions,
+            "options": options,
             "analysis": analysis.strip(),
             "suggested_branch": suggested_branch,
             "suggested_approach": suggested_approach.strip(),
