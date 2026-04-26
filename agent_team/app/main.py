@@ -27,6 +27,7 @@ from tools.agent_knowledge_loader import AgentKnowledgeLoader
 from tools.local_file_reader import load_local_files
 from tools.obsidian_context import ObsidianContextTool
 from tools.openai_client import DryRunResponsesClient, ResponsesClient
+from tools.session_persistence import describe_session, load_session, save_session
 from tools.voice_loader import VoiceLoader
 
 
@@ -94,6 +95,14 @@ def main() -> None:
         except ValueError as e:
             print(f"\nConfiguration error: {e}\n")
             return
+
+        def _make_client(agent: str) -> ResponsesClient:
+            """Return a ResponsesClient pinned to the model configured for *agent*."""
+            resolved = settings.agent_model(agent)
+            return ResponsesClient(settings, model=resolved)
+
+        # Shared client used only for infrastructure tools (Obsidian navigation,
+        # vault context). Classification/routing quality is fine at the global model.
         client = ResponsesClient(settings)
 
         if settings.obsidian_vault_path:
@@ -120,25 +129,52 @@ def main() -> None:
         elif settings.voice_file_path:
             print(f"[tools] Warning: VOICE_FILE_PATH set but file not found: {settings.voice_file_path}")
 
+    if not args.dry_run:
+        print("[models] Agent model assignments:")
+        for _agent_name in (
+            "chief_of_staff", "researcher", "writer", "reviewer", "jt",
+            "backend", "frontend", "qa",
+            "advisor_router", "advisor", "advisor_clusters",
+        ):
+            print(f"  {_agent_name}: {settings.agent_model(_agent_name)}")
+
     chief_of_staff = ChiefOfStaffAgent(
-        client,
+        _make_client("chief_of_staff") if not args.dry_run else client,
         obsidian_tool=obsidian_tool,
         agent_knowledge_loader=agent_knowledge_loader,
     )
-    jt = JTAgent(client)
-    researcher = ResearcherAgent(client, obsidian_tool=obsidian_tool)
-    reviewer = ReviewerAgent(client)
-    writer = WriterAgent(client, voice_loader=voice_loader)
-    backend = BackendAgent(client)
-    frontend = FrontendAgent(client)
-    qa = QAAgent(client)
-    advisor = AdvisorAgent(client)
-    advisor_router = AdvisorRouterAgent(client)
-    strategy_systems_adv = StrategySystemsAdvisorAgent(client)
-    leadership_culture_adv = LeadershipCultureAdvisorAgent(client)
-    communication_influence_adv = CommunicationInfluenceAdvisorAgent(client)
-    growth_mindset_adv = GrowthMindsetAdvisorAgent(client)
-    entrepreneur_execution_adv = EntrepreneurExecutionAdvisorAgent(client)
+    jt = JTAgent(_make_client("jt") if not args.dry_run else client)
+    researcher = ResearcherAgent(
+        _make_client("researcher") if not args.dry_run else client,
+        obsidian_tool=obsidian_tool,
+    )
+    reviewer = ReviewerAgent(_make_client("reviewer") if not args.dry_run else client)
+    writer = WriterAgent(
+        _make_client("writer") if not args.dry_run else client,
+        voice_loader=voice_loader,
+    )
+    backend = BackendAgent(_make_client("backend") if not args.dry_run else client)
+    frontend = FrontendAgent(_make_client("frontend") if not args.dry_run else client)
+    qa = QAAgent(_make_client("qa") if not args.dry_run else client)
+    advisor = AdvisorAgent(_make_client("advisor") if not args.dry_run else client)
+    advisor_router = AdvisorRouterAgent(
+        _make_client("advisor_router") if not args.dry_run else client
+    )
+    strategy_systems_adv = StrategySystemsAdvisorAgent(
+        _make_client("strategy_systems_advisor") if not args.dry_run else client
+    )
+    leadership_culture_adv = LeadershipCultureAdvisorAgent(
+        _make_client("leadership_culture_advisor") if not args.dry_run else client
+    )
+    communication_influence_adv = CommunicationInfluenceAdvisorAgent(
+        _make_client("communication_influence_advisor") if not args.dry_run else client
+    )
+    growth_mindset_adv = GrowthMindsetAdvisorAgent(
+        _make_client("growth_mindset_advisor") if not args.dry_run else client
+    )
+    entrepreneur_execution_adv = EntrepreneurExecutionAdvisorAgent(
+        _make_client("entrepreneur_execution_advisor") if not args.dry_run else client
+    )
 
     graph = build_graph(
         chief_of_staff,
@@ -157,7 +193,22 @@ def main() -> None:
         growth_mindset_advisor=growth_mindset_adv,
         entrepreneur_execution_advisor=entrepreneur_execution_adv,
     )
-    session_project_memory = empty_project_memory()
+
+    # ── Session persistence ───────────────────────────────────────────────────
+    # Try to restore the prior session from disk. Falls back to empty memory
+    # gracefully if the file doesn't exist or is malformed.
+    _session_file = settings.session_file if not args.dry_run else ""
+    _loaded = load_session(_session_file) if _session_file else None
+    if _loaded:
+        print(f"\n[session] Restored prior session: {describe_session(_loaded)}")
+        print(f"[session] File: {_session_file}\n")
+        session_project_memory = _loaded
+    else:
+        if _session_file and not args.dry_run:
+            print(f"\n[session] No prior session found — starting fresh.")
+            print(f"[session] Will save to: {_session_file}\n")
+        session_project_memory = empty_project_memory()
+
     pending_task = " ".join(args.task).strip()
 
     while True:
@@ -203,12 +254,15 @@ def main() -> None:
                 print(f"[CoS] Intake unavailable ({exc}), proceeding directly.\n")
 
         jt_requested, jt_mode = detect_jt_request(task=task, cli_jt=args.jt, cli_mode=args.jt_mode)
+        # CLI branch flags are forwarded as hints — CoS reads them but makes the
+        # final routing call.  Hard overrides are kept for backward compat: if
+        # --dev-pod or --advisor is explicit, they still force the first sub-task.
+        branch_hint = "build" if args.dev_pod else ("brainstorm" if args.advisor else "plan")
         dev_pod_requested = args.dev_pod
         advisor_pod_requested = args.advisor
         print(f"JT requested (CLI): {jt_requested}")
         print(f"JT mode (CLI): {jt_mode}")
-        print(f"Dev pod requested (CLI): {dev_pod_requested}")
-        print(f"Advisor pod requested (CLI): {advisor_pod_requested}")
+        print(f"Branch hint (CLI): {branch_hint}")
         if args.web_search:
             print("[tools] Web search enabled for Researcher.")
 
@@ -222,6 +276,10 @@ def main() -> None:
             "jt_mode": jt_mode,
             "dev_pod_requested": dev_pod_requested,
             "advisor_pod_requested": advisor_pod_requested,
+            "branch_hint": branch_hint,
+            "task_plan": [],
+            "current_subtask_index": 0,
+            "subtask_results": [],
             "jt_feedback": [],
             "jt_rewrite": None,
             "jt_findings": None,
@@ -261,7 +319,101 @@ def main() -> None:
                 print("\nOpenAI rate limit reached. Please wait a moment and try again.\n")
             return
 
+        # ── Sub-task continuation loop ────────────────────────────────────────
+        # If the CoS decomposed the task into a plan, iterate through remaining
+        # sub-tasks. Intermediate sub-tasks auto-approve (dry_run=True in state
+        # only affects human_review_node — real API calls still run normally).
+        # The final sub-task goes through normal human review.
+        task_plan = result.get("task_plan", [])
+        if task_plan and len(task_plan) > 1:
+            subtask_results: list[dict] = []
+            current_index = 0
+
+            while current_index + 1 < len(task_plan):
+                subtask_output = result.get("final_output", "")
+                subtask_results.append({
+                    "id": task_plan[current_index].get("id", str(current_index + 1)),
+                    "description": task_plan[current_index].get("description", ""),
+                    "branch": task_plan[current_index].get("branch", "plan"),
+                    "output": subtask_output,
+                })
+
+                current_index += 1
+                next_subtask = task_plan[current_index]
+                total = len(task_plan)
+                is_last = current_index == total - 1
+
+                print(
+                    f"\n[task_plan] Sub-task {current_index}/{total} done. "
+                    f"Starting sub-task {current_index + 1}/{total}: "
+                    f"{next_subtask.get('description', '')[:80]}\n"
+                )
+
+                # Carry forward memory with prior sub-task's approved output so
+                # the next agent knows what was just produced.
+                updated_memory = normalize_project_memory(result.get("project_memory"))
+                updated_memory = {
+                    **updated_memory,
+                    "latest_approved_output": subtask_output,
+                }
+
+                next_state: SharedState = {
+                    **initial_state,
+                    "user_task": next_subtask.get("description", ""),
+                    "status": "received",
+                    # Auto-approve all but the final sub-task at human_review_node.
+                    "dry_run": False if is_last else True,
+                    "work_order": next_subtask.get("work_order", {}),
+                    "dev_pod_requested": next_subtask.get("branch") == "build",
+                    "advisor_pod_requested": next_subtask.get("branch") == "brainstorm",
+                    "branch_hint": next_subtask.get("branch", "plan"),
+                    "task_plan": task_plan,
+                    "current_subtask_index": current_index,
+                    "subtask_results": subtask_results,
+                    "project_memory": updated_memory,
+                    # Clear per-run output state.
+                    "draft": "",
+                    "final_output": "",
+                    "jt_feedback": [],
+                    "jt_rewrite": None,
+                    "jt_findings": None,
+                    "review_feedback": [],
+                    "auto_redraft_count": 0,
+                    "chief_redraft_count": 0,
+                    "model_metadata": {
+                        "file_contents": file_read_result["file_contents"],
+                    },
+                }
+
+                try:
+                    result = graph.invoke(next_state)
+                except (AuthenticationError, RateLimitError) as e:
+                    print(f"\n[task_plan] Sub-task {current_index + 1} failed: {e}\n")
+                    break
+
+                # Save progress after each completed sub-task.
+                inter_memory = normalize_project_memory(result.get("project_memory"))
+                if _session_file:
+                    save_session(inter_memory, _session_file)
+                    print(f"[session] Sub-task {current_index + 1} saved.")
+
+            # Print sub-task plan summary before the final output block.
+            if subtask_results:
+                print("\n=== Task Plan Summary ===")
+                for sr in subtask_results:
+                    print(f"  [{sr['branch']}] {sr['description'][:70]}")
+                    preview = (sr["output"] or "").replace("\n", " ")[:120]
+                    print(f"    → {preview}...")
+                print(f"  [{task_plan[-1].get('branch', 'plan')}] "
+                      f"{task_plan[-1].get('description', '')[:70]} ← final (see below)")
+                print("========================\n")
+
         session_project_memory = normalize_project_memory(result.get("project_memory"))
+
+        # Persist to disk so the next session can pick up where this one left off.
+        if _session_file:
+            save_session(session_project_memory, _session_file)
+            print(f"[session] Saved: {describe_session(session_project_memory)}")
 
         print("\n=== Final Output ===\n")
         print(result.get("final_output", "(no final output produced)"))

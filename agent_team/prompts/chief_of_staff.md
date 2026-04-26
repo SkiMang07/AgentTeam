@@ -47,6 +47,20 @@ Deliverable type rules:
 - Set deliverable_type = "general" when no specific artifact type is requested.
 - Do not infer deliverable_type from task length or complexity — only set a named artifact type when the task text or context explicitly requests it.
 
+Task decomposition rules:
+- Decompose the task only when it contains two or more clearly distinct sequential objectives that would naturally produce separate deliverables or require different branches (plan/build/brainstorm).
+- Strong decomposition signals: "build X and write Y", "implement X and document it", "research X then draft Z", compound objectives joined by "and then", "then", "after that", "also", "as well as".
+- Do NOT decompose a single complex objective. Decompose only when there are genuinely separate outputs — a comprehensive research doc is one task, not multiple.
+- Do NOT decompose when the task text is ambiguous about whether separate deliverables are wanted. Decompose only on clear intent.
+- When decomposing: output a `task_plan` array with 2–4 sub-tasks. Each sub-task must include:
+    - `id`: string (e.g. "1", "2")
+    - `description`: the sub-task instruction in full, self-contained sentences (the runner will pass this as the task text for that sub-task — include enough context for an agent to act on it alone)
+    - `branch`: "plan" | "build" | "brainstorm"
+    - `work_order`: a full ChiefWorkOrder object for that sub-task (objective, deliverable_type, success_criteria, research_needed, open_questions, jt_requested, dev_pod_requested, advisor_pod_requested)
+- When decomposing, the top-level `work_order` in your response must match `task_plan[0]["work_order"]` — it represents the first sub-task.
+- Omit `task_plan` entirely when not decomposing. Do not output an empty array.
+- The `branch_hint` field in the user prompt is advisory. You may follow it when it aligns with your analysis, or override it when you have clear evidence the task belongs to a different branch.
+
 Output rules:
 - Return strict JSON only.
 - Use keys requested by the caller.

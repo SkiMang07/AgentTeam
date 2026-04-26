@@ -163,6 +163,22 @@ class SharedState(TypedDict):
     sandbox_root: NotRequired[str]
     files_created: NotRequired[list[str]]
     allowed_read_dirs: NotRequired[list[str]]
+    # ── Sub-task decomposition ────────────────────────────────────────────────
+    # task_plan: CoS-generated sequence of sub-tasks when a request decomposes
+    #   into multiple distinct pipeline passes. Each item:
+    #     { id: str, description: str, branch: "plan"|"build"|"brainstorm",
+    #       work_order: ChiefWorkOrder }
+    #   Empty list = single-task run (default, backward-compatible).
+    # current_subtask_index: which sub-task is actively executing (0-based).
+    #   0 = first (or only) task; set to 1+ by the runner for continuation passes.
+    # subtask_results: outputs accumulated from already-completed sub-tasks.
+    #   Each item: { id, description, branch, output: str }
+    # branch_hint: advisory branch signal from CLI/UI ("plan"|"build"|"brainstorm"|"").
+    #   CoS reads this but may override it based on task analysis.
+    task_plan: NotRequired[list[dict]]
+    current_subtask_index: NotRequired[int]
+    subtask_results: NotRequired[list[dict]]
+    branch_hint: NotRequired[str]
 
 
 def get_canonical_jt_requested(state: Mapping[str, Any]) -> bool:

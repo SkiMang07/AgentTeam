@@ -159,6 +159,22 @@ class ChiefOfStaffAgent:
             return f"(Agent knowledge layer unavailable: {exc})"
 
     def run(self, state: SharedState) -> SharedState:
+        # ── Sub-task continuation: skip replanning ────────────────────────────
+        # When the runner is executing sub-task N>0 of a pre-built plan, the CoS
+        # does not need to re-analyse the task or make another LLM call.
+        # It simply unpacks the pre-planned work_order and sets routing fields.
+        current_subtask_index = state.get("current_subtask_index", 0)
+        task_plan = state.get("task_plan", [])
+        if (
+            isinstance(current_subtask_index, int)
+            and current_subtask_index > 0
+            and isinstance(task_plan, list)
+            and current_subtask_index < len(task_plan)
+        ):
+            return self._run_planned_subtask(
+                state, task_plan[current_subtask_index], current_subtask_index
+            )
+
         user_task = state["user_task"]
         inferred_jt_requested = state.get("jt_requested", False)
         inferred_dev_pod_requested = state.get("dev_pod_requested", False)
@@ -167,6 +183,7 @@ class ChiefOfStaffAgent:
         memory_open_questions = project_memory.get("open_questions", [])
         memory_lookup_requested = self._is_memory_lookup_request(user_task)
         memory_turn_type = self._get_memory_turn_type(user_task)
+        branch_hint = state.get("branch_hint", "") or ""
 
         # Load Obsidian vault context for this task
         obsidian_block = self._load_obsidian_context(user_task)
@@ -192,7 +209,11 @@ class ChiefOfStaffAgent:
                 "do not treat memory as evidence or claimed facts unless they are present in current task inputs. "
                 "Use vault context to extract specific facts, tool descriptions, and current state into success_criteria — "
                 "do not treat vault context as approved facts for the Researcher, but do use it to write concrete, falsifiable success_criteria items. "
+                "If the task clearly decomposes into multiple distinct sequential objectives (e.g. 'build X and write docs for it'), "
+                "include a task_plan array per the decomposition rules in your system prompt. "
+                "Omit task_plan when the task is single-objective. "
                 "Do not include extra keys.\n\n"
+                f"Branch hint (advisory): {branch_hint or 'not specified'}\n"
                 f"CLI JT requested flag: {inferred_jt_requested}\n"
                 f"CLI dev pod requested flag: {inferred_dev_pod_requested}\n"
                 f"CLI advisor pod requested flag: {inferred_advisor_pod_requested}\n\n"
@@ -263,6 +284,29 @@ class ChiefOfStaffAgent:
 
         pod_task_brief = data.get("pod_task_brief") or ""
         advisor_brief = data.get("advisor_brief") or ""
+        task_plan = data.get("task_plan", [])
+
+        # If task_plan was generated, propagate research_needed/route overrides to all
+        # sub-task work_orders that share the vault context (sub-task 0 is already
+        # updated above via `work_order`; update the plan's copy to stay in sync).
+        if task_plan and vault_context_available:
+            updated_plan = []
+            for i, sub in enumerate(task_plan):
+                if i == 0:
+                    updated_plan.append({**sub, "work_order": work_order})
+                else:
+                    sub_wo = sub.get("work_order", {})
+                    if isinstance(sub_wo, dict) and not sub_wo.get("research_needed"):
+                        sub_wo = {**sub_wo, "research_needed": True}
+                    updated_plan.append({**sub, "work_order": sub_wo})
+            task_plan = updated_plan
+
+        if task_plan:
+            print(
+                f"[CoS] Task decomposed into {len(task_plan)} sub-tasks: "
+                + ", ".join(f"'{s.get('description', '')[:60]}'" for s in task_plan)
+            )
+
         return {
             **state,
             "work_order": work_order,
@@ -275,6 +319,10 @@ class ChiefOfStaffAgent:
             "advisor_brief": advisor_brief,
             "memory_turn_type": memory_turn_type,
             "memory_lookup_requested": memory_lookup_requested,
+            "task_plan": task_plan,
+            "current_subtask_index": 0,
+            "subtask_results": state.get("subtask_results", []),
+            "branch_hint": branch_hint,
             "current_run": {
                 "objective": work_order["objective"],
                 "deliverable_type": work_order["deliverable_type"],
@@ -287,6 +335,78 @@ class ChiefOfStaffAgent:
             "model_metadata": {
                 **state.get("model_metadata", {}),
                 "chief_of_staff_raw": raw,
+            },
+        }
+
+    def _run_planned_subtask(
+        self, state: SharedState, subtask: dict, index: int
+    ) -> SharedState:
+        """Execute a pre-planned sub-task without making a new CoS LLM call.
+
+        Called when current_subtask_index > 0 — i.e. we're continuing through
+        a CoS-generated task_plan rather than planning from scratch.  Routing
+        flags and work_order are taken directly from the plan entry so the
+        downstream pipeline runs exactly what the CoS originally decided.
+        """
+        branch = subtask.get("branch", "plan")
+        is_build = branch == "build"
+        is_brainstorm = branch == "brainstorm"
+
+        work_order = self._normalize_work_order(
+            subtask.get("work_order", {}),
+            inferred_jt_requested=bool(state.get("jt_requested", False)),
+            inferred_dev_pod_requested=is_build,
+            inferred_advisor_pod_requested=is_brainstorm,
+            prior_memory=normalize_project_memory(state.get("project_memory")),
+        )
+        project_memory = normalize_project_memory(state.get("project_memory"))
+        updated_project_memory = {
+            **project_memory,
+            "current_objective": work_order["objective"],
+            "active_deliverable_type": work_order["deliverable_type"],
+            "open_questions": work_order["open_questions"],
+        }
+
+        description = subtask.get("description", "")
+        print(
+            f"[CoS] Sub-task {index + 1}/{len(state.get('task_plan', []))}: "
+            f"branch={branch} — {description[:80]}"
+        )
+
+        # Route: honour research_needed from the pre-planned work_order.
+        route: str = "research" if work_order["research_needed"] else "write_direct"
+
+        return {
+            **state,
+            "work_order": work_order,
+            "route": route,
+            "jt_requested": work_order["jt_requested"],
+            "jt_mode": state.get("jt_mode"),
+            "dev_pod_requested": work_order["dev_pod_requested"],
+            "advisor_pod_requested": work_order["advisor_pod_requested"],
+            "pod_task_brief": subtask.get("pod_task_brief", ""),
+            "advisor_brief": subtask.get("advisor_brief", ""),
+            "memory_turn_type": "project_work",
+            "memory_lookup_requested": False,
+            # Clear per-run output fields so the pipeline starts clean.
+            "draft": "",
+            "review_feedback": [],
+            "auto_redraft_count": 0,
+            "chief_redraft_count": 0,
+            "current_run": {
+                "objective": work_order["objective"],
+                "deliverable_type": work_order["deliverable_type"],
+                "open_questions": work_order["open_questions"],
+                "latest_draft": "",
+                "latest_approved_output": "",
+            },
+            "project_memory": updated_project_memory,
+            "status": "routed",
+            "model_metadata": {
+                **state.get("model_metadata", {}),
+                "chief_of_staff_raw": (
+                    f"(sub-task {index + 1}: pre-planned, no LLM call)"
+                ),
             },
         }
 
@@ -415,12 +535,69 @@ class ChiefOfStaffAgent:
         if not isinstance(pod_task_brief, str):
             pod_task_brief = ""
 
+        # Parse and validate task_plan (optional — omitted for single-objective tasks).
+        task_plan_raw = data.get("task_plan")
+        task_plan = (
+            ChiefOfStaffAgent._normalize_task_plan(task_plan_raw)
+            if isinstance(task_plan_raw, list)
+            else []
+        )
+
         return {
             **data,
             "route": route,
             "work_order": work_order,
             "pod_task_brief": pod_task_brief,
+            "task_plan": task_plan,
         }
+
+    @staticmethod
+    def _normalize_task_plan(raw: list) -> list[dict]:
+        """Validate and normalise a CoS-generated task_plan.
+
+        Returns an empty list for single-task runs (< 2 valid entries) or when
+        any entry is malformed enough to be unsafe to execute.
+        """
+        if not isinstance(raw, list) or len(raw) < 2:
+            return []
+
+        valid_branches = {"plan", "build", "brainstorm"}
+        normalized: list[dict] = []
+
+        for i, item in enumerate(raw[:4]):  # cap at 4 sub-tasks
+            if not isinstance(item, dict):
+                continue
+            branch = item.get("branch", "plan")
+            if branch not in valid_branches:
+                branch = "plan"
+            is_build = branch == "build"
+            is_brainstorm = branch == "brainstorm"
+            work_order = ChiefOfStaffAgent._normalize_work_order(
+                item.get("work_order", {}),
+                inferred_jt_requested=False,
+                inferred_dev_pod_requested=is_build,
+                inferred_advisor_pod_requested=is_brainstorm,
+            )
+            description = item.get("description", "")
+            if not isinstance(description, str):
+                description = work_order.get("objective", f"Sub-task {i + 1}")
+
+            entry: dict = {
+                "id": str(item.get("id", i + 1)),
+                "description": description.strip(),
+                "branch": branch,
+                "work_order": work_order,
+            }
+            # Carry optional brief fields so continuation passes can use them.
+            if branch == "build" and isinstance(item.get("pod_task_brief"), str):
+                entry["pod_task_brief"] = item["pod_task_brief"]
+            if branch == "brainstorm" and isinstance(item.get("advisor_brief"), str):
+                entry["advisor_brief"] = item["advisor_brief"]
+
+            normalized.append(entry)
+
+        # Require at least 2 valid entries to qualify as a decomposition.
+        return normalized if len(normalized) >= 2 else []
 
     @staticmethod
     def _normalize_work_order(

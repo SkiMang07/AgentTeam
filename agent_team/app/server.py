@@ -43,6 +43,7 @@ from tools.file_writer import FileWriter
 from tools.local_file_reader import load_local_files
 from tools.obsidian_context import ObsidianContextTool
 from tools.openai_client import ResponsesClient
+from tools.session_persistence import describe_session, load_session, save_session
 from tools.vault_session_loader import VaultSessionLoader
 from tools.voice_loader import VoiceLoader
 
@@ -62,6 +63,8 @@ _agents: dict[str, Any] | None = None
 _agents_lock = threading.Lock()
 _default_output_dir: str = ""  # Populated from OUTPUT_DIR in .env at first agent init
 _vault_session_loader: VaultSessionLoader | None = None  # Set in _init_agents()
+_session_file: str = ""         # Populated from settings.session_file at first agent init
+_base_memory: dict[str, Any] = {}  # Loaded from disk at startup; used as fallback for new tabs
 
 # ── In-flight session state ───────────────────────────────────────────────────
 # session_id -> {event_queue, review_event, review_result}
@@ -75,7 +78,7 @@ _session_memory: dict[str, Any] = {}
 
 def _init_agents() -> dict[str, Any]:
     """Create and return all agent instances. Called once at startup."""
-    global _default_output_dir, _vault_session_loader
+    global _default_output_dir, _vault_session_loader, _session_file, _base_memory
     try:
         settings = get_settings()
     except ValueError as e:
@@ -85,7 +88,33 @@ def _init_agents() -> dict[str, Any]:
         _default_output_dir = settings.output_dir
         print(f"[server] Default output directory: {_default_output_dir}")
 
+    # ── Session persistence ───────────────────────────────────────────────────
+    _session_file = settings.session_file
+    _loaded = load_session(_session_file) if _session_file else None
+    if _loaded:
+        _base_memory = dict(_loaded)
+        print(f"[server] Restored prior session: {describe_session(_loaded)}")
+        print(f"[server] Session file: {_session_file}")
+    else:
+        _base_memory = {}
+        print(f"[server] No prior session found — starting fresh.")
+        if _session_file:
+            print(f"[server] Will save to: {_session_file}")
+
+    def _make_client(agent: str) -> ResponsesClient:
+        """Return a ResponsesClient pinned to the model configured for *agent*."""
+        return ResponsesClient(settings, model=settings.agent_model(agent))
+
+    # Shared client for infrastructure tools (Obsidian navigation).
     client = ResponsesClient(settings)
+
+    print("[models] Agent model assignments:")
+    for _agent_name in (
+        "chief_of_staff", "researcher", "writer", "reviewer", "jt",
+        "backend", "frontend", "qa",
+        "advisor_router", "advisor", "advisor_clusters",
+    ):
+        print(f"  {_agent_name}: {settings.agent_model(_agent_name)}")
 
     obsidian_tool: ObsidianContextTool | None = None
     agent_knowledge_loader: AgentKnowledgeLoader | None = None
@@ -125,25 +154,35 @@ def _init_agents() -> dict[str, Any]:
 
     return {
         "chief_of_staff": ChiefOfStaffAgent(
-            client,
+            _make_client("chief_of_staff"),
             obsidian_tool=obsidian_tool,
             agent_knowledge_loader=agent_knowledge_loader,
             voice_loader=voice_loader,
         ),
-        "jt": JTAgent(client),
-        "researcher": ResearcherAgent(client, obsidian_tool=obsidian_tool),
-        "reviewer": ReviewerAgent(client),
-        "writer": WriterAgent(client, voice_loader=voice_loader),
-        "backend": BackendAgent(client),
-        "frontend": FrontendAgent(client),
-        "qa": QAAgent(client),
-        "advisor": AdvisorAgent(client),
-        "advisor_router": AdvisorRouterAgent(client),
-        "strategy_systems_advisor": StrategySystemsAdvisorAgent(client),
-        "leadership_culture_advisor": LeadershipCultureAdvisorAgent(client),
-        "communication_influence_advisor": CommunicationInfluenceAdvisorAgent(client),
-        "growth_mindset_advisor": GrowthMindsetAdvisorAgent(client),
-        "entrepreneur_execution_advisor": EntrepreneurExecutionAdvisorAgent(client),
+        "jt": JTAgent(_make_client("jt")),
+        "researcher": ResearcherAgent(_make_client("researcher"), obsidian_tool=obsidian_tool),
+        "reviewer": ReviewerAgent(_make_client("reviewer")),
+        "writer": WriterAgent(_make_client("writer"), voice_loader=voice_loader),
+        "backend": BackendAgent(_make_client("backend")),
+        "frontend": FrontendAgent(_make_client("frontend")),
+        "qa": QAAgent(_make_client("qa")),
+        "advisor": AdvisorAgent(_make_client("advisor")),
+        "advisor_router": AdvisorRouterAgent(_make_client("advisor_router")),
+        "strategy_systems_advisor": StrategySystemsAdvisorAgent(
+            _make_client("strategy_systems_advisor")
+        ),
+        "leadership_culture_advisor": LeadershipCultureAdvisorAgent(
+            _make_client("leadership_culture_advisor")
+        ),
+        "communication_influence_advisor": CommunicationInfluenceAdvisorAgent(
+            _make_client("communication_influence_advisor")
+        ),
+        "growth_mindset_advisor": GrowthMindsetAdvisorAgent(
+            _make_client("growth_mindset_advisor")
+        ),
+        "entrepreneur_execution_advisor": EntrepreneurExecutionAdvisorAgent(
+            _make_client("entrepreneur_execution_advisor")
+        ),
     }
 
 
@@ -474,8 +513,15 @@ def run_stream(
                     f"{task}\n\n[Preferred output format: {output_format}]"
                 )
 
-            # Carry project memory across runs within the same browser session
-            prior_memory = _session_memory.get(mem_session or session_id, empty_project_memory())
+            # Carry project memory across runs within the same browser session.
+            # Falls back to _base_memory (loaded from disk at startup) for new tabs.
+            prior_memory = _session_memory.get(
+                mem_session or session_id,
+                _base_memory if _base_memory else empty_project_memory(),
+            )
+
+            # Derive branch_hint from the UI branch selector (advisory to CoS).
+            branch_hint = branch if branch in {"plan", "build", "brainstorm"} else "plan"
 
             initial_state: SharedState = {
                 "user_task": enhanced_task,
@@ -487,6 +533,10 @@ def run_stream(
                 "jt_mode": jt_mode,
                 "dev_pod_requested": branch == "build",
                 "advisor_pod_requested": branch == "brainstorm",
+                "branch_hint": branch_hint,
+                "task_plan": [],
+                "current_subtask_index": 0,
+                "subtask_results": [],
                 "jt_feedback": [],
                 "jt_rewrite": None,
                 "jt_findings": None,
@@ -515,10 +565,95 @@ def run_stream(
 
             result = graph.invoke(initial_state)
 
-            # Persist memory for next run
-            _session_memory[mem_session or session_id] = normalize_project_memory(
-                result.get("project_memory")
-            )
+            # ── Sub-task continuation loop ────────────────────────────────────
+            # Mirror of the main.py loop. Intermediate sub-tasks auto-approve
+            # (dry_run=True in state only affects human_review_node).
+            # The final sub-task goes through normal browser-side human review.
+            task_plan = result.get("task_plan", [])
+            if task_plan and len(task_plan) > 1:
+                subtask_results: list[dict] = []
+                current_index = 0
+
+                while current_index + 1 < len(task_plan):
+                    subtask_output = result.get("final_output", "")
+                    subtask_results.append({
+                        "id": task_plan[current_index].get("id", str(current_index + 1)),
+                        "description": task_plan[current_index].get("description", ""),
+                        "branch": task_plan[current_index].get("branch", "plan"),
+                        "output": subtask_output,
+                    })
+
+                    current_index += 1
+                    next_subtask = task_plan[current_index]
+                    total = len(task_plan)
+                    is_last = current_index == total - 1
+
+                    event_queue.put({
+                        "type": "subtask_start",
+                        "subtask_index": current_index,
+                        "subtask_total": total,
+                        "description": next_subtask.get("description", ""),
+                        "branch": next_subtask.get("branch", "plan"),
+                    })
+
+                    updated_memory = normalize_project_memory(result.get("project_memory"))
+                    updated_memory = {
+                        **updated_memory,
+                        "latest_approved_output": subtask_output,
+                    }
+
+                    next_state: SharedState = {
+                        **initial_state,
+                        "user_task": next_subtask.get("description", ""),
+                        "status": "received",
+                        "dry_run": False if is_last else True,
+                        "work_order": next_subtask.get("work_order", {}),
+                        "dev_pod_requested": next_subtask.get("branch") == "build",
+                        "advisor_pod_requested": next_subtask.get("branch") == "brainstorm",
+                        "branch_hint": next_subtask.get("branch", "plan"),
+                        "task_plan": task_plan,
+                        "current_subtask_index": current_index,
+                        "subtask_results": subtask_results,
+                        "project_memory": updated_memory,
+                        # Clear per-run output state.
+                        "draft": "",
+                        "final_output": "",
+                        "jt_feedback": [],
+                        "jt_rewrite": None,
+                        "jt_findings": None,
+                        "review_feedback": [],
+                        "auto_redraft_count": 0,
+                        "chief_redraft_count": 0,
+                        "model_metadata": {
+                            "file_contents": file_read_result["file_contents"],
+                            "vault_context": vault_run_ctx,
+                        },
+                    }
+
+                    result = graph.invoke(next_state)
+
+                    event_queue.put({
+                        "type": "subtask_complete",
+                        "subtask_index": current_index,
+                        "subtask_total": total,
+                        "description": next_subtask.get("description", ""),
+                        "output_preview": (result.get("final_output", "") or "")[:200],
+                    })
+
+                    # Persist progress after each intermediate sub-task.
+                    inter_memory = normalize_project_memory(result.get("project_memory"))
+                    _session_memory[mem_session or session_id] = inter_memory
+                    if _session_file:
+                        save_session(inter_memory, _session_file)
+
+            # Persist memory for next run within this browser session.
+            updated_memory = normalize_project_memory(result.get("project_memory"))
+            _session_memory[mem_session or session_id] = updated_memory
+
+            # Also persist to disk so the next server restart can pick up here.
+            if _session_file:
+                save_session(updated_memory, _session_file)
+                print(f"[server] Session saved: {describe_session(updated_memory)}")
 
             files_created = result.get("files_created", [])
             if files_created:
@@ -536,6 +671,7 @@ def run_stream(
                 ),
                 "files_created": files_created,
                 "sandbox_root": result.get("sandbox_root", ""),
+                "subtask_results": result.get("subtask_results", []),
             })
 
         except Exception as exc:  # noqa: BLE001

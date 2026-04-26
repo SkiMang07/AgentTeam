@@ -12,9 +12,12 @@ log = logging.getLogger(__name__)
 
 
 class ResponsesClient:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, model: str | None = None) -> None:
         self._client = OpenAI(api_key=settings.openai_api_key)
-        self._model = settings.model
+        # ``model`` overrides the global settings.model when provided.
+        # Pass settings.agent_model("<agent_name>") at construction time to pin
+        # a specific agent to a specific model.
+        self._model = model or settings.model
 
     def ask(self, system_prompt: str, user_prompt: str) -> str:
         response = self._client.responses.create(
