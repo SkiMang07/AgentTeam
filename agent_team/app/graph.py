@@ -125,6 +125,24 @@ def build_graph(
         # File-derived evidence facts come first so they're not buried by generic
         # researcher output when the writer scans the approved_facts list.
         approved_facts = _dedupe_preserving_order([*evidence_facts, *research_facts])
+
+        # Safety net: if no research ran and no file evidence was loaded, the writer
+        # would produce hollow filler with nothing to ground its output against.
+        # Inject the prior session's approved output as a concrete fallback fact so
+        # the writer at minimum has the last known good output to work from.
+        # Excluded for memory-lookup turns (which intentionally set approved_facts
+        # themselves) and when research already produced facts (no need for fallback).
+        if not approved_facts and not state.get("memory_lookup_requested", False):
+            _prior = normalize_project_memory(state.get("project_memory")).get(
+                "latest_approved_output", ""
+            )
+            if isinstance(_prior, str) and _prior.strip():
+                approved_facts = [f"Prior session approved output:\n{_prior}"]
+                print(
+                    "[evidence_extract] No research facts available — injecting prior "
+                    "session output as fallback context for the Writer."
+                )
+
         simple_grounded_retrieval = _is_simple_grounded_retrieval_task(
             task=state.get("user_task", ""),
             required_structures=required_structures,

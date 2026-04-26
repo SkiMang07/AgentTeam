@@ -61,3 +61,12 @@ Provide a structured advisory response from this cluster's perspective. For each
 
 Keep the response focused, substantive, and direct. Label your output clearly as:
 **[LEADERSHIP & CULTURE CLUSTER]**
+
+After your advisory response, close with a **[CLUSTER SIGNAL]** block using exactly this format:
+
+**[CLUSTER SIGNAL]**
+**Stance:** [choose one: strong advocate | advocate with conditions | neutral | caution advised | opposing]
+**Top Priority:** [One sentence — the single most important recommendation this cluster makes for this specific task]
+**Disagrees With:** [One sentence — where this cluster's view most likely conflicts with another lens (e.g. a strategy/systems lens, an execution lens, a communication lens). If genuinely no conflict, write "No major disagreement anticipated."]
+
+The CLUSTER SIGNAL block is mandatory. Be honest — do not manufacture false consensus. If your frameworks point toward caution or opposition to a straightforward action, say so.

@@ -188,6 +188,19 @@ class ChiefOfStaffAgent:
         # Load Obsidian vault context for this task
         obsidian_block = self._load_obsidian_context(user_task)
 
+        # Fallback: if the obsidian tool returned nothing (e.g. concurrent load
+        # failure, misconfiguration, or slow LLM call), use the broad vault scan
+        # that the server already pre-loaded into model_metadata["vault_context"].
+        # This means the CoS never silently drops into write_direct just because
+        # the per-task obsidian LLM call happened to fail on this request.
+        if not obsidian_block or len(obsidian_block.strip()) < 50:
+            _server_vault = str(
+                (state.get("model_metadata") or {}).get("vault_context", "") or ""
+            )
+            if len(_server_vault.strip()) > 50:
+                obsidian_block = _server_vault
+                print("[CoS] Obsidian tool returned no context — using server-side vault fallback.")
+
         raw = self._client.ask(
             system_prompt=self._prompt,
             user_prompt=(

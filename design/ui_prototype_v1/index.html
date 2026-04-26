@@ -179,6 +179,12 @@
         padding: 7px 10px;
         font-size: 11.5px;
         color: #a8bcd4;
+        cursor: pointer;
+        transition: background 0.12s;
+      }
+      .cos-questions li:hover {
+        background: rgba(82,113,154,0.16);
+        color: #c8daf0;
       }
       .cos-questions li::before { content: "→ "; color: #52789e; }
       /* Selectable option chips — shown when CoS offers a multiple-choice fork */
@@ -1053,13 +1059,20 @@
         row.appendChild(lbl);
         row.appendChild(bubble);
 
-        // Questions — read-only list, user types the answer
+        // Questions — clickable, clicking fills input and auto-sends
         if (questions && questions.length) {
           const ul = document.createElement('ul');
           ul.className = 'cos-questions';
           questions.forEach(q => {
             const li = document.createElement('li');
             li.textContent = q;
+            li.addEventListener('click', () => {
+              taskInput.value = q;
+              taskInput.style.height = 'auto';
+              taskInput.style.height = Math.min(taskInput.scrollHeight, 180) + 'px';
+              taskInput.focus();
+              if (!intakePending) sendBtn.click();
+            });
             ul.appendChild(li);
           });
           bubble.appendChild(ul);
